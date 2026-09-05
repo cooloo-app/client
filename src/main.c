@@ -7,10 +7,12 @@
  *   cooloo follow <room>                stream (persists offset, auto-resume)
  *   cooloo chat <room>                  interactive read/write
  *   cooloo rooms | whoami [--register <nick>]
+ *   cooloo gui [--lua-dev DIR]          GUI (same as bare `cooloo`)
  *   global flag: -y/--tofu              auto-trust unknown server fingerprint
- * Running bare (no args) is reserved for the v2 GUI.
+ * Running bare (no args) enters the v2 GUI (D31).
  */
 #include "cli.h"
+#include "gui.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -24,6 +26,7 @@ static void usage(FILE *out)
             "  cooloo read [--raw] <room> <off|-N>  read messages\n"
             "  cooloo follow <room>                 stream new messages\n"
             "  cooloo chat <room>                   interactive chat\n"
+            "  cooloo gui [--lua-dev DIR]           GUI (default when bare)\n"
             "  cooloo rooms                         list rooms\n"
             "  cooloo whoami [--register <nick>]    show / register nick\n"
             "  flags: -y/--tofu auto-trust new server fingerprint\n"
@@ -34,12 +37,8 @@ int main(int argc, char **argv)
 {
     int i, j;
 
-    if (argc < 2) {
-        fprintf(stderr, "cooloo: GUI is not implemented yet (v2); "
-                        "this build is the CLI\n\n");
-        usage(stderr);
-        return 2;
-    }
+    if (argc < 2)
+        return cooloo_gui_run(NULL);      /* bare -> GUI (D31) */
 
     /* pull global flags out of argv before dispatch */
     for (i = 1; i < argc; i++) {
@@ -70,6 +69,12 @@ int main(int argc, char **argv)
         return cooloo_cli_whoami(argc, argv);
     if (!strcmp(argv[1], "chat"))
         return cooloo_cli_chat(argc, argv);
+    if (!strcmp(argv[1], "gui")) {
+        const char *dev = NULL;
+        if (argc >= 4 && !strcmp(argv[2], "--lua-dev"))
+            dev = argv[3];
+        return cooloo_gui_run(dev);
+    }
     if (!strcmp(argv[1], "help") || !strcmp(argv[1], "--help") ||
         !strcmp(argv[1], "-h")) {
         usage(stdout);

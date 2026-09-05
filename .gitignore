@@ -1,2 +1,6 @@
 /cooloo
+/cooloo.exe
 *.dSYM/
+/build/
+/src/embedded_lua.c
+/src/embedded_font.c

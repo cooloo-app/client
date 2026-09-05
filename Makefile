@@ -1,25 +1,80 @@
-# cooloo client - v1 CLI (POSIX only; Windows arrives with v2 GUI)
+# cooloo client - single binary: v1 CLI + v2 GUI (04 doc D27-D31)
+# bare `cooloo` / `cooloo gui` -> GUI (SDL2+Lua); subcommands -> v1 CLI.
 CC      ?= cc
 CFLAGS  ?= -O2 -Wall -Wextra -std=c99
 PREFIX  ?= /usr/local
+CMAKE   := $(shell command -v cmake 2>/dev/null || echo /opt/homebrew/bin/cmake)
+BUILD   := build
+
+# --- SDL2 static sub-build (vendored source, video+events only, sw rendering)
+SDL_MAC     := $(BUILD)/sdl2-mac
+SDL_MAC_LIB := $(SDL_MAC)/libSDL2.a
+SDL_WIN     := $(BUILD)/sdl2-win
+SDL_WIN_LIB := $(SDL_WIN)/libSDL2.a
+
+SDL_CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON \
+	-DSDL_TEST=OFF -DSDL_TESTS=OFF -DSDL_AUDIO=OFF -DSDL_HAPTIC=OFF \
+	-DSDL_JOYSTICK=OFF -DSDL_SENSOR=OFF -DSDL_HIDAPI=OFF -DSDL_POWER=OFF \
+	-DSDL_RENDER=OFF -DSDL_OPENGL=OFF -DSDL_OPENGLES=OFF -DSDL_VULKAN=OFF \
+	-DSDL_METAL=OFF -DSDL_INSTALL=OFF
 
 NOISE_SRC := src/noise_xx.c src/vendor/monocypher.c
-CLI_SRC   := src/main.c src/cli.c src/net.c src/config.c $(NOISE_SRC)
+LUA_SRC   := $(filter-out src/vendor/lua/lua.c src/vendor/lua/luac.c,$(wildcard src/vendor/lua/*.c))
+CORE_SRC  := src/main.c src/cli.c src/net.c src/config.c $(NOISE_SRC)
+GUI_SRC   := src/gui.c src/font.c src/luabind.c
+EMBED_SRC := src/embedded_lua.c src/embedded_font.c
+ALL_SRC   := $(CORE_SRC) $(GUI_SRC) $(LUA_SRC) $(EMBED_SRC)
+HEADERS   := $(wildcard src/*.h) $(wildcard src/vendor/lua/*.h) src/vendor/stb_truetype.h
+
+SDL_MAC_INC := -Isrc/vendor/sdl2/include -I$(SDL_MAC)/include -Isrc/vendor/lua
+SDL_WIN_INC := -Isrc/vendor/sdl2/include -I$(SDL_WIN)/include -Isrc/vendor/lua
+MAC_LIBS  := $(SDL_MAC_LIB) -framework Cocoa -framework Carbon -framework IOKit \
+	-framework CoreFoundation -framework CoreVideo -liconv -lm
+WIN_LIBS  := $(SDL_WIN_LIB) -lwinmm -lole32 -loleaut32 -limm32 -lversion -luuid \
+	-ladvapi32 -lsetupapi -lshell32 -lgdi32 -luser32 -lkernel32 -lws2_32 \
+	-static -static-libgcc -lm
+WIN_CC    := x86_64-w64-mingw32-gcc
 
 all: cooloo
 
-cooloo: $(CLI_SRC) $(wildcard src/*.h)
-	$(CC) $(CFLAGS) -Isrc -o $@ $(CLI_SRC)
+cooloo: $(ALL_SRC) $(HEADERS) $(SDL_MAC_LIB)
+	$(CC) $(CFLAGS) -Isrc $(SDL_MAC_INC) -o $@ $(ALL_SRC) $(MAC_LIBS)
+
+$(SDL_MAC_LIB):
+	mkdir -p $(SDL_MAC)
+	cd $(SDL_MAC) && $(CMAKE) $(abspath src/vendor/sdl2) $(SDL_CMAKE_FLAGS)
+	$(CMAKE) --build $(SDL_MAC) --parallel
+
+$(SDL_WIN_LIB):
+	mkdir -p $(SDL_WIN)
+	cd $(SDL_WIN) && $(CMAKE) $(abspath src/vendor/sdl2) $(SDL_CMAKE_FLAGS) \
+		-DCMAKE_TOOLCHAIN_FILE=$(abspath tools/mingw-toolchain.cmake)
+	$(CMAKE) --build $(SDL_WIN) --parallel
+
+src/embedded_lua.c src/embedded_font.c: lua/main.lua lua/chat.lua lua/ui.lua lua/input.lua \
+		src/vendor/fonts/JetBrainsMono-Regular.ttf tools/embed.py
+	python3 tools/embed.py lua src/vendor/fonts/JetBrainsMono-Regular.ttf \
+		src/embedded_lua.c src/embedded_font.c
 
 # loopback integration against the sibling server repo's coolood
 # (planner checkout layout: client and server are sibling submodules)
 test: cooloo
 	sh tests/nettest.sh
 
+release-windows: cooloo.exe
+cooloo.exe: $(ALL_SRC) $(HEADERS) $(SDL_WIN_LIB)
+	$(WIN_CC) $(CFLAGS) -Isrc $(SDL_WIN_INC) -o $@ $(ALL_SRC) $(WIN_LIBS)
+
+release-macos: cooloo
+	@echo "release-macos: ./cooloo (native $$(uname -m))"
+
 install: cooloo
 	install -m 0755 cooloo $(PREFIX)/bin/cooloo
 
 clean:
-	rm -f cooloo
+	rm -f cooloo cooloo.exe src/embedded_lua.c src/embedded_font.c
 
-.PHONY: all test install clean
+distclean: clean
+	rm -rf $(BUILD)
+
+.PHONY: all test install clean distclean release-windows release-macos

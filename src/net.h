@@ -20,6 +20,9 @@ typedef struct {
     /* decrypted stream buffer (line extraction) */
     uint8_t  plain[NOISE_FRAME_MAX_PT + 1];
     size_t   plain_len;
+    /* v2: raw frame accumulator for nonblocking net_try_recv */
+    uint8_t  raw[NOISE_FRAME_MAX_PT + NOISE_FRAME_OVERHEAD];
+    size_t   raw_len;
 } netconn;
 
 /* Connect + Noise_XX handshake as initiator (prologue "cooloo-v1").
@@ -55,5 +58,41 @@ int  net_read_line(netconn *c, char *out, size_t cap);
 int  net_recv(netconn *c);
 
 void net_close(netconn *c);
+
+/* ---------------------------------------------------------------- */
+/* v2: nonblocking API for the GUI event pump (04 doc D30/D32)       */
+/* ---------------------------------------------------------------- */
+
+/* Nonblocking frame receive (c->fd must be nonblocking):
+ * 1 = one frame decrypted into c->plain, 0 = would block, -1 closed/error. */
+int  net_try_recv(netconn *c);
+/* Extract one buffered line (strips \n): 1 = got a line, 0 = need more. */
+int  net_try_line(netconn *c, char *out, size_t cap);
+
+/* async connect + Noise_XX handshake, TOFU pause between msg2 and msg3 */
+enum { NAS_TCP, NAS_HS1, NAS_HS2, NAS_HS3, NAS_GREET,
+       NAS_READY, NAS_TOFU, NAS_FAILED };
+typedef struct {
+    int      state;
+    netconn  c;                     /* usable once state == NAS_READY */
+    noise_hs hs;
+    char     host[256];
+    int      port;
+    uint8_t  sk[32];
+    uint8_t  wbuf[NOISE_MSG3_LEN];
+    size_t   wlen, woff;
+    uint8_t  rbuf[NOISE_MSG2_LEN];
+    size_t   rlen;
+    char     err[160];
+    char     hostport[300];
+} net_async;
+
+int  net_async_start(net_async *a, const char *host, int port,
+                     const uint8_t sk[32]);
+/* pump once per UI frame: 0 working, 1 ready, 2 tofu-wait, -1 failed (a.err) */
+int  net_async_pump(net_async *a);
+/* NAS_TOFU only: pin the seen fingerprint and finish the handshake */
+void net_async_trust(net_async *a);
+void net_async_abort(net_async *a);
 
 #endif /* COOLOO_NET_H */

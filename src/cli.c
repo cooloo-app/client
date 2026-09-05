@@ -9,14 +9,23 @@
 #include "config.h"
 #include "noise_xx.h"
 
+#ifdef _WIN32
+#define _CRT_RAND_S
+#include <winsock2.h>
+#include <windows.h>
+#define poll WSAPoll
+#define sleep(s) Sleep((s) * 1000)
+#else
+#include <unistd.h>
+#include <poll.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
 #include <signal.h>
 #include <time.h>
-#include <poll.h>
 
 static int g_tofu;                      /* -y/--tofu: auto-trust new server */
 static volatile sig_atomic_t g_stop;
@@ -38,8 +47,16 @@ static void on_sigint(int sig)
 
 static int read_random(uint8_t *out, size_t len)
 {
-#ifdef __APPLE__
+#if defined(__APPLE__)
     arc4random_buf(out, len);
+    return 0;
+#elif defined(_WIN32)
+    unsigned int i, v = 0;
+    for (i = 0; i < len; i++) {
+        if (i % 4 == 0 && rand_s(&v) != 0)
+            return -1;
+        out[i] = (uint8_t)(v >> ((i % 4) * 8));
+    }
     return 0;
 #else
     FILE *f = fopen("/dev/urandom", "rb");
@@ -140,7 +157,11 @@ static void print_msg(const char *ts_s, const char *nick,
     struct tm tmv;
     const char *p, *e;
 
+#ifdef _WIN32
+    if (localtime_s(&tmv, &t) == 0)
+#else
     if (localtime_r(&t, &tmv))
+#endif
         strftime(hm, sizeof hm, "%H:%M", &tmv);
     unescape(text, sizeof text, text_escaped, strlen(text_escaped));
 

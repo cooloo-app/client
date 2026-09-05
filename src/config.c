@@ -9,8 +9,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+#include <fcntl.h>
+/* POSIX permission calls as no-op-ish win32 shims (files land in the
+ * user's profile dir; ACLs are the win32 permission model) */
+static int  win_mkdir(const char *p, int m) { (void)m; return _mkdir(p); }
+static int  win_umask(int m) { (void)m; return 0; }
+static int  win_chmod(const char *p, int m) { (void)p; (void)m; return 0; }
+#define mkdir(p, m)   win_mkdir(p, m)
+#define umask(m)      win_umask(m)
+#define chmod(p, m)   win_chmod(p, m)
+#else
+#include <unistd.h>
+#endif
 
 #define PATH_BUF 1024
 #define MAX_KV   256
@@ -36,6 +50,10 @@ int cfg_dir(char *buf, size_t buflen)
         n = snprintf(buf, buflen, "%s", env);
     else {
         home = getenv("HOME");
+#ifdef _WIN32
+        if (!home)
+            home = getenv("USERPROFILE");
+#endif
         if (!home)
             return -1;
         n = snprintf(buf, buflen, "%s/.config/cooloo", home);
@@ -98,7 +116,15 @@ int cfg_identity_create(const uint8_t sk[32])
     if (cfg_path(path, sizeof path, "identity") != 0)
         return -1;
     old_umask = umask(077);
+#ifdef _WIN32
+    {
+        int fd = _open(path, _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY,
+                       0600);
+        f = fd < 0 ? NULL : _fdopen(fd, "wb");
+    }
+#else
     f = fopen(path, "wbx");        /* fail if exists (C11 x; POSIX 2024 ok) */
+#endif
     if (!f) {
         umask(old_umask);
         return -1;
