@@ -1,5 +1,5 @@
 /*
- * gui.h - SDL2 window + event pump + draw-list execution (04 doc D29/D30).
+ * gui.h - SDL3 window + event pump + draw-list execution (04 doc D29/D30).
  *
  * cooloo_gui_run owns the whole GUI lifecycle. The draw primitives are
  * called by luabind.c while executing a Lua draw list; gui.c only knows
@@ -16,6 +16,9 @@ void gui_draw_text(int x, int y, const char *utf8, unsigned rgb, int size);
 void gui_set_clip(int x, int y, int w, int h);
 void gui_clear_clip(void);
 void gui_present(void);
+
+/* position the IME candidate window (SDL_SetTextInputArea wrapper) */
+void gui_set_ime_rect(int x, int y, int w, int h);
 
 int  gui_screen_w(void);
 int  gui_screen_h(void);

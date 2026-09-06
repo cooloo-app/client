@@ -10,7 +10,9 @@
 #include "luabind.h"
 #include "config.h"
 
-#include <SDL.h>
+/* SDL_MAIN_HANDLED: plain main() everywhere (single exe is CLI+GUI) */
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,14 +34,13 @@ int gui_screen_h(void) { return scr_h; }
 static int make_canvas(int w, int h)
 {
     if (canvas)
-        SDL_FreeSurface(canvas);
-    canvas = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
-                                            SDL_PIXELFORMAT_ARGB8888);
+        SDL_DestroySurface(canvas);
+    canvas = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
     if (!canvas) {
         fprintf(stderr, "cooloo gui: canvas: %s\n", SDL_GetError());
         return -1;
     }
-    SDL_SetClipRect(canvas, NULL);
+    SDL_SetSurfaceClipRect(canvas, NULL);
     return 0;
 }
 
@@ -50,21 +51,21 @@ void gui_set_clip(int x, int y, int w, int h)
     clip_rect.w = w;
     clip_rect.h = h;
     clip_active = 1;
-    SDL_SetClipRect(canvas, &clip_rect);
+    SDL_SetSurfaceClipRect(canvas, &clip_rect);
 }
 
 void gui_clear_clip(void)
 {
     clip_active = 0;
-    SDL_SetClipRect(canvas, NULL);
+    SDL_SetSurfaceClipRect(canvas, NULL);
 }
 
 void gui_draw_rect(int x, int y, int w, int h, unsigned rgb)
 {
     SDL_Rect r = { x, y, w, h };
-    SDL_FillRect(canvas, &r,
-                 SDL_MapRGB(canvas->format, (rgb >> 16) & 0xff,
-                            (rgb >> 8) & 0xff, rgb & 0xff));
+    SDL_FillSurfaceRect(canvas, &r,
+                        SDL_MapSurfaceRGB(canvas, (rgb >> 16) & 0xff,
+                                          (rgb >> 8) & 0xff, rgb & 0xff));
 }
 
 void gui_draw_text(int x, int y, const char *utf8, unsigned rgb, int size)
@@ -74,8 +75,7 @@ void gui_draw_text(int x, int y, const char *utf8, unsigned rgb, int size)
     int fr = (int)((rgb >> 16) & 0xff), fg = (int)((rgb >> 8) & 0xff),
         fb = (int)(rgb & 0xff);
 
-    if (SDL_MUSTLOCK(canvas))
-        SDL_LockSurface(canvas);
+    /* canvas is a plain software surface: pixels directly accessible */
     while (p < end && *p) {
         uint32_t cp = font_utf8_next(&p, end);
         const glyph *g;
@@ -132,8 +132,12 @@ void gui_draw_text(int x, int y, const char *utf8, unsigned rgb, int size)
         }
         pen_x += (int)(g->advance + 0.5f);
     }
-    if (SDL_MUSTLOCK(canvas))
-        SDL_UnlockSurface(canvas);
+}
+
+void gui_set_ime_rect(int x, int y, int w, int h)
+{
+    SDL_Rect r = { x, y, w, h };
+    SDL_SetTextInputArea(win, &r, 0);
 }
 
 void gui_present(void)
@@ -174,16 +178,16 @@ static const char *special_key(SDL_Keycode k)
     }
 }
 
-static void on_keydown(SDL_Keysym *ks)
+static void on_keydown(SDL_Keycode key, SDL_Keymod kmod)
 {
     char name[32];
-    const char *sp = special_key(ks->sym);
+    const char *sp = special_key(key);
     int mod = 0;
 
     if (sp) {
         snprintf(name, sizeof name, "%s", sp);
     } else {
-        const char *sn = SDL_GetKeyName(ks->sym);
+        const char *sn = SDL_GetKeyName(key);
         size_t i, n = sn ? strlen(sn) : 0;
         if (!n || n >= sizeof name)
             return;
@@ -191,35 +195,36 @@ static void on_keydown(SDL_Keysym *ks)
             name[i] = (char)tolower((unsigned char)sn[i]);
         name[n] = '\0';
     }
-    if (ks->mod & KMOD_CTRL)  mod |= 1;
-    if (ks->mod & KMOD_ALT)   mod |= 2;
-    if (ks->mod & KMOD_SHIFT) mod |= 4;
-    if (ks->mod & KMOD_GUI)   mod |= 8;
+    if (kmod & SDL_KMOD_CTRL)  mod |= 1;
+    if (kmod & SDL_KMOD_ALT)   mod |= 2;
+    if (kmod & SDL_KMOD_SHIFT) mod |= 4;
+    if (kmod & SDL_KMOD_GUI)   mod |= 8;
     luabind_ev_key(name, mod);
 }
 
 static void translate(SDL_Event *ev)
 {
     switch (ev->type) {
-    case SDL_QUIT:
+    case SDL_EVENT_QUIT:
         luabind_ev_quit();
         break;
-    case SDL_KEYDOWN:
-        on_keydown(&ev->key.keysym);
+    case SDL_EVENT_KEY_DOWN:
+        on_keydown(ev->key.key, ev->key.mod);
         break;
-    case SDL_TEXTINPUT:
+    case SDL_EVENT_TEXT_INPUT:
         luabind_ev_text(ev->text.text);
         break;
-    case SDL_TEXTEDITING:
+    case SDL_EVENT_TEXT_EDITING:
         luabind_ev_ime(ev->edit.text, ev->edit.start);
         break;
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP:
-        luabind_ev_mouse(ev->type == SDL_MOUSEBUTTONDOWN ? "down" : "up",
-                         ev->button.x, ev->button.y, ev->button.button, 0, 0);
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        luabind_ev_mouse(ev->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "down" : "up",
+                         (int)ev->button.x, (int)ev->button.y,
+                         ev->button.button, 0, 0);
         break;
-    case SDL_MOUSEWHEEL: {
-        int wx = ev->wheel.x, wy = ev->wheel.y;
+    case SDL_EVENT_MOUSE_WHEEL: {
+        int wx = ev->wheel.integer_x, wy = ev->wheel.integer_y;
         if (ev->wheel.direction == SDL_MOUSEWHEEL_FLIPPED) {
             wx = -wx;
             wy = -wy;
@@ -227,13 +232,11 @@ static void translate(SDL_Event *ev)
         luabind_ev_mouse("wheel", 0, 0, 0, wx, wy);
         break;
     }
-    case SDL_WINDOWEVENT:
-        if (ev->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-            scr_w = ev->window.data1;
-            scr_h = ev->window.data2;
-            if (make_canvas(scr_w, scr_h) == 0)
-                luabind_ev_resize(scr_w, scr_h);
-        }
+    case SDL_EVENT_WINDOW_RESIZED:
+        scr_w = ev->window.data1;
+        scr_h = ev->window.data2;
+        if (make_canvas(scr_w, scr_h) == 0)
+            luabind_ev_resize(scr_w, scr_h);
         break;
     }
 }
@@ -248,17 +251,16 @@ int cooloo_gui_run(const char *lua_dev_dir)
     int w = 960, h = 640, quit = 0;
     Uint64 last;
 
-    SDL_SetMainReady();
     if (getenv("COOLOO_PROBE_STARTUP"))
         fprintf(stderr, "probe: main enter %llu ms\n",
-                (unsigned long long)SDL_GetTicks64());
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+                (unsigned long long)SDL_GetTicks());
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "cooloo gui: SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
     if (getenv("COOLOO_PROBE_STARTUP"))
         fprintf(stderr, "probe: SDL_Init done %llu ms\n",
-                (unsigned long long)SDL_GetTicks64());
+                (unsigned long long)SDL_GetTicks());
     if (cfg_get("gui.w", val, sizeof val) == 0)
         w = atoi(val);
     if (cfg_get("gui.h", val, sizeof val) == 0)
@@ -268,18 +270,17 @@ int cooloo_gui_run(const char *lua_dev_dir)
     if (h < 240)
         h = 240;
 
-    win = SDL_CreateWindow("cooloo",
-                           SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                           w, h, SDL_WINDOW_RESIZABLE);
+    win = SDL_CreateWindow("cooloo", w, h, SDL_WINDOW_RESIZABLE);
     if (!win) {
         fprintf(stderr, "cooloo gui: window: %s\n", SDL_GetError());
         SDL_Quit();
         return 1;
     }
+    SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_GetWindowSize(win, &scr_w, &scr_h);
     if (getenv("COOLOO_PROBE_STARTUP"))
         fprintf(stderr, "probe: window created %llu ms\n",
-                (unsigned long long)SDL_GetTicks64());
+                (unsigned long long)SDL_GetTicks());
     if (make_canvas(scr_w, scr_h) != 0)
         return 1;
     if (font_init(cooloo_embedded_font, cooloo_embedded_font_len) != 0) {
@@ -288,14 +289,14 @@ int cooloo_gui_run(const char *lua_dev_dir)
     }
     if (luabind_init(lua_dev_dir) != 0)
         return 1;
-    SDL_StartTextInput();
+    SDL_StartTextInput(win);
     if (getenv("COOLOO_PROBE_STARTUP"))
         fprintf(stderr, "probe: lua+font ready %llu ms\n",
-                (unsigned long long)SDL_GetTicks64());
+                (unsigned long long)SDL_GetTicks());
 
-    last = SDL_GetTicks64();
+    last = SDL_GetTicks();
     while (!quit) {
-        Uint64 now = SDL_GetTicks64();
+        Uint64 now = SDL_GetTicks();
         double dt = (double)(now - last) / 1000.0;
         SDL_Event ev;
 
@@ -310,7 +311,7 @@ int cooloo_gui_run(const char *lua_dev_dir)
         quit = luabind_frame(dt);
         if (getenv("COOLOO_PROBE_STARTUP")) {   /* acceptance measurement */
             fprintf(stderr, "cooloo gui: first frame in %llu ms\n",
-                    (unsigned long long)(SDL_GetTicks64() - last));
+                    (unsigned long long)(SDL_GetTicks() - last));
             break;
         }
     }

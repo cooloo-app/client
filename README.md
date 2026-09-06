@@ -1,7 +1,7 @@
 # cooloo client
 
 Single-binary cooloo client: **v1 CLI + v2 GUI in one exe**
-(C core + vendored SDL2/Lua/stb_truetype, software rendering, terminal
+(C core + vendored SDL3/Lua/stb_truetype, software rendering, terminal
 aesthetic). No runtime dependencies beyond the OS.
 
 ```
@@ -26,7 +26,7 @@ env:   COOLOO_HOST=host[:port]  COOLOO_CONFIG=<dir>
 | `make release-windows` | mingw-w64 (`brew install mingw-w64`) | `./cooloo.exe` (PE32+, system DLLs only) |
 | `make release-macos` | clang | native binary (arm64 on m106) |
 
-First build runs CMake on the vendored SDL2 (static, video+events only)
+First build runs CMake on the vendored SDL3 (static, video+events only)
 and `tools/embed.py` to compile `lua/*.lua` + the primary TTF into the
 binary. Vendored components with versions/sha256: `src/vendor/README.md`.
 
@@ -80,7 +80,7 @@ src/        main cli net noise_xx config (v1) + gui font luabind (v2)
 lua/        all UI logic: main (frame dispatch) chat ui input
 tools/      embed.py (asset->C), mingw-toolchain.cmake
 tests/      nettest.sh (CLI loopback integration)
-src/vendor/ monocypher lua sdl2 stb_truetype.h fonts/ (see README.md)
+src/vendor/ monocypher lua sdl3 stb_truetype.h fonts/ (see README.md)
 ```
 
 ## Platform caveats

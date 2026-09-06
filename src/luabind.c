@@ -18,7 +18,7 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -373,12 +373,10 @@ static int l_line_height(lua_State *l)
 
 static int l_set_ime_rect(lua_State *l)
 {
-    SDL_Rect r;
-    r.x = (int)luaL_checkinteger(l, 1);
-    r.y = (int)luaL_checkinteger(l, 2);
-    r.w = (int)luaL_checkinteger(l, 3);
-    r.h = (int)luaL_checkinteger(l, 4);
-    SDL_SetTextInputRect(&r);
+    gui_set_ime_rect((int)luaL_checkinteger(l, 1),
+                     (int)luaL_checkinteger(l, 2),
+                     (int)luaL_checkinteger(l, 3),
+                     (int)luaL_checkinteger(l, 4));
     return 0;
 }
 
