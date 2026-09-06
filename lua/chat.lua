@@ -109,6 +109,10 @@ local function send_follow(r)
 end
 
 function M.start_follows()
+    -- D25: unregistered conns may only HELLO/WHOAMI/PING/ROOMS, so a
+    -- room conn opened before registration gets its READ rejected and
+    -- would wedge in "reading" forever (the register-race bug)
+    if not M.registered then return end
     for _, name in ipairs(M.order) do
         local r = M.rooms[name]
         if not r.conn then
@@ -189,7 +193,11 @@ function M.on_line(conn, line)
             M.nick = nick
             M.registered = true
             M.want_register = false
+            M.status = ""   -- clear a stale "registering as ..." text
             cfgset("nick", nick)
+            -- registration completed after ROOMS: room conns were gated
+            -- in start_follows, open them now
+            if M.rooms_loaded then M.start_follows() end
             return
         end
         if line:sub(1, 4) == "ERR " then M.status = line; return end
@@ -223,7 +231,14 @@ function M.on_line(conn, line)
         if not r.following then send_follow(r) end
         return
     end
-    if line:sub(1, 4) == "ERR " then M.status = line; return end
+    if line:sub(1, 4) == "ERR " then
+        M.status = line
+        -- an ERR before FOLLOW is terminal for the current op (e.g. D25
+        -- not-registered): close so on_closed schedules a reconnect that
+        -- re-opens the room conn once we're allowed (registered)
+        if not r.following then cooloo.net.close(conn) end
+        return
+    end
 end
 
 function M.on_closed(conn, reason)

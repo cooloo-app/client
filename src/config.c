@@ -14,6 +14,7 @@
 #include <direct.h>
 #include <io.h>
 #include <fcntl.h>
+#include <windows.h>
 /* POSIX permission calls as no-op-ish win32 shims (files land in the
  * user's profile dir; ACLs are the win32 permission model) */
 static int  win_mkdir(const char *p, int m) { (void)m; return _mkdir(p); }
@@ -22,6 +23,12 @@ static int  win_chmod(const char *p, int m) { (void)p; (void)m; return 0; }
 #define mkdir(p, m)   win_mkdir(p, m)
 #define umask(m)      win_umask(m)
 #define chmod(p, m)   win_chmod(p, m)
+/* MSVCRT rename() refuses to replace an existing target (POSIX replaces
+ * atomically), which made kv files write-once on Windows: the first key
+ * stuck and every later cfg_set silently failed (lost nick/offsets). */
+static int  win_rename(const char *a, const char *b)
+{ return MoveFileExA(a, b, MOVEFILE_REPLACE_EXISTING) ? 0 : -1; }
+#define rename(a, b)  win_rename(a, b)
 #else
 #include <unistd.h>
 #endif
