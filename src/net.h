@@ -83,6 +83,7 @@ typedef struct {
     size_t   wlen, woff;
     uint8_t  rbuf[NOISE_MSG2_LEN];
     size_t   rlen;
+    unsigned stall_ticks;           /* pump ticks without progress (timeout) */
     char     err[160];
     char     hostport[300];
 } net_async;

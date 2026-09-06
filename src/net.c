@@ -19,6 +19,7 @@ static long sock_write(int fd, const void *buf, size_t len)
 { return (long)send(fd, (const char *)buf, (int)len, 0); }
 #define sock_close(fd) closesocket(fd)
 static int  sock_wouldblock(void) { return WSAGetLastError() == WSAEWOULDBLOCK; }
+static int  sock_err(void) { return WSAGetLastError(); }
 static int  sock_inprogress(void)
 { int e = WSAGetLastError(); return e == WSAEWOULDBLOCK || e == WSAEINPROGRESS; }
 static int  sock_nonblock(int fd)
@@ -38,6 +39,7 @@ static long sock_write(int fd, const void *buf, size_t len)
 #define sock_close(fd) close(fd)
 static int  sock_wouldblock(void)
 { return errno == EAGAIN || errno == EWOULDBLOCK; }
+static int  sock_err(void) { return errno; }
 static int  sock_inprogress(void) { return errno == EINPROGRESS; }
 static int  sock_nonblock(int fd)
 { return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK); }
@@ -114,7 +116,13 @@ static int handshake_until_tofu(netconn *c, const uint8_t sk[32],
 
     noise_hs_init_initiator(hs_out, sk, (const uint8_t *)"cooloo-v1", 9);
     n = noise_hs_write_msg1(hs_out, msg, sizeof msg, NULL, 0);
-    if (!n || write_full(c->fd, msg, n) != 0)
+    if (!n) {
+        /* msg1 build failed before any IO: OS RNG unavailable
+         * (was the silent Windows kill path when /dev/urandom was used) */
+        snprintf(errbuf, errcap, "handshake init failed (RNG)");
+        return -1;
+    }
+    if (write_full(c->fd, msg, n) != 0)
         goto hs_fail;
     if (read_full(c->fd, msg, NOISE_MSG2_LEN) != 0)
         goto hs_fail;
@@ -383,6 +391,25 @@ static void nas_fail(net_async *a, const char *msg)
     }
 }
 
+/* nas_fail + last socket error, so GUI logs can tell failure stages apart */
+static void nas_fail_io(net_async *a, const char *msg, int errnum)
+{
+#ifdef _WIN32
+    snprintf(a->err, sizeof a->err, "%s (WSA %d)", msg, errnum);
+#else
+    snprintf(a->err, sizeof a->err, "%s (%s)", msg, strerror(errnum));
+#endif
+    a->state = NAS_FAILED;
+    if (a->c.fd >= 0) {
+        sock_close(a->c.fd);
+        a->c.fd = -1;
+    }
+}
+
+/* give up a connect/handshake with no progress for this many pump ticks
+ * (~60s at the GUI's ~60fps frame pump); reset on any byte of progress */
+#define NAS_PUMP_TIMEOUT 3600u
+
 int net_async_start(net_async *a, const char *host, int port,
                     const uint8_t sk[32])
 {
@@ -435,30 +462,42 @@ int net_async_pump(net_async *a)
 {
     netconn *c = &a->c;
 
+    /* ~1 pump per GUI frame: bound a stuck connect/handshake. NAS_TOFU
+     * parks for the user and READY/FAILED are terminal, so no ticking. */
+    if (a->state <= NAS_GREET && ++a->stall_ticks >= NAS_PUMP_TIMEOUT) {
+        nas_fail(a, "connection timed out");
+        return -1;
+    }
     switch (a->state) {
     case NAS_TCP: {
         int soerr = 0;
         socklen_t sl = sizeof soerr;
-        fd_set wf;
+        fd_set wf, ef;
         struct timeval tv;
         /* BSD/macOS reports SO_ERROR==0 while a connect is still in
-         * flight; only trust it once the socket polls writable */
+         * flight; only trust it once the socket polls writable. Winsock
+         * reports a *failed* nonblocking connect via exceptfds — pass it
+         * or select may never wake and the GUI would spin forever. */
         FD_ZERO(&wf);
         FD_SET(c->fd, &wf);
+        FD_ZERO(&ef);
+        FD_SET(c->fd, &ef);
         tv.tv_sec = 0;
         tv.tv_usec = 0;
-        if (select(c->fd + 1, NULL, &wf, NULL, &tv) <= 0)
+        if (select(c->fd + 1, NULL, &wf, &ef, &tv) <= 0)
             return 0;                       /* still connecting */
-        if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, (char *)&soerr, &sl) != 0 ||
-            soerr != 0) {
-            nas_fail(a, "connect failed");
+        if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, (char *)&soerr, &sl) != 0)
+            soerr = -1;
+        if (soerr != 0) {
+            nas_fail_io(a, "connect failed", soerr);
             return -1;
         }
         noise_hs_init_initiator(&a->hs, a->sk, (const uint8_t *)"cooloo-v1", 9);
         a->wlen = noise_hs_write_msg1(&a->hs, a->wbuf, sizeof a->wbuf, NULL, 0);
         a->woff = 0;
         if (!a->wlen) {
-            nas_fail(a, "handshake failed");
+            /* OS RNG unavailable — see ensure_ephemeral() */
+            nas_fail(a, "handshake init failed (RNG)");
             return -1;
         }
         a->state = NAS_HS1;
@@ -469,6 +508,7 @@ int net_async_pump(net_async *a)
             long n = sock_write(c->fd, a->wbuf + a->woff, a->wlen - a->woff);
             if (n > 0) {
                 a->woff += (size_t)n;
+                a->stall_ticks = 0;
                 continue;
             }
             if (n < 0 && sock_wouldblock())
@@ -477,7 +517,7 @@ int net_async_pump(net_async *a)
             if (n < 0 && errno == EINTR)
                 continue;
 #endif
-            nas_fail(a, "handshake failed");
+            nas_fail_io(a, "handshake msg1 send", sock_err());
             return -1;
         }
         a->rlen = 0;
@@ -489,10 +529,13 @@ int net_async_pump(net_async *a)
                                NOISE_MSG2_LEN - a->rlen);
             if (n > 0) {
                 a->rlen += (size_t)n;
+                a->stall_ticks = 0;
                 continue;
             }
             if (n == 0) {
-                nas_fail(a, "handshake failed");
+                /* recv()==0 means a graceful close: the server hung up
+                 * mid-handshake. Retrying recv would just spin. */
+                nas_fail(a, "handshake closed by server");
                 return -1;
             }
             if (sock_wouldblock())
@@ -501,7 +544,7 @@ int net_async_pump(net_async *a)
             if (errno == EINTR)
                 continue;
 #endif
-            nas_fail(a, "handshake failed");
+            nas_fail_io(a, "handshake msg2 recv", sock_err());
             return -1;
         }
         {
@@ -510,7 +553,7 @@ int net_async_pump(net_async *a)
             char pinned[65];
             if (noise_hs_read_msg2(&a->hs, a->rbuf, NOISE_MSG2_LEN,
                                    dummy, sizeof dummy, &dummy_len) != 0) {
-                nas_fail(a, "handshake failed");
+                nas_fail(a, "handshake msg2 rejected");
                 return -1;
             }
             noise_fingerprint_hex(c->server_fp, a->hs.rs);
@@ -538,6 +581,7 @@ int net_async_pump(net_async *a)
             long n = sock_write(c->fd, a->wbuf + a->woff, a->wlen - a->woff);
             if (n > 0) {
                 a->woff += (size_t)n;
+                a->stall_ticks = 0;
                 continue;
             }
             if (n < 0 && sock_wouldblock())
@@ -546,7 +590,7 @@ int net_async_pump(net_async *a)
             if (n < 0 && errno == EINTR)
                 continue;
 #endif
-            nas_fail(a, "handshake failed");
+            nas_fail_io(a, "handshake msg3 send", sock_err());
             return -1;
         }
         noise_hs_split(&a->hs, &c->sess);
@@ -560,6 +604,8 @@ int net_async_pump(net_async *a)
             nas_fail(a, "no greeting from server");
             return -1;
         }
+        if (rc > 0)
+            a->stall_ticks = 0;
         if (!net_try_line(c, line, sizeof line))
             return 0;
         if (strncmp(line, "COOLOO 1 ", 9) != 0) {
@@ -587,9 +633,10 @@ void net_async_trust(net_async *a)
     a->wlen = noise_hs_write_msg3(&a->hs, a->wbuf, sizeof a->wbuf, NULL, 0);
     a->woff = 0;
     if (!a->wlen) {
-        nas_fail(a, "handshake failed");
+        nas_fail(a, "handshake msg3 build failed");
         return;
     }
+    a->stall_ticks = 0;
     a->state = NAS_HS3;
 }
 
