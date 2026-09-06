@@ -704,13 +704,16 @@ static void exec_draw_list(void)
                           (int)geti("w"), (int)geti("h"),
                           (unsigned)geti("color"));
         } else if (!strcmp(op, "text")) {
+            /* read numeric fields BEFORE pushing "text": geti() indexes
+             * the stack top, which must still be the op table */
             const char *t;
+            int x = (int)geti("x"), y = (int)geti("y");
+            unsigned color = (unsigned)geti("color");
+            int size = (int)opti("size", 15);
             lua_getfield(L, -1, "text");
             t = lua_tostring(L, -1);
             if (t)
-                gui_draw_text((int)geti("x"), (int)geti("y"), t,
-                              (unsigned)geti("color"),
-                              (int)opti("size", 15));
+                gui_draw_text(x, y, t, color, size);
             lua_pop(L, 1);
         } else if (!strcmp(op, "clip")) {
             gui_set_clip((int)geti("x"), (int)geti("y"),

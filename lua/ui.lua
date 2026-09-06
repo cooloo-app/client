@@ -43,45 +43,48 @@ end
 -- text wrapping (cached per message per width)
 -- ------------------------------------------------------------------
 
-local function wrap_para(para, avail)
-    -- returns array of chunk strings, hard-broken at avail px
-    local chunks = {}
+local function wrap_para(para, first_avail, cont_avail, out)
+    -- hard-break para at pixel limits, appending chunk strings to out.
+    -- the message's first wrapped line has first_avail px (it carries
+    -- the "HH:MM <nick> " prefix); continuation lines have cont_avail.
     local cur, curw, last_sp = "", 0, nil
+    local limit = (#out == 0) and first_avail or cont_avail
     for _, cp in utf8.codes(para, true) do
         local ch = utf8.char(cp)
         local cw = cooloo.text_width(ch, SIZE)
-        if curw + cw > avail and cur ~= "" then
+        if curw + cw > limit and cur ~= "" then
             if last_sp and last_sp > 1 then
-                chunks[#chunks + 1] = cur:sub(1, last_sp - 1)
+                out[#out + 1] = cur:sub(1, last_sp - 1)
                 cur = cur:sub(last_sp + 1) .. ch
                 curw = cooloo.text_width(cur, SIZE)
             else
-                chunks[#chunks + 1] = cur
+                out[#out + 1] = cur
                 cur, curw = ch, cw
             end
             last_sp = nil
+            limit = cont_avail
         else
             cur = cur .. ch
             curw = curw + cw
             if ch == " " then last_sp = #cur end
         end
     end
-    chunks[#chunks + 1] = cur
-    return chunks
+    out[#out + 1] = cur
 end
 
-local function wrap_msg(m, avail)
-    if m.wrap and m.wrap.avail == avail then return m.wrap.chunks end
+local function wrap_msg(m, cont_avail, first_avail)
+    if m.wrap and m.wrap.cont == cont_avail and m.wrap.first == first_avail then
+        return m.wrap.chunks
+    end
     local chunks = {}
     local paras = {}
     m.text:gsub("([^\n]*)\n?", function(p) paras[#paras + 1] = p end)
     if paras[#paras] == "" then paras[#paras] = nil end
     if #paras == 0 then paras = { "" } end
     for _, p in ipairs(paras) do
-        local w = wrap_para(p, avail)
-        for _, c in ipairs(w) do chunks[#chunks + 1] = c end
+        wrap_para(p, first_avail, cont_avail, chunks)
     end
-    m.wrap = { avail = avail, chunks = chunks }
+    m.wrap = { cont = cont_avail, first = first_avail, chunks = chunks }
     return chunks
 end
 
@@ -213,7 +216,11 @@ local function render_messages(o, L)
 
     while mi >= 1 and #lines < need do
         local m = r.buf[mi]
-        local chunks = wrap_msg(m, avail - indent)
+        -- the first wrapped line must also make room for "HH:MM <nick> "
+        local prefix = os.date("%H:%M", m.ts) .. " <" .. m.nick .. "> "
+        local chunks = wrap_msg(m, avail - indent,
+                                math.max(60, avail -
+                                         cooloo.text_width(prefix, SIZE)))
         local ci = #chunks
         while ci >= 1 and #lines < need do
             if skip > 0 then

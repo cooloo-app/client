@@ -55,6 +55,9 @@ local function newroom(name)
         following = false, -- FOLLOW sent (refollow never re-sent)
         read_n = READ_INIT,
         backfilling = false,
+        read_requested = 0, -- READ -N in flight: requested count
+        read_received = 0,  -- raw MSG lines seen in that READ window
+        exhausted = false,  -- server returned a short READ: no older history
         scroll = 0,        -- lines up from the bottom (0 = tail)
         unread = 0,
     }
@@ -161,6 +164,8 @@ function M.on_ready(conn, nick)
     local r = M.by_conn[conn]
     if r then
         r.phase = "reading"
+        r.read_requested = r.read_n
+        r.read_received = 0
         cooloo.net.send(conn, ("READ %s -%d\n"):format(r.name, r.read_n))
     end
 end
@@ -201,10 +206,19 @@ function M.on_line(conn, line)
     end
     local e, ts, nick = line:match("^MSG (%d+) (%d+) (%S+) %d+$")
     if e then
+        -- READ pauses live push, so MSG lines in a READ window are all
+        -- READ results; count them raw (pre-dedupe) to detect a short read
+        if r.phase == "reading" or r.backfilling then
+            r.read_received = r.read_received + 1
+        end
         r.pending = { endoff = tonumber(e), ts = tonumber(ts), nick = nick }
         return
     end
     if line == "END" then
+        if (r.phase == "reading" or r.backfilling) and
+            r.read_received < r.read_requested then
+            r.exhausted = true
+        end
         r.backfilling = false
         if not r.following then send_follow(r) end
         return
@@ -245,7 +259,9 @@ function M.scroll(r, dlines)
 end
 
 function M.maybe_backfill(r)
-    if r.phase ~= "following" or r.backfilling or not r.conn then return end
+    if r.phase ~= "following" or r.backfilling or not r.conn or r.exhausted then
+        return
+    end
     local n = math.min(r.read_n + 50, READ_MAX)
     if n <= r.read_n then
         if r.read_n >= READ_MAX then M.status = "history limit (1000)" end
@@ -253,6 +269,8 @@ function M.maybe_backfill(r)
     end
     r.read_n = n
     r.backfilling = true
+    r.read_requested = n
+    r.read_received = 0
     cooloo.net.send(r.conn, ("READ %s -%d\n"):format(r.name, n))
 end
 

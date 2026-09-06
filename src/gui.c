@@ -2,8 +2,12 @@
  * gui.c - see gui.h.
  *
  * Framebuffer: own ARGB8888 software canvas blitted to the window surface
- * each present (D25 software rendering; no SDL renderer, no HiDPI scaling -
- * 1:1 pixels, documented minimal choice).
+ * each present (D25 software rendering, no HiDPI scaling - 1:1 pixels,
+ * documented minimal choice). Note: SDL3 has no Cocoa window framebuffer,
+ * so on macOS SDL_GetWindowSurface is backed by SDL's texture framebuffer
+ * (Metal render driver, enabled at SDL build time) - it only presents the
+ * final bitmap; all drawing stays in our software canvas. Windows uses
+ * SDL's GDI framebuffer, no render subsystem needed.
  */
 #include "gui.h"
 #include "font.h"

@@ -217,8 +217,12 @@ static void rasterize(cent *e, uint32_t cp, int size)
         e->g.advance = (float)size * 0.6f;
         return;
     }
+    /* em-to-pixels: size means em size (9px Latin advance at 15px).
+     * ScaleForPixelHeight would size by the ascender-descender span,
+     * which is 1.32x upm for JetBrains Mono -> text came out ~25% small
+     * and out of proportion with CJK fallback fonts. */
     f = &fonts[e->fi];
-    scale = stbtt_ScaleForPixelHeight(&f->info, (float)size);
+    scale = stbtt_ScaleForMappingEmToPixels(&f->info, (float)size);
     stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
     e->g.advance = scale * (float)adv;
     bmp = stbtt_GetCodepointBitmap(&f->info, scale, scale, (int)cp,
@@ -328,7 +332,8 @@ int font_ascent(int size)
 {
     int a = 0, d = 0, g = 0;
     stbtt_GetFontVMetrics(&fonts[0].info, &a, &d, &g);
-    return (int)(stbtt_ScaleForPixelHeight(&fonts[0].info, (float)size) *
+    return (int)(stbtt_ScaleForMappingEmToPixels(&fonts[0].info,
+                                                 (float)size) *
                  (float)a + 0.5f);
 }
 
@@ -337,7 +342,7 @@ int font_line_height(int size)
     int a = 0, d = 0, g = 0, h;
     float s;
     stbtt_GetFontVMetrics(&fonts[0].info, &a, &d, &g);
-    s = stbtt_ScaleForPixelHeight(&fonts[0].info, (float)size);
+    s = stbtt_ScaleForMappingEmToPixels(&fonts[0].info, (float)size);
     h = (int)(s * (float)(a - d + g) + 0.999f);
     return (h + 1) & ~1;
 }
