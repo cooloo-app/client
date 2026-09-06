@@ -7,12 +7,12 @@
 
 | 文件 | 平台 | 大小 | sha256 |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | macOS 26 arm64（Apple Silicon） | 2.4MB | `bed832556804736d213a7f8ae86cdbcb8ec36471acc03f9ca79e8d38aae4da56` |
-| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64（mingw 静态，仅系统 DLL） | 3.8MB | `4153942b30749549f558ef6a96498974149bdefcdbdd2729cd1f9cc6d39746cb` |
+| `cooloo-darwin-arm64` | macOS 26 arm64（Apple Silicon） | 2.4MB | `4aa7f2565b06c27fe03b2927ef8029a3e7de59372b25662dc8dd317db309a7df` |
+| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64（mingw 静态，仅系统 DLL） | 3.8MB | `a1ea24891d5e859d525d37c3a0d6852a582934f35301d9cdd756862bbb3582a4` |
 
-来源 commit：`9953d1a`（fix: windows handshake RNG + net_async hardening，基于
-`6f1eb9f`；事件记录见 `../../progress/handoff/20260906-windows-noise-rng-fix.md`）。
-构建日期 2026-09-06。
+来源 commit：`76c5f16`（gui: fix register-flow wedge (D25 race) + windows kv
+persistence；事件记录见 `../../progress/handoff/20260907-register-race-fix.md`）。
+构建日期 2026-09-07。
 Linux GUI 本期不交付（owner 决策），无 linux 二进制。
 
 ## 使用
@@ -33,9 +33,10 @@ cooloo-windows-x86_64.exe send general "hi"
 - 校验：`shasum -a 256 <file>` 与上表比对
 - Windows 二进制真机首测发现握手 RNG 缺陷（`/dev/urandom` 不存在 → msg1 生成
   失败，见 `../../progress/handoff/20260906-windows-noise-rng-fix.md`），已于
-  2026-09-06 修复并重出二进制，**修复后版本待真机复测**；macOS 版本协议层
-  实测通过，键盘/IME 路径待真机目检（见 planner
-  `progress/handoff/20250906-v2-done.md` §5）
+  2026-09-06 修复；2026-09-07 真机复测再暴露注册流程 D25 竞态 + Windows kv
+  持久化两缺陷（见 `../../progress/handoff/20260907-register-race-fix.md`），已
+  修复并重出二进制，**注册全流程 Windows 真机验证通过**；macOS 版本协议层
+  实测通过（见 planner `progress/handoff/20250906-v2-done.md` §5）
 
 ## 重新发布（更新二进制后）
 
