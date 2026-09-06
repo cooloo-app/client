@@ -7,10 +7,10 @@
 
 | 文件 | 平台 | 大小 | sha256 |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | macOS 26 arm64（Apple Silicon） | 2.2MB | `2a838fe5ed41b61ac590edc5145da178109c87a0f37a776ebfbde6f48f9d67f7` |
-| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64（mingw 静态，仅系统 DLL） | 3.8MB | `28938ada23cd4e57b73ca723476da797f0829229f2a043ad2b3586e38966e874` |
+| `cooloo-darwin-arm64` | macOS 26 arm64（Apple Silicon） | 2.4MB | `aa00d73a53b87ee003cf1b4edb26c1f6642f8ce604fc2645e205fd53cd218d6d` |
+| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64（mingw 静态，仅系统 DLL） | 3.8MB | `2f5bb78e2ea76f933f5024ecb8221a35009fde2de160de6126fbf37edb8084ca` |
 
-来源 commit：`83ae4fe`（v3: port GUI to SDL3）。构建日期 2026-09-06。
+来源 commit：`6f1eb9f`（gui: fix rendering: mac black window, text at origin, font scale, wrap, backfill）。构建日期 2026-09-06。
 Linux GUI 本期不交付（owner 决策），无 linux 二进制。
 
 ## 使用
