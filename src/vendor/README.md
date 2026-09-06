@@ -9,10 +9,10 @@ github.com is blocked, the mirror URL below is what was actually fetched
 - fetched: https://cdn.jsdelivr.net/gh/nothings/stb@6e9f34d5429cf16790ec43c9bac3f1ee4ad1f760/stb_truetype.h
 - sha256: `ecd30b05e0dd4fea3a13c26810dd9e1992dc379049482c393d5a19e6b5090aab`
 
-## SDL2 2.30.12
-- canonical: https://github.com/libsdl-org/SDL/tree/release-2.30.12
-- fetched: https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-2.30.12
-- sha256: `560da2e54dd8af933e35bd08fb1b6cf80d4f6938c67710fecf13b7e9bdd6c47e`
+## SDL3 3.2.30 (LTS)
+- canonical: https://github.com/libsdl-org/SDL/tree/release-3.2.30
+- fetched: https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.2.30
+- sha256: `8bfb8f70a72f216dff66cde64b9d7b863d5e8aa46be7f2fd400d7f1f9baafe76`
 
 ## Lua 5.4.9
 - canonical: https://www.lua.org/versions.html#5.4.9
@@ -25,15 +25,17 @@ github.com is blocked, the mirror URL below is what was actually fetched
 - sha256: `a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f`
 
 ## Licenses
-- SDL2: zlib (vendor/sdl2/LICENSE.txt)
+- SDL3: zlib (vendor/sdl3/LICENSE.txt)
 - Lua: MIT (vendor/lua/readme.html / lua.h header)
 - stb_truetype: public domain / MIT dual (file header)
 - JetBrains Mono: SIL OFL 1.1 (vendor/fonts/OFL.txt)
 
 ## Notes
-- SDL2 tree trimmed of test/docs/IDE-project dirs (script SDL_TRIM);
-  CMake static build validated after trim.
+- SDL3 tree trimmed of test/docs/examples/IDE-project dirs
+  (VisualC*/Xcode/android-project); CMake static build validated after trim.
 - Lua: interpreter (lua.c) and compiler (luac.c) mains excluded; the
   library is compiled directly into the cooloo binary.
-- SDL2 came from the git tag archive (not the autotools dist tarball);
-  CMake build only, which is all we use.
+- SDL3 came from the git tag archive; CMake build only, which is all we
+  use. Public headers are self-contained (apps don't need the generated
+  SDL_build_config.h). macOS static link additionally needs
+  -framework UniformTypeIdentifiers (UTType, cocoa clipboard).
