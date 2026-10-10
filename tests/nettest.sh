@@ -62,8 +62,10 @@ fi
 grep -q "127.0.0.1:$PORT [0-9a-f]\{64\}" "$TMP/cfg1/known_servers" \
     && ok "known_servers pinned" || bad "known_servers pinned"
 cp "$TMP/cfg1/known_servers" "$TMP/ks.bak"
-sed -i '' 's/[0-9a-f]$/0/' "$TMP/cfg1/known_servers" 2>/dev/null || \
-    sed -i 's/[0-9a-f]$/0/' "$TMP/cfg1/known_servers"
+# Always change the fingerprint: replacing the final nibble with 0 is a
+# no-op for 1/16 of keys and makes this regression test randomly fail.
+awk '{ last = substr($2, length($2), 1); $2 = substr($2, 1, length($2)-1) (last == "0" ? "1" : "0"); print }' \
+    "$TMP/ks.bak" >"$TMP/cfg1/known_servers"
 if "$CLI" rooms >"$TMP/t2" 2>&1; then
     bad "fingerprint mismatch refused"
 else

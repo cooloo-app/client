@@ -7,12 +7,14 @@
 
 | 文件 | 平台 | 大小 | sha256 |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | macOS 26 arm64（Apple Silicon） | 2.4MB | `4aa7f2565b06c27fe03b2927ef8029a3e7de59372b25662dc8dd317db309a7df` |
-| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64（mingw 静态，仅系统 DLL） | 3.8MB | `a1ea24891d5e859d525d37c3a0d6852a582934f35301d9cdd756862bbb3582a4` |
+| `cooloo-darwin-arm64` | macOS 26 arm64（Apple Silicon） | 2.4MB | `46e5a12b9991f5c93e5b0dbd095bc5dad19eb2fa848f20cbb2df374ccc53338b` |
+| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64（mingw 静态，仅系统 DLL） | 3.9MB | `586f549cdc7b0bca9ca24895e7db0d78abaa57258729f631ba4585d2d2baddd3` |
 
-来源 commit：`76c5f16`（gui: fix register-flow wedge (D25 race) + windows kv
-persistence；事件记录见 `../../progress/handoff/20260907-register-race-fix.md`）。
-构建日期 2026-09-07。
+来源：客户端 tag `v0.1.0`（基于 `0c8241d`；透明橙色 C 图标、Windows GUI
+子系统、`--debug` 控制台与标准流兼容、移除 `gui` 子命令）。
+在 m106 隔离构建目录生成，未修改远程 checkout。
+构建日期 2026-10-10。macOS CLI 集成测试 24/24；Windows 真机启动、窗口大小
+图标、控制台有无、TOFU 输入、多行管道 send/read、重定向与退出码测试通过。
 Linux GUI 本期不交付（owner 决策），无 linux 二进制。
 
 ## 使用
@@ -24,10 +26,15 @@ chmod +x cooloo-darwin-arm64
 ./cooloo-darwin-arm64 send general "hi"   # CLI 用法不变
 
 # Windows：双击 cooloo-windows-x86_64.exe 或命令行运行（单 exe 双模）
-cooloo-windows-x86_64.exe          # GUI（带控制台窗口，设计如此）
+cooloo-windows-x86_64.exe          # GUI（无控制台窗口，不需要 gui 子命令）
+cooloo-windows-x86_64.exe --debug  # GUI + 控制台日志
 cooloo-windows-x86_64.exe send general "hi"
+# CMD 交互启动若需要同步等待：
+start "" /wait cooloo-windows-x86_64.exe --debug
 ```
 
+- EXE 与窗口图标为透明底橙色 C（`#D9622B`），资源内嵌，无需附带图片。
+- Windows Explorer/任务栏会缓存图标；若显示旧图标，先取消旧固定快捷方式再重新固定。
 - 首次运行自动创建 `~/.config/cooloo/`（identity / known_servers / config）
 - 未注册机器会进入注册引导（输 nick → HELLO 注册）
 - 校验：`shasum -a 256 <file>` 与上表比对

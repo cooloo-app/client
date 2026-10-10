@@ -13,6 +13,7 @@
 #include "font.h"
 #include "luabind.h"
 #include "config.h"
+#include "embedded_icon.h"
 
 /* SDL_MAIN_HANDLED: plain main() everywhere (single exe is CLI+GUI) */
 #define SDL_MAIN_HANDLED
@@ -279,6 +280,15 @@ int cooloo_gui_run(const char *lua_dev_dir)
         fprintf(stderr, "cooloo gui: window: %s\n", SDL_GetError());
         SDL_Quit();
         return 1;
+    }
+    {
+        SDL_Surface *icon = SDL_CreateSurfaceFrom(COOLOO_ICON_SIZE, COOLOO_ICON_SIZE,
+            SDL_PIXELFORMAT_RGBA32, (void *)cooloo_icon_rgba, COOLOO_ICON_SIZE * 4);
+        if (icon) {
+            if (!SDL_SetWindowIcon(win, icon))
+                fprintf(stderr, "cooloo gui: icon: %s\n", SDL_GetError());
+            SDL_DestroySurface(icon);
+        }
     }
     SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_GetWindowSize(win, &scr_w, &scr_h);

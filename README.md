@@ -6,7 +6,8 @@ aesthetic). No runtime dependencies beyond the OS.
 
 ```
 cooloo                  bare -> GUI (D31)
-cooloo gui              same; add --lua-dev <dir> for script hot reload
+cooloo --debug          GUI with console logs (Windows: attach or allocate console)
+cooloo --lua-dev <dir>  GUI with script hot reload; no gui subcommand
 cooloo keygen           create identity, print fingerprint
 cooloo send <room> [text...]        append (stdin when no text args)
 cooloo read [--raw] <room> <off|-N> read messages
@@ -78,15 +79,27 @@ Full field reference: planner wiki `reference/client-config.md`.
 ```
 src/        main cli net noise_xx config (v1) + gui font luabind (v2)
 lua/        all UI logic: main (frame dispatch) chat ui input
-tools/      embed.py (asset->C), mingw-toolchain.cmake
+tools/      embed.py (asset->C), generate_icon.py, mingw-toolchain.cmake
+assets/     transparent orange-C PNG/ICO (generated without fonts or dependencies)
 tests/      nettest.sh (CLI loopback integration)
 src/vendor/ monocypher lua sdl3 stb_truetype.h fonts/ (see README.md)
 ```
 
 ## Platform caveats
 
-- **Windows**: cross-built artifact is `file`/DLL-checked only -
-  *not verified on real hardware* (no test machine, 2025-09).
+- **Windows startup**: GUI subsystem (`-mwindows`): double-click/bare launch
+  creates no console. `--debug` attaches to the parent's console or allocates
+  one. CLI commands initialize console I/O while preserving pipes/redirection.
+  CMD may return immediately for an interactive GUI-subsystem launch; use
+  `start "" /wait cooloo.exe --debug` when synchronous waiting is wanted.
+- **Icons**: transparent orange C (`#D9622B`), multi-size ICO embedded via
+  windres; embedded RGBA is passed to SDL_SetWindowIcon. No image sidecars.
+  Regenerate with `python3 tools/generate_icon.py`.
+- **Windows tests**: `powershell -File tests/windows-startup.ps1 -Exe <exe>`
+  verifies startup, redirection and exit codes. Set `COOLOO_TEST_HOST` to an
+  **isolated test server** to also test TOFU/stdin send/read. Run
+  `tests/windows-window.ps1` to check actual window icons and console presence.
+  Verified on Windows 10, 2026-10-10.
 - **Windows CLI**: builds and socket paths work; `chat`/`follow` poll
   stdin via WSAPoll which does not support console handles - use
   `send`/`read` there.

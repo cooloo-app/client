@@ -7,12 +7,13 @@
  *   cooloo follow <room>                stream (persists offset, auto-resume)
  *   cooloo chat <room>                  interactive read/write
  *   cooloo rooms | whoami [--register <nick>]
- *   cooloo gui [--lua-dev DIR]          GUI (same as bare `cooloo`)
+ *   cooloo [--debug] [--lua-dev DIR]    GUI (default)
  *   global flag: -y/--tofu              auto-trust unknown server fingerprint
  * Running bare (no args) enters the v2 GUI (D31).
  */
 #include "cli.h"
 #include "gui.h"
+#include "win_console.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -26,7 +27,7 @@ static void usage(FILE *out)
             "  cooloo read [--raw] <room> <off|-N>  read messages\n"
             "  cooloo follow <room>                 stream new messages\n"
             "  cooloo chat <room>                   interactive chat\n"
-            "  cooloo gui [--lua-dev DIR]           GUI (default when bare)\n"
+            "  cooloo [--debug] [--lua-dev DIR]     GUI (default)\n"
             "  cooloo rooms                         list rooms\n"
             "  cooloo whoami [--register <nick>]    show / register nick\n"
             "  flags: -y/--tofu auto-trust new server fingerprint\n"
@@ -35,10 +36,35 @@ static void usage(FILE *out)
 
 int main(int argc, char **argv)
 {
-    int i, j;
+    int i, j, debug = 0;
+    const char *dev = NULL;
 
+    /* Parse startup flags before GUI selection: --debug alone still runs GUI. */
+    for (i = 1; i < argc; i++) {
+        int remove = 0;
+        if (!strcmp(argv[i], "--debug")) {
+            debug = 1;
+            remove = 1;
+        } else if (!strcmp(argv[i], "--lua-dev")) {
+            if (i + 1 >= argc) {
+                cooloo_console_init(1);
+                fprintf(stderr, "cooloo: --lua-dev requires a directory\n");
+                return 2;
+            }
+            dev = argv[i + 1];
+            remove = 2;
+        }
+        if (remove) {
+            for (j = i; j + remove < argc; j++)
+                argv[j] = argv[j + remove];
+            argc -= remove;
+            argv[argc] = NULL;
+            i--;
+        }
+    }
+    cooloo_console_init(debug || argc >= 2);
     if (argc < 2)
-        return cooloo_gui_run(NULL);      /* bare -> GUI (D31) */
+        return cooloo_gui_run(dev);       /* bare -> GUI (D31) */
 
     /* pull global flags out of argv before dispatch */
     for (i = 1; i < argc; i++) {
@@ -69,12 +95,6 @@ int main(int argc, char **argv)
         return cooloo_cli_whoami(argc, argv);
     if (!strcmp(argv[1], "chat"))
         return cooloo_cli_chat(argc, argv);
-    if (!strcmp(argv[1], "gui")) {
-        const char *dev = NULL;
-        if (argc >= 4 && !strcmp(argv[2], "--lua-dev"))
-            dev = argv[3];
-        return cooloo_gui_run(dev);
-    }
     if (!strcmp(argv[1], "help") || !strcmp(argv[1], "--help") ||
         !strcmp(argv[1], "-h")) {
         usage(stdout);

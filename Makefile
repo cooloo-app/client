@@ -1,5 +1,5 @@
 # cooloo client - single binary: v1 CLI + v2 GUI (04 doc D27-D31)
-# bare `cooloo` / `cooloo gui` -> GUI (SDL3+Lua); subcommands -> v1 CLI.
+# bare `cooloo` -> GUI (SDL3+Lua); subcommands -> v1 CLI.
 CC      ?= cc
 CFLAGS  ?= -O2 -Wall -Wextra -std=c99
 PREFIX  ?= /usr/local
@@ -29,7 +29,7 @@ SDL_WIN_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DSDL_RENDER=OFF -DSDL_METAL=OFF
 
 NOISE_SRC := src/noise_xx.c src/vendor/monocypher.c
 LUA_SRC   := $(filter-out src/vendor/lua/lua.c src/vendor/lua/luac.c,$(wildcard src/vendor/lua/*.c))
-CORE_SRC  := src/main.c src/cli.c src/net.c src/config.c $(NOISE_SRC)
+CORE_SRC  := src/main.c src/win_console.c src/cli.c src/net.c src/config.c $(NOISE_SRC)
 GUI_SRC   := src/gui.c src/font.c src/luabind.c
 EMBED_SRC := src/embedded_lua.c src/embedded_font.c
 ALL_SRC   := $(CORE_SRC) $(GUI_SRC) $(LUA_SRC) $(EMBED_SRC)
@@ -46,10 +46,12 @@ WIN_LIBS  := $(SDL_WIN_LIB) -lwinmm -lole32 -loleaut32 -limm32 -lversion -luuid 
 	-ladvapi32 -lsetupapi -lshell32 -lgdi32 -luser32 -lkernel32 -lws2_32 \
 	-static -static-libgcc -lm
 WIN_CC    := x86_64-w64-mingw32-gcc
+WIN_RC    := x86_64-w64-mingw32-windres
+WIN_ICON  := $(BUILD)/cooloo-icon.o
 
 all: cooloo
 
-cooloo: $(ALL_SRC) $(HEADERS) $(SDL_MAC_LIB)
+cooloo: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_MAC_LIB)
 	$(CC) $(CFLAGS) -Isrc $(SDL_MAC_INC) -o $@ $(ALL_SRC) $(MAC_LIBS)
 
 $(SDL_MAC_LIB):
@@ -73,9 +75,16 @@ src/embedded_lua.c src/embedded_font.c: lua/main.lua lua/chat.lua lua/ui.lua lua
 test: cooloo
 	sh tests/nettest.sh
 
+src/embedded_icon.h assets/cooloo.ico assets/cooloo.png: tools/generate_icon.py
+	python3 tools/generate_icon.py
+
+$(WIN_ICON): src/cooloo.rc assets/cooloo.ico
+	mkdir -p $(BUILD)
+	$(WIN_RC) -Isrc -i src/cooloo.rc -o $@
+
 release-windows: cooloo.exe
-cooloo.exe: $(ALL_SRC) $(HEADERS) $(SDL_WIN_LIB)
-	$(WIN_CC) $(CFLAGS) -Isrc $(SDL_WIN_INC) -o $@ $(ALL_SRC) $(WIN_LIBS)
+cooloo.exe: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_WIN_LIB) $(WIN_ICON)
+	$(WIN_CC) $(CFLAGS) -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(ALL_SRC) $(WIN_ICON) $(WIN_LIBS)
 
 release-macos: cooloo
 	@echo "release-macos: ./cooloo (native $$(uname -m))"
