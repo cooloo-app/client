@@ -17,6 +17,8 @@ foreach ($debug in @($false,$true)) {
  $s.UseShellExecute=$false
  if ($debug) { $s.Arguments='--debug' }
  $s.EnvironmentVariables['COOLOO_CONFIG']=$cfg
+ $s.EnvironmentVariables.Remove('COOLOO_PROBE_STARTUP')
+ $s.EnvironmentVariables['COOLOO_HOST']='127.0.0.1:1'
  # Simulate Explorer: no parent console and no redirected handles.
  $s.CreateNoWindow=$true
  $p=[Diagnostics.Process]::Start($s)
