@@ -13,6 +13,26 @@
 #include <io.h>
 #include <windows.h>
 #define mkdir(p,m) _mkdir(p)
+/* Cache nesting exceeds MAX_PATH even with ordinary user-profile paths. */
+static const char *win_path(const char *p,char out[2048])
+{
+    char absolute[1800];size_t i;DWORD n=GetFullPathNameA(p,sizeof absolute,absolute,NULL);
+    if(!n||n>=sizeof absolute)return p;
+    if(absolute[0]=='\\'&&absolute[1]=='\\')snprintf(out,2048,"\\\\?\\UNC\\%s",absolute+2);
+    else snprintf(out,2048,"\\\\?\\%s",absolute);
+    for(i=0;out[i];i++)if(out[i]=='/')out[i]='\\';
+    return out;
+}
+static FILE *win_fopen(const char *p,const char *mode){char w[2048];return fopen(win_path(p,w),mode);}
+static int win_cache_mkdir(const char *p){char w[2048];return _mkdir(win_path(p,w));}
+static int win_cache_stat(const char *p,struct stat *st){char w[2048];return stat(win_path(p,w),st);}
+static int win_cache_remove(const char *p){char w[2048];return remove(win_path(p,w));}
+static int win_cache_move(const char *a,const char *b){char wa[2048],wb[2048];return MoveFileExA(win_path(a,wa),win_path(b,wb),MOVEFILE_REPLACE_EXISTING)?0:-1;}
+#define fopen(p,m) win_fopen(p,m)
+#undef mkdir
+#define mkdir(p,m) win_cache_mkdir(p)
+#define stat(p,s) win_cache_stat(p,s)
+#define remove(p) win_cache_remove(p)
 #else
 #include <unistd.h>
 #include <sys/file.h>
@@ -80,7 +100,7 @@ int cache_meta(const char *server,const char *self,const char *json)
     if(fputs(json,f)==EOF||fputc('\n',f)==EOF)rc=-1;
     if(fclose(f))rc=-1;
 #ifdef _WIN32
-    if(!rc&&!MoveFileExA(tmp,p,MOVEFILE_REPLACE_EXISTING))rc=-1;
+    if(!rc&&win_cache_move(tmp,p))rc=-1;
 #else
     if(!rc&&rename(tmp,p))rc=-1;
 #endif
