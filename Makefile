@@ -29,7 +29,7 @@ SDL_WIN_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DSDL_RENDER=OFF -DSDL_METAL=OFF
 
 NOISE_SRC := src/noise_xx.c src/vendor/monocypher.c
 LUA_SRC   := $(filter-out src/vendor/lua/lua.c src/vendor/lua/luac.c,$(wildcard src/vendor/lua/*.c))
-CORE_SRC  := src/main.c src/win_console.c src/cli.c src/net.c src/config.c $(NOISE_SRC)
+CORE_SRC  := src/main.c src/win_console.c src/cli.c src/net.c src/config.c src/record.c $(NOISE_SRC)
 GUI_SRC   := src/gui.c src/font.c src/luabind.c
 EMBED_SRC := src/embedded_lua.c src/embedded_font.c
 ALL_SRC   := $(CORE_SRC) $(GUI_SRC) $(LUA_SRC) $(EMBED_SRC)
@@ -50,6 +50,10 @@ WIN_RC    := x86_64-w64-mingw32-windres
 WIN_ICON  := $(BUILD)/cooloo-icon.o
 
 all: cooloo
+
+# Portable CLI-only build for isolated Linux integration tests.
+cooloo-cli: $(CORE_SRC) $(HEADERS)
+	$(CC) $(CFLAGS) -DCOOLOO_CLI_ONLY -Isrc -o $@ $(CORE_SRC)
 
 cooloo: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_MAC_LIB)
 	$(CC) $(CFLAGS) -Isrc $(SDL_MAC_INC) -o $@ $(ALL_SRC) $(MAC_LIBS)
@@ -72,8 +76,13 @@ src/embedded_lua.c src/embedded_font.c: lua/main.lua lua/chat.lua lua/ui.lua lua
 
 # loopback integration against the sibling server repo's coolood
 # (planner checkout layout: client and server are sibling submodules)
-test: cooloo
-	sh tests/nettest.sh
+test: cooloo-cli
+	python3 tests/protocol2_test.py
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -DLUA_USE_POSIX -I src/vendor/lua tests/lua_test.c $(LUA_SRC) -lm -o $(BUILD)/lua-test
+	$(BUILD)/lua-test tests/chat_protocol2.lua
+	$(CC) $(CFLAGS) -Isrc tests/cache_test.c src/record.c src/config.c -o $(BUILD)/cache-test
+	@tmp=$$(mktemp -d); $(BUILD)/cache-test "$$tmp"; rc=$$?; rm -rf "$$tmp"; exit $$rc
 
 src/embedded_icon.h assets/cooloo.ico assets/cooloo.png: tools/generate_icon.py
 	python3 tools/generate_icon.py
@@ -93,7 +102,7 @@ install: cooloo
 	install -m 0755 cooloo $(PREFIX)/bin/cooloo
 
 clean:
-	rm -f cooloo cooloo.exe src/embedded_lua.c src/embedded_font.c
+	rm -f cooloo cooloo.exe cooloo-cli src/embedded_lua.c src/embedded_font.c
 
 distclean: clean
 	rm -rf $(BUILD)

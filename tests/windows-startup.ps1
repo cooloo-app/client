@@ -24,8 +24,8 @@ function Run-Test($arguments, $inputText = '') {
         [IO.File]::WriteAllText($infile, $inputText, [Text.Encoding]::ASCII)
         $start.FileName = $env:ComSpec
         $redirection = '< "' + $infile + '"'
-        if ($arguments -eq 'send general') { $redirection = 'type "' + $infile + '" |' }
-        if ($arguments -eq 'send general') {
+        if ($arguments -match '^send [0-9a-f]{64}$') {
+            $redirection = 'type "' + $infile + '" |'
             $start.Arguments = '/d /s /c "' + $redirection + ' "' + $exe + '" ' + $arguments + ' > "' + $outfile + '" 2> "' + $errfile + '""'
         } else {
             $start.Arguments = '/d /s /c ""' + $exe + '" ' + $arguments + ' ' + $redirection + ' > "' + $outfile + '" 2> "' + $errfile + '""'
@@ -54,7 +54,7 @@ if ($r.Code -ne 0 -or $r.Out -notmatch 'usage:') { throw 'help/redirection faile
 $r = Run-Test 'bogus'
 if ($r.Code -ne 2 -or $r.Err -notmatch 'unknown command') { throw 'stderr/exit failed' }
 $r = Run-Test 'keygen'
-if ($r.Code -ne 0 -or $r.Out -notmatch 'fingerprint:') { throw 'keygen failed' }
+if ($r.Code -ne 0 -or $r.Out.Trim() -notmatch '^[0-9a-f]{64}$') { throw 'keygen failed' }
 $r = Run-Test '--debug'
 if ($r.Code -ne 0 -or $r.Err -notmatch 'first frame') { throw 'debug GUI failed' }
 $r = Run-Test ''
@@ -65,10 +65,13 @@ if ($env:COOLOO_TEST_HOST) {
     $r = Run-Test 'rooms' "y`n"
     if ($r.Code -ne 0 -or $r.Err -notmatch 'trust and pin') { throw 'piped TOFU input failed' }
     $r = Run-Test 'whoami --register ui-test'
-    if ($r.Code -ne 0 -or $r.Out -notmatch 'NICK ui-test') { throw 'register failed' }
-    $r = Run-Test 'send general' "transparent C pipe test`nsecond line`n"
+    if ($r.Code -ne 0 -or $r.Out -notmatch 'ui-test') { throw 'register failed' }
+    $r = Run-Test 'create ui-test-room'
+    if ($r.Code -ne 0 -or $r.Out -notmatch '^OK ([0-9a-f]{64})') { throw 'create failed' }
+    $room = $Matches[1]
+    $r = Run-Test "send $room" "transparent C pipe test`nsecond line`n"
     if ($r.Code -ne 0 -or $r.Out -notmatch '^OK ') { throw 'piped send failed' }
-    $r = Run-Test 'read general -1'
+    $r = Run-Test "read --raw $room 0"
     if ($r.Code -ne 0 -or $r.Out -notmatch 'transparent C pipe test' -or $r.Out -notmatch 'second line') { throw 'readback failed' }
     Write-Output 'PASS: Windows piped TOFU, registration, multiline stdin send and readback'
 }

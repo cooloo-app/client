@@ -24,11 +24,14 @@ static void usage(FILE *out)
             "usage:\n"
             "  cooloo keygen                        create identity\n"
             "  cooloo send <room> [text...]         append a message\n"
-            "  cooloo read [--raw] <room> <off|-N>  read messages\n"
+            "  cooloo read [--raw] <id> <offset>    read messages\n"
             "  cooloo follow <room>                 stream new messages\n"
             "  cooloo chat <room>                   interactive chat\n"
             "  cooloo [--debug] [--lua-dev DIR]     GUI (default)\n"
-            "  cooloo rooms                         list rooms\n"
+            "  cooloo rooms                         list rooms and own inbox\n"
+            "  cooloo create <nickname>             create public room\n"
+            "  cooloo avatar <slot> <public-id> <nickname>\n"
+            "  cooloo meta <id> | rename <id> <nickname>\n"
             "  cooloo whoami [--register <nick>]    show / register nick\n"
             "  flags: -y/--tofu auto-trust new server fingerprint\n"
             "  env:   COOLOO_HOST=host[:port] override server\n");
@@ -63,8 +66,15 @@ int main(int argc, char **argv)
         }
     }
     cooloo_console_init(debug || argc >= 2);
-    if (argc < 2)
-        return cooloo_gui_run(dev);       /* bare -> GUI (D31) */
+    if (argc < 2) {
+#ifdef COOLOO_CLI_ONLY
+        (void)dev;
+        usage(stderr);
+        return 2;
+#else
+        return cooloo_gui_run(dev);
+#endif
+    }
 
     /* pull global flags out of argv before dispatch */
     for (i = 1; i < argc; i++) {
@@ -81,6 +91,9 @@ int main(int argc, char **argv)
         return 2;
     }
 
+    if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
+        !strcmp(argv[1], "meta") || !strcmp(argv[1], "rename"))
+        return cooloo_cli_request(argc, argv);
     if (!strcmp(argv[1], "keygen"))
         return cooloo_cli_keygen(argc, argv);
     if (!strcmp(argv[1], "send"))

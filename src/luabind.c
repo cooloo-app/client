@@ -12,6 +12,7 @@
 #include "font.h"
 #include "net.h"
 #include "config.h"
+#include "record.h"
 #include "noise_xx.h"
 
 #include <lua.h>
@@ -214,7 +215,7 @@ void luabind_net_pump(void)
                 break;
             }
             {
-                char line[8192];
+                char line[RECORD_MAX];
                 while (net_try_line(&s->a.c, line, sizeof line))
                     ev_net_line(i, line);
             }
@@ -470,6 +471,57 @@ static int l_identity_fp(lua_State *l)
     return 1;
 }
 
+static int l_public_id(lua_State *l)
+{
+    uint8_t sk[32], pk[32]; char id[65]; int i;
+    if (cfg_identity_load(sk)) { lua_pushnil(l); return 1; }
+    noise_public_key(pk, sk); memset(sk, 0, sizeof sk);
+    for (i = 0; i < 32; i++) sprintf(id + i * 2, "%02x", pk[i]);
+    lua_pushstring(l, id); return 1;
+}
+static int l_record(lua_State *l)
+{
+    struct record r;
+    if (record_parse(luaL_checkstring(l, 1), &r)) { lua_pushnil(l); return 1; }
+    lua_newtable(l);
+    lua_pushinteger(l, r.ts); lua_setfield(l, -2, "ts");
+    lua_pushstring(l, r.from); lua_setfield(l, -2, "from");
+    lua_pushstring(l, r.to); lua_setfield(l, -2, "to");
+    lua_pushstring(l, r.content); lua_setfield(l, -2, "content");
+    return 1;
+}
+static int cached_line(void *ctx, long long end, const char *json)
+{
+    lua_State *l = ctx;
+    lua_pushvalue(l, 4);
+    lua_pushinteger(l, end);
+    lua_pushstring(l, json);
+    return lua_pcall(l, 2, 0, 0) == LUA_OK ? 0 : -1;
+}
+static int l_cache_read(lua_State *l)
+{
+    luaL_checktype(l, 4, LUA_TFUNCTION);
+    lua_pushboolean(l, cache_read(luaL_checkstring(l, 1), luaL_checkstring(l, 2),
+        luaL_checkstring(l, 3), cached_line, l) == 0);
+    return 1;
+}
+static int l_cache_meta(lua_State *l)
+{
+    lua_pushboolean(l, cache_meta(luaL_checkstring(l, 1), luaL_checkstring(l, 2), luaL_checkstring(l, 3)) == 0);
+    return 1;
+}
+static int l_cache_offset(lua_State *l)
+{
+    lua_pushinteger(l, cache_offset(luaL_checkstring(l, 1), luaL_checkstring(l, 2), luaL_checkstring(l, 3)));
+    return 1;
+}
+static int l_cache_append(lua_State *l)
+{
+    lua_pushboolean(l, cache_append(luaL_checkstring(l, 1), luaL_checkstring(l, 2),
+        luaL_checkstring(l, 3), luaL_checkinteger(l, 4), luaL_checkstring(l, 5)) == 0);
+    return 1;
+}
+
 static int l_server(lua_State *l)
 {
     char host[256];
@@ -490,6 +542,12 @@ static void register_api(void)
         { "set_ime_rect", l_set_ime_rect },
         { "ensure_identity", l_ensure_identity },
         { "identity_fp", l_identity_fp },
+        { "public_id", l_public_id },
+        { "record", l_record },
+        { "cache_offset", l_cache_offset },
+        { "cache_read", l_cache_read },
+        { "cache_meta", l_cache_meta },
+        { "cache_append", l_cache_append },
         { "server", l_server },
         { "quit", l_quit },
         { "log", l_log },

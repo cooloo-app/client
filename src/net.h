@@ -16,9 +16,9 @@ typedef struct {
     int      fd;
     noise_session sess;
     char     server_fp[65];            /* server static key fingerprint */
-    char     nick[17];                 /* greeting nick; "" = unregistered */
+    char     nick[65];                 /* greeting nick; "" = unregistered */
     /* decrypted stream buffer (line extraction) */
-    uint8_t  plain[NOISE_FRAME_MAX_PT + 1];
+    uint8_t  plain[64 * 1024 + 1];
     size_t   plain_len;
     /* v2: raw frame accumulator for nonblocking net_try_recv */
     uint8_t  raw[NOISE_FRAME_MAX_PT + NOISE_FRAME_OVERHEAD];

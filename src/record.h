@@ -1,0 +1,15 @@
+#ifndef COOLOO_RECORD_H
+#define COOLOO_RECORD_H
+#include <stddef.h>
+#define RECORD_MAX 25088
+struct record { long long ts; char from[65], to[65], content[4097]; };
+int record_parse(const char *json, struct record *r);
+/* Contiguous server byte prefix, segregated by server and local public ID. */
+long long cache_offset(const char *server, const char *self, const char *room);
+int cache_append(const char *server, const char *self, const char *room,
+                 long long end, const char *json);
+int cache_meta(const char *server, const char *self, const char *json);
+typedef int (*cache_visit)(void *ctx, long long end, const char *json);
+int cache_read(const char *server, const char *self, const char *room,
+               cache_visit visit, void *ctx);
+#endif

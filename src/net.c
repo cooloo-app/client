@@ -1,6 +1,10 @@
 /*
  * net.c - client side of the native protocol. See net.h.
  */
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#include <sys/select.h>
+#endif
 #include "net.h"
 #include "config.h"
 
@@ -114,7 +118,7 @@ static int handshake_until_tofu(netconn *c, const uint8_t sk[32],
     uint8_t dummy[1];
     size_t dummy_len;
 
-    noise_hs_init_initiator(hs_out, sk, (const uint8_t *)"cooloo-v1", 9);
+    noise_hs_init_initiator(hs_out, sk, (const uint8_t *)"cooloo-v2", 9);
     n = noise_hs_write_msg1(hs_out, msg, sizeof msg, NULL, 0);
     if (!n) {
         /* msg1 build failed before any IO: OS RNG unavailable
@@ -160,12 +164,16 @@ static int read_greeting(netconn *c, char *errbuf, size_t errcap)
         snprintf(errbuf, errcap, "no greeting from server");
         return -1;
     }
-    if (strncmp(line, "COOLOO 1 ", 9) != 0) {
+    if (strncmp(line, "COOLOO 2 ", 9) != 0) {
         snprintf(errbuf, errcap, "bad greeting: %s", line);
         return -1;
     }
+    if (strlen(line + 9) > 64) {
+        snprintf(errbuf, errcap, "nickname exceeds protocol limit");
+        return -1;
+    }
     if (strcmp(line + 9, "-") != 0)
-        snprintf(c->nick, sizeof c->nick, "%s", line + 9);
+        memcpy(c->nick, line + 9, strlen(line + 9) + 1);
     return 0;
 }
 
@@ -492,7 +500,7 @@ int net_async_pump(net_async *a)
             nas_fail_io(a, "connect failed", soerr);
             return -1;
         }
-        noise_hs_init_initiator(&a->hs, a->sk, (const uint8_t *)"cooloo-v1", 9);
+        noise_hs_init_initiator(&a->hs, a->sk, (const uint8_t *)"cooloo-v2", 9);
         a->wlen = noise_hs_write_msg1(&a->hs, a->wbuf, sizeof a->wbuf, NULL, 0);
         a->woff = 0;
         if (!a->wlen) {
@@ -560,7 +568,7 @@ int net_async_pump(net_async *a)
             if (cfg_known_server_get(a->hostport, pinned)) {
                 if (strcmp(pinned, c->server_fp) != 0) {
                     snprintf(a->err, sizeof a->err,
-                             "SERVER FINGERPRINT CHANGED for %s "
+                             "SERVER FINGERPRINT CHANGED for %.64s "
                              "(pinned %.16s..., got %.16s...)",
                              a->hostport, pinned, c->server_fp);
                     a->state = NAS_FAILED;
@@ -608,13 +616,17 @@ int net_async_pump(net_async *a)
             a->stall_ticks = 0;
         if (!net_try_line(c, line, sizeof line))
             return 0;
-        if (strncmp(line, "COOLOO 1 ", 9) != 0) {
+        if (strncmp(line, "COOLOO 2 ", 9) != 0) {
             snprintf(a->err, sizeof a->err, "bad greeting: %.64s", line);
             a->state = NAS_FAILED;
             return -1;
         }
+        if (strlen(line + 9) > 64) {
+            nas_fail(a, "nickname exceeds protocol limit");
+            return -1;
+        }
         if (strcmp(line + 9, "-") != 0)
-            snprintf(c->nick, sizeof c->nick, "%s", line + 9);
+            memcpy(c->nick, line + 9, strlen(line + 9) + 1);
         a->state = NAS_READY;
         return 1;
     }

@@ -182,7 +182,7 @@ local function render_rooms(o, L)
         if name == chat.sel then
             o.rect(4, y - 3, L.rooms_w - 8, L.lh + 6, C.sel)
         end
-        o.text(10, y, "#" .. name, name == chat.sel and C.fg or C.gray)
+        o.text(10, y, "#" .. (r.nickname or name), name == chat.sel and C.fg or C.gray)
         if r.unread > 0 then
             local b = ("+%d"):format(r.unread)
             o.text(L.rooms_w - cooloo.text_width(b, SIZE) - 10, y, b,

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
@@ -63,7 +64,7 @@ int cfg_dir(char *buf, size_t buflen)
 #endif
         if (!home)
             return -1;
-        n = snprintf(buf, buflen, "%s/.config/cooloo", home);
+        n = snprintf(buf, buflen, "%s/.cooloo", home);
     }
     if (n <= 0 || n >= (int)buflen)
         return -1;

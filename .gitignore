@@ -1,5 +1,6 @@
 /cooloo
 /cooloo.exe
+/cooloo-cli
 *.dSYM/
 /build/
 /src/embedded_lua.c

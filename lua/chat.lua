@@ -98,7 +98,7 @@ local function send_follow(r)
     r.phase = "following"
     -- resume from the persisted offset so a restart/reconnect loses
     -- nothing (04 doc 6.3); fall back to live tail when unknown
-    local saved = cfgget("offset." .. r.name)
+    local saved = r.newest_end and tostring(r.newest_end)
     if saved then
         cooloo.net.send(r.conn, ("FOLLOW %s %s\n"):format(r.name, saved))
     elseif r.newest_end then
@@ -148,7 +148,7 @@ local function add_msg(r, endoff, ts, nick, text)
         r.ends[old.endoff] = nil
         r.oldest_end = r.buf[1] and r.buf[1].endoff or nil
     end
-    cfgset("offset." .. r.name, tostring(r.newest_end))
+    -- The durable JSONL prefix is the synchronization checkpoint.
     if r ~= M.current() then r.unread = r.unread + 1 end
 end
 
@@ -162,7 +162,7 @@ function M.on_ready(conn, nick)
             M.nick = nick
             M.registered = true
         end
-        cooloo.net.send(conn, "ROOMS\n")
+        if M.registered then cooloo.net.send(conn, "ROOMS\n") end
         return
     end
     local r = M.by_conn[conn]
@@ -170,14 +170,51 @@ function M.on_ready(conn, nick)
         r.phase = "reading"
         r.read_requested = r.read_n
         r.read_received = 0
-        cooloo.net.send(conn, ("READ %s -%d\n"):format(r.name, r.read_n))
+        r.server_fp = cooloo.net.fp(conn)
+        r.self_id = cooloo.public_id()
+        local ok = cooloo.cache_read(r.server_fp, r.self_id, r.name, function(endoff, json)
+            local msg = cooloo.record(json)
+            if msg then
+                add_msg(r, endoff, msg.ts, (M.names or {})[msg.from] or msg.from, msg.content)
+                for _, m in ipairs(r.buf) do if m.endoff == endoff then m.from = msg.from end end
+            end
+        end)
+        local offset = cooloo.cache_offset(r.server_fp, r.self_id, r.name)
+        if not ok or offset < 0 then
+            M.status = "cache read failure"
+            cooloo.net.close(conn)
+            return
+        end
+        r.newest_end = offset
+        cooloo.net.send(conn, ("READ %s %d\n"):format(r.name, offset))
     end
 end
 
 function M.on_line(conn, line)
     if conn == M.ctrl then
-        local room = line:match("^ROOM (.+)$")
-        if room then M.ensure_room(room); return end
+        local room, nickname = line:match("^ROOM (%x+) (.+)$")
+        if room then
+            M.ensure_room(room).nickname = nickname
+            cooloo.net.send(conn, "METAFILE " .. room .. "\n")
+            return
+        end
+        local meta = line:match("^META (.+)$")
+        if meta then
+            if not cooloo.cache_meta(cooloo.net.fp(conn), cooloo.public_id(), meta) then
+                M.status = "metadata cache failure"
+            end
+            return
+        end
+        local id, kind, owner, slot, name = line:match("^INFO (%x+) (%S+) (%S+) (%d+) (.+)$")
+        if id then
+            M.names = M.names or {}; M.names[id] = name
+            for _, r in pairs(M.rooms) do
+                for _, m in ipairs(r.buf) do
+                    if m.from == id then m.nick = name; m.wrap = nil end
+                end
+            end
+            return
+        end
         if line == "END" then
             -- every ROOMS response (initial or periodic refresh) is a
             -- chance to pick up rooms created after connect
@@ -189,14 +226,14 @@ function M.on_line(conn, line)
             return
         end
         local nick = line:match("^NICK (.+)$")
-        if nick then
+        if nick and nick ~= "-" then
             M.nick = nick
             M.registered = true
             M.want_register = false
             M.status = ""   -- clear a stale "registering as ..." text
             cfgset("nick", nick)
-            -- registration completed after ROOMS: room conns were gated
-            -- in start_follows, open them now
+            -- Registration creates the inbox; refresh the visible address list.
+            cooloo.net.send(conn, "ROOMS\n")
             if M.rooms_loaded then M.start_follows() end
             return
         end
@@ -209,17 +246,30 @@ function M.on_line(conn, line)
     if r.pending then
         local h = r.pending
         r.pending = nil
-        add_msg(r, h.endoff, h.ts, h.nick, unescape(line))
+        local msg = cooloo.record(line)
+        if not msg or #line ~= h.len or msg.to ~= r.name or
+            not cooloo.cache_append(r.server_fp, r.self_id, r.name, h.endoff, line) then
+            M.status = "invalid message or cache write failure"
+            cooloo.net.close(conn)
+            return
+        end
+        M.names = M.names or {}
+        if not M.names[msg.from] then
+            M.names[msg.from] = msg.from
+            cooloo.net.send(M.ctrl, "META " .. msg.from .. "\n")
+        end
+        add_msg(r, h.endoff, msg.ts, M.names[msg.from], msg.content)
+        for _, m in ipairs(r.buf) do if m.endoff == h.endoff then m.from = msg.from end end
         return
     end
-    local e, ts, nick = line:match("^MSG (%d+) (%d+) (%S+) %d+$")
+    local e, len = line:match("^MSG (%d+) (%d+)$")
     if e then
         -- READ pauses live push, so MSG lines in a READ window are all
         -- READ results; count them raw (pre-dedupe) to detect a short read
         if r.phase == "reading" or r.backfilling then
             r.read_received = r.read_received + 1
         end
-        r.pending = { endoff = tonumber(e), ts = tonumber(ts), nick = nick }
+        r.pending = { endoff = tonumber(e), len = tonumber(len) }
         return
     end
     if line == "END" then
@@ -274,19 +324,7 @@ function M.scroll(r, dlines)
 end
 
 function M.maybe_backfill(r)
-    if r.phase ~= "following" or r.backfilling or not r.conn or r.exhausted then
-        return
-    end
-    local n = math.min(r.read_n + 50, READ_MAX)
-    if n <= r.read_n then
-        if r.read_n >= READ_MAX then M.status = "history limit (1000)" end
-        return
-    end
-    r.read_n = n
-    r.backfilling = true
-    r.read_requested = n
-    r.read_received = 0
-    cooloo.net.send(r.conn, ("READ %s -%d\n"):format(r.name, n))
+    if #r.buf >= ROOM_CAP then M.status = "older history is available in local JSONL" end
 end
 
 function M.register(nick)
