@@ -1,7 +1,8 @@
-# Protocol 2 client — development checkout
+# Protocol 2 client — v0.2.0
 
-**Not released.** `release/` binaries still speak protocol 1. This source tree
-requires the protocol-2 sibling server. It does not migrate old config/history.
+Requires a protocol-2 server. Production remains on protocol 1 until a separate
+cutover; these binaries cannot connect to that deployment. No old config/history
+migration is provided.
 
 ## CLI
 
@@ -66,8 +67,6 @@ make cooloo-cli                  # portable CLI-only build
 make test                       # isolated CLI/gate/cache + Lua state tests
 ```
 
-GUI builds remain `make` (macOS) / `make release-windows` (cross-build).
-The existing static SDL3/Lua/font bundling and Windows dual-mode entry point
-remain. **These platform builds and actual GUI windows have not been verified
-for protocol 2.** Do not replace published artifacts before platform validation.
-Old `tests/nettest.sh` and Windows scripts need updating before protocol-2 use.
+Platform release validation and remaining limitations are recorded in
+`release/README.md`. Windows scripts use an isolated config and optional isolated
+protocol-2 test server; never point their network tests at production.
