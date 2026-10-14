@@ -16,8 +16,9 @@
 /* Cache nesting exceeds MAX_PATH even with ordinary user-profile paths. */
 static const char *win_path(const char *p,char out[2048])
 {
-    char absolute[1800];size_t i;DWORD n=GetFullPathNameA(p,sizeof absolute,absolute,NULL);
-    if(!n||n>=sizeof absolute)return p;
+    char absolute[1800];size_t i;
+    if((p[0]&&p[1]==':')||(p[0]=='\\'&&p[1]=='\\'))snprintf(absolute,sizeof absolute,"%s",p);
+    else {DWORD n=GetFullPathNameA(p,sizeof absolute,absolute,NULL);if(!n||n>=sizeof absolute)return p;}
     if(absolute[0]=='\\'&&absolute[1]=='\\')snprintf(out,2048,"\\\\?\\UNC\\%s",absolute+2);
     else snprintf(out,2048,"\\\\?\\%s",absolute);
     for(i=0;out[i];i++)if(out[i]=='/')out[i]='\\';
