@@ -24,8 +24,8 @@ static const char *win_path(const char *p,char out[2048])
     return out;
 }
 static FILE *win_fopen(const char *p,const char *mode){char w[2048];return fopen(win_path(p,w),mode);}
-static int win_cache_mkdir(const char *p){char w[2048];return _mkdir(win_path(p,w));}
-static int win_cache_stat(const char *p,struct stat *st){char w[2048];return stat(win_path(p,w),st);}
+static int win_cache_mkdir(const char *p){char w[2048];if(CreateDirectoryA(win_path(p,w),NULL))return 0;errno=GetLastError()==ERROR_ALREADY_EXISTS?EEXIST:EIO;return -1;}
+static int win_cache_stat(const char *p,struct stat *st){char w[2048];DWORD a=GetFileAttributesA(win_path(p,w));if(a==INVALID_FILE_ATTRIBUTES){errno=EIO;return -1;}memset(st,0,sizeof *st);st->st_mode=(a&FILE_ATTRIBUTE_DIRECTORY)?S_IFDIR:S_IFREG;return 0;}
 static int win_cache_remove(const char *p){char w[2048];return remove(win_path(p,w));}
 static int win_cache_move(const char *a,const char *b){char wa[2048],wb[2048];return MoveFileExA(win_path(a,wa),win_path(b,wb),MOVEFILE_REPLACE_EXISTING)?0:-1;}
 #define fopen(p,m) win_fopen(p,m)
