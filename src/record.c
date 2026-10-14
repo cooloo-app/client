@@ -72,7 +72,7 @@ int record_parse(const char *p,struct record *r)
        literal(&p,",\"content\":")||string(&p,r->content,sizeof r->content)||strcmp(p,"}"))return -1;
     return 0;
 }
-static int dir(const char *p){struct stat st;if(!mkdir(p,0700))return 0;return errno==EEXIST&&!stat(p,&st)&&S_ISDIR(st.st_mode)?0:-1;}
+static int dir(const char *p){struct stat st;if(!mkdir(p,0700))return 0;if(errno==EEXIST&&!stat(p,&st)&&S_ISDIR(st.st_mode))return 0;fprintf(stderr,"cache directory failed: %s (errno=%d)\n",p,errno);return -1;}
 static int cache_path(char *p,size_t cap,const char *server,const char *self,const char *room)
 {
     char base[1024];int n;
@@ -96,7 +96,7 @@ int cache_meta(const char *server,const char *self,const char *json)
 #else
     snprintf(tmp,sizeof tmp,"%s.%ld.tmp",p,(long)getpid());
 #endif
-    f=fopen(tmp,"wb");if(!f)return -1;
+    f=fopen(tmp,"wb");if(!f){fprintf(stderr,"cache metadata open failed (errno=%d)\n",errno);return -1;}
     if(fputs(json,f)==EOF||fputc('\n',f)==EOF)rc=-1;
     if(fclose(f))rc=-1;
 #ifdef _WIN32
