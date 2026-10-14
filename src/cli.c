@@ -105,8 +105,9 @@ static int sync_meta(netconn *c,const char *self,const char *address)
 {
     char line[1200];
     snprintf(line,sizeof line,"METAFILE %s\n",address);
-    if(net_send_line(c,line)||net_read_line(c,line,sizeof line)||strncmp(line,"META ",5))return -1;
-    return cache_meta(c->server_fp,self,line+5);
+    if(net_send_line(c,line)||net_read_line(c,line,sizeof line)||strncmp(line,"META ",5)) {fprintf(stderr,"metadata request failed: %s\n",line);return -1;}
+    if(cache_meta(c->server_fp,self,line+5)) {fprintf(stderr,"metadata cache I/O failed\n");return -1;}
+    return 0;
 }
 static int receive(netconn *c,const char *self,int raw,int cache,int follow)
 {
@@ -116,7 +117,7 @@ static int receive(netconn *c,const char *self,int raw,int cache,int follow)
         if(net_read_line(c,line,sizeof line))return 1;
         if(!strcmp(line,"END"))return 0;
         if(sscanf(line,"MSG %lld %zu %c",&end,&len,&extra)!=2){fprintf(stderr,"%s\n",line);return 1;}
-        if(net_read_line(c,json,sizeof json)||strlen(json)!=len||record_parse(json,&r))return 1;
+        if(net_read_line(c,json,sizeof json)||strlen(json)!=len||record_parse(json,&r)){fprintf(stderr,"invalid message payload (expected %zu bytes)\n",len);return 1;}
         if(cache&&cache_append(c->server_fp,self,r.to,end,json)){fprintf(stderr,"cache failure (gap, conflict or I/O error)\n");return 1;}
         if(raw)puts(json);else printf("%lld <%s> %s\n",r.ts,r.from,r.content);
         fflush(stdout);
