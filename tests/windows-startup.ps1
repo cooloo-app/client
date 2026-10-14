@@ -63,11 +63,11 @@ $r = Run-Test '--lua-dev'
 if ($r.Code -ne 2 -or $r.Err -notmatch 'requires a directory') { throw 'argument error failed' }
 if ($env:COOLOO_TEST_HOST) {
     $r = Run-Test 'rooms' "y`n"
-    if ($r.Code -ne 0 -or $r.Err -notmatch 'trust and pin') { throw 'piped TOFU input failed' }
+    if ($r.Code -ne 1 -or $r.Out -notmatch 'not-registered' -or $r.Err -notmatch 'Trust server') { throw 'piped TOFU input failed' }
     $r = Run-Test 'whoami --register ui-test'
     if ($r.Code -ne 0 -or $r.Out -notmatch 'ui-test') { throw 'register failed' }
     $r = Run-Test 'create ui-test-room'
-    if ($r.Code -ne 0 -or $r.Out -notmatch '^OK ([0-9a-f]{64})') { throw 'create failed' }
+    if ($r.Code -ne 0 -or $r.Out -notmatch '^ROOM ([0-9a-f]{64})') { throw 'create failed' }
     $room = $Matches[1]
     $r = Run-Test "send $room" "transparent C pipe test`nsecond line`n"
     if ($r.Code -ne 0 -or $r.Out -notmatch '^OK ') { throw 'piped send failed' }

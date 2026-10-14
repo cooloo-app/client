@@ -93,7 +93,7 @@ $(WIN_ICON): src/cooloo.rc assets/cooloo.ico
 
 release-windows: cooloo.exe
 cooloo.exe: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_WIN_LIB) $(WIN_ICON)
-	$(WIN_CC) $(CFLAGS) -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(ALL_SRC) $(WIN_ICON) $(WIN_LIBS)
+	$(WIN_CC) $(CFLAGS) -D__USE_MINGW_ANSI_STDIO=1 -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(ALL_SRC) $(WIN_ICON) $(WIN_LIBS)
 
 release-macos: cooloo
 	@echo "release-macos: ./cooloo (native $$(uname -m))"
