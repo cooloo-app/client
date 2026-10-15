@@ -30,6 +30,8 @@ static void usage(FILE *out)
             "  cooloo [--debug] [--lua-dev DIR]     GUI (default)\n"
             "  cooloo rooms                         list rooms and own inbox\n"
             "  cooloo create <nickname>             create public room\n"
+            "  cooloo join <room-id>                request membership\n"
+            "  cooloo room-mode <room-id> public|private\n"
             "  cooloo avatar <slot> <public-id> <nickname>\n"
             "  cooloo meta <id> | rename <id> <nickname>\n"
             "  cooloo whoami [--register <nick>]    show / register nick\n"
@@ -92,7 +94,8 @@ int main(int argc, char **argv)
     }
 
     if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
-        !strcmp(argv[1], "meta") || !strcmp(argv[1], "rename"))
+        !strcmp(argv[1], "meta") || !strcmp(argv[1], "rename") ||
+        !strcmp(argv[1], "join") || !strcmp(argv[1], "room-mode"))
         return cooloo_cli_request(argc, argv);
     if (!strcmp(argv[1], "keygen"))
         return cooloo_cli_keygen(argc, argv);

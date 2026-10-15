@@ -92,7 +92,56 @@ with tempfile.TemporaryDirectory(prefix='cooloo-client2-') as tmp:
                     finally:
                         follower.terminate()
                         follower.wait(timeout=5)
-            print('client2: native/SSH interoperability, independent avatars, private ACL, exact JSONL cache, deduplication and FOLLOW restart passed')
+            # Private-room CLI/control messages cross both transports.
+            cli('b', 'room-mode', room, 'private')
+            d = cli('d', 'keygen').strip()
+            cli('d', 'whoami', '--register', 'late-user')
+            cli('d', 'read', room, '0', ok=False)
+            cli('d', 'meta', room, ok=False)
+            cli('d', 'follow', room, ok=False)
+            assert room not in cli('d', 'rooms')
+            cli('d', 'send', room, 'not a member', ok=False)
+            cli('d', 'join', room)
+            cli('d', 'join', room, ok=False)
+            gate(b, f'send {room}', input=f'@{room} join-approve {d}')
+            assert 'join-request' in cli('d', 'read', '--raw', room, '0')
+            cli('d', 'send', room, 'approved via SSH')
+            e = cli('e', 'keygen').strip()
+            cli('e', 'whoami', '--register', 'late-two')
+            gate(e, f'join {room}')
+            cli('d', 'send', room, f'@{room} join-approve {e}')
+            assert 'approved via SSH' in gate(e, f'read {room} 0')
+            f = cli('f', 'keygen').strip()
+            cli('f', 'whoami', '--register', 'outsider')
+            cli('f', 'room-mode', room, 'public')
+            assert 'approved via SSH' in cli('f', 'read', '--raw', room, '0')
+            # A read-only public follower must stop after the room becomes private.
+            fe = dict(os.environ, COOLOO_CONFIG=str(base / 'f'), COOLOO_HOST=f'127.0.0.1:{port}')
+            with open(base / 'readonly-follow.log', 'w+') as follow_log:
+                follower = subprocess.Popen([str(client / 'cooloo-cli'), '-y', 'follow', room],
+                                            env=fe, stdout=follow_log, stderr=follow_log)
+                try:
+                    cli('a', 'send', room, 'readonly-follow-ready')
+                    for _ in range(200):
+                        follow_log.seek(0)
+                        if 'readonly-follow-ready' in follow_log.read():
+                            break
+                        time.sleep(.02)
+                    else:
+                        raise AssertionError('read-only follower not ready')
+                    gate(f, f'room-mode {room} private')
+                    assert follower.wait(timeout=5) != 0
+                finally:
+                    if follower.poll() is None:
+                        follower.terminate()
+                        follower.wait(timeout=5)
+            cli('f', 'send', room, 'not a historical sender', ok=False)
+            cli('f', 'read', room, '0', ok=False)
+            cli('f', 'room-mode', room, 'public')
+            cli('f', 'send', room, 'historical participant')
+            gate(f, f'room-mode {room} private')
+            cli('f', 'send', room, 'included in snapshot')
+            print('client2: native/SSH interoperability, private-room CLI/join/approval, metadata ACL, exact JSONL cache and FOLLOW restart passed')
         finally:
             daemon.terminate()
             daemon.wait(timeout=5)

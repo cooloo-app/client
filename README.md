@@ -1,8 +1,8 @@
-# Protocol 2 client — v0.2.0
+# Protocol 2 client — v0.2.1
 
-Requires a protocol-2 server. Production remains on protocol 1 until a separate
-cutover; these binaries cannot connect to that deployment. No old config/history
-migration is provided.
+Requires a protocol-2 server. Production uses Protocol 2; the new simple private
+room commands require server v0.2.1 or later. No old config/history migration
+is provided.
 
 ## CLI
 
@@ -11,6 +11,8 @@ cooloo keygen                         # print actual public-key ID (64 hex)
 cooloo whoami --register <nickname>    # duplicate nicknames allowed
 cooloo whoami
 cooloo create <nickname>               # create public room, returns its ID
+cooloo join <room-id>                  # sends @<room-id> join-request
+cooloo room-mode <room-id> public|private
 cooloo avatar <001..899> <child-public-id> <nickname>
 cooloo rooms
 cooloo meta <id-or-alias>
@@ -19,6 +21,22 @@ cooloo send <id-or-alias> [text...]     # stdin preserves exact bytes
 cooloo read [--raw] <id-or-alias> <offset>
 cooloo follow <id-or-alias>            # durable catch-up then live stream
 ```
+
+Simple private rooms require the matching updated server. Approve with:
+
+```sh
+cooloo send <room-id> '@<room-id> join-approve <applicant-user-id>'
+```
+
+Replace placeholders with complete IDs. Any member may approve; requests must
+be more than 24 hours apart and expire after seven days. Owner counts toward the
+200-member limit. Private rooms share their full history with members.
+**Temporary policy: any registered user may switch any room to public, exposing
+all history.** Switching public -> private adds user IDs that have sent messages
+in this room, retaining owner and existing members; over 200 rejects conversion.
+Registration, reading, or switching mode alone does not grant membership.
+Member blocks are reserved, empty, and have no client API yet. No GUI controls
+are added; ordinary GUI messages can carry the exact control text.
 
 `-y/--tofu` trusts and pins a previously unknown server; a changed pin fails.
 Create a child key in its own `COOLOO_CONFIG` directory, then authorize its public

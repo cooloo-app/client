@@ -48,7 +48,20 @@ int cooloo_cli_request(int argc,char **argv)
 {
     netconn c;char self[65],line[2048],response[2048];size_t used;int i,rc=1;
     const char *cmd=argv[1];
-    if(!strcmp(cmd,"create"))cmd="CREATE";
+    if(!strcmp(cmd,"join")) {
+        char text[100]; char *sendargs[5]; size_t j;
+        if(argc!=3 || strlen(argv[2])!=64)return 2;
+        for(j=0;j<64;j++)if(!strchr("0123456789abcdef",argv[2][j]))return 2;
+        snprintf(text,sizeof text,"@%s join-request",argv[2]);
+        sendargs[0]=argv[0];sendargs[1]="send";sendargs[2]=argv[2];sendargs[3]=text;sendargs[4]=NULL;
+        return cooloo_cli_send(4,sendargs);
+    }
+    if(!strcmp(cmd,"room-mode")) {
+        if(argc!=4 || (strcmp(argv[3],"public") && strcmp(argv[3],"private")))return 2;
+        if(!strcmp(argv[3],"public"))fprintf(stderr,"Warning: this makes ALL room history public to registered users.\n");
+        cmd="ROOMMODE";
+    }
+    else if(!strcmp(cmd,"create"))cmd="CREATE";
     else if(!strcmp(cmd,"avatar"))cmd="AVATAR";
     else if(!strcmp(cmd,"meta"))cmd="META";
     else if(!strcmp(cmd,"rename"))cmd="RENAME";
