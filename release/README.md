@@ -1,75 +1,50 @@
-# cooloo client v0.2.2 — Message delegation and sent recovery
+# cooloo client v0.2.3 — JSON machine API and Python distribution
 
-Requires Protocol 2; delegation, AS, SENT and history require server v0.2.2.
-No protocol-1 compatibility or legacy history/config migration.
+GUI+CLI single binaries. Protocol 2; delegation/SENT require server v0.2.2.
+Source commit: `2ac3f027aca3b5f6a746e490bf5dd3384fc0b746`.
+Integration server: `de4f3d21aecaa2190564c329608c02a9decd8010` (unchanged).
+Built 2026-10-15 in isolated `/tmp/cooloo-python-v023-final` on m106.
+The later artifact commit contains these outputs; it is not their build input.
 
-## Artifacts (Git LFS)
-
-Built on 2026-10-15 in isolated `/tmp/cooloo-delegation-v022` on m106
-(macOS arm64), Windows x86_64 cross-compiled with mingw-w64.
-Exact client source: `5a39a43844f661c23f47c78e51c290372727fe3c`.
-Integration-test server: `de4f3d21aecaa2190564c329608c02a9decd8010`.
-The artifact-containing release commit is not the source build input.
-
-| File | Platform | Bytes | SHA-256 |
+| File | Target | Bytes | SHA256 |
 |---|---|---:|---|
-| `cooloo-darwin-arm64` | macOS arm64 | 2569528 | `cb264e988ded1c5e3b7c619947422ccc3f336016195b593b8b6c3ea898a2805a` |
-| `cooloo-windows-x86_64.exe` | Windows 10+ x86_64 | 4153766 | `cc8c1192f2dad5091b6c233197875d517829f498fca30d222a8e8f475732aafb` |
+| cooloo-darwin-arm64 | macOS arm64, deployment target 11.0 | 2589896 | 701cdeab865967ec15a41a5d1d44ed607ceca2329d04a775f421e693d1fe84f8 |
+| cooloo-windows-x86_64.exe | Windows x86_64 GUI subsystem | 4161497 | 19079ec6c559eb58c5ddac6807669ba51b34fa830103246cdae003b7613fc28a |
 
-Mach-O arm64 / PE32+ x86_64 GUI subsystem, static vendored libraries and
-Windows system DLLs only (including UCRT). Unsigned/not notarized. No Linux GUI.
+Git LFS tracked; unsigned/not notarized. Windows cross-built with mingw-w64, system
+DLLs only. macOS minimum is pinned for both SDL and final link, not inferred from host OS.
+Actual execution on macOS 11 has NOT been tested.
 
-## Validation
+## Changes
 
-- Linux server/client tests pass: private-room regressions, independent read/write
-  grants, effective/default sender, escalation/invalid-grant denial, filtered SENT,
-  merged history/discovery gap, cross-transport and FOLLOW revocation, cache isolation.
-- Clean macOS server/client tests pass, including cache and GUI Lua state mocks.
-  The actual GUI-linked release passes the full protocol integration suite.
-- macOS SDL startup/first-frame probe passes (49 ms).
-- Windows m101 help, error exit codes, keygen, redirected output and debug/bare GUI
-  first-frame pass. Piped TOFU, registration, room creation, multiline stdin SEND
-  and raw READ/cache pass against a dedicated m106 listener, not production.
-- **Not validated:** desktop-visible Windows icons/console-presence (window probe
-  reports `GUI window missing` in SSH session), full manual GUI conversation,
-  identity switching and scrolling on either platform. Windows delegation-specific
-  workflows are not separately tested; complete workflows pass on Linux/macOS.
+- `--json` JSONL schema 1, noninteractive TOFU, structured results/errors and version query.
+- Machine READ/FOLLOW do not write normal caches; explicit FOLLOW byte offset.
+- Message end-offset and SENT scan-offset preserved. No automatic retries/ACKs.
+- SEND lost acknowledgement reports uncertain delivery; AS failure never falls back.
+- `--gui` explicit GUI alias; ordinary CLI and GUI remain available.
+- Redirected Windows machine processes do not allocate a console solely for stdio.
+- See ../MACHINE_API.md and https://github.com/cooloo-app/python-sdk .
 
-## Delegation and recovery
+## This release's validation
 
-```sh
-cooloo delegate <child-id> read,write  # actual owner credentials; replaces grant
-cooloo --as <owner-id> send <peer-id> "delegated sender"
-cooloo --as <owner-id> sent <peer-id> 0
-cooloo --as <owner-id> history
-cooloo delegate <child-id> none       # revoke
-```
+- Linux existing client integration, Lua state and cache tests passed.
+- Clean macOS server/client tests passed; Python integration/process suite 7/7 passed
+  against the GUI-linked release and again from the installed final wheel (Python 3.14).
+- macOS GUI startup first-frame probe passed (28 ms final run).
+- Windows m101 Python 3.12 wheel import, JSON output/exit status, pip/pipx install/run,
+  explicit GUI first-frame (1 ms) and Unicode package installation path passed.
+- Windows Python against isolated m106 port 24223: multiline Unicode SEND/READ, explicit
+  FOLLOW + cancellation, delegation/revocation, filtered SENT empty cursor and no cache passed.
+- Both platform wheels built and twine check passed; bundled hashes verified after transfer.
+- No production mutation/deployment. macOS/Windows full interactive GUI, desktop-visible
+  window/icon/console state, macOS 11 runtime, Windows Unicode identity-directory paths,
+  Python 3.10/3.11/3.13 and full architecture/OS matrix remain unverified.
+- Binary default blocking calls still have no new network deadline; Python enforces process
+  deadlines. No automatic follow reconnect or keepalive. See SDK docs for explicit close.
 
-Login identity remains the default. Grant only to an existing avatar; read/write
-are independent, with no transitive grants or delegated management. GUI `/as <id>`
-and `/self` select a window identity; ordinary caches are identity-partitioned.
-SENT is filtered server-side and never written to the contiguous peer inbox cache.
-History discovers peers from incoming messages: **peers that never replied are
-omitted unless explicitly queried with sent**. GUI outgoing recovery is online/
-in-memory, refreshed on reconnect, not persistent or continuously followed.
-Physical SENT offsets reveal peer inbox size/activity, not unrelated content.
+## Rebuild / publication
 
-Private-room temporary policy remains: **any registered user can make any room
-public, exposing all history; not a confidentiality guarantee**. No kick/leave/
-owner transfer, room block API or GUI private-room controls.
-
-Default private identity/config/cache: `~/.cooloo` (USERPROFILE fallback on Windows).
-`COOLOO_CONFIG` selects an isolated root; `COOLOO_HOST=host:port` selects server.
-Protect backups of the entire directory. Server backups must also include authz.
-
-## Other limitations and rebuilding
-
-No complete multi-device recovery, read receipts, contact/subscription sync or E2EE.
-CLI chat is unavailable; FOLLOW does not automatically reconnect or send idle
-keepalives. GUI memory is capped at 2000 messages; no older on-disk history paging.
-Large-history performance, Windows >2 GB offsets/non-ASCII paths/ACL behavior and
-concurrent GUI cache writers remain unvalidated.
-
-Use fresh sibling sources at recorded commits: `make release-macos`, `make test`,
-`make release-windows`. GitHub Release assets are standalone binaries, not LFS
-pointers. Verify SHA-256 after download.
+Use sibling source commits above: make release-macos; make test; make release-windows.
+Python wheels include this same GUI+CLI binary, not a CLI-only build.
+Local tag requested as v0.2.3; pushing tags/LFS, GitHub Release and PyPI upload are separate.
+SDK 0.1.0 public-package release is blocked on owner license approval and publication setup.
