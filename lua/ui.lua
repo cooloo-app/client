@@ -168,6 +168,9 @@ local function render_status(o, L, st)
            left:sub(1, 4) == "ERR " and C.err or C.gray)
     local right = ("%s@%s:%d"):format(chat.nick ~= "" and chat.nick or "?",
                                       chat.host or "?", chat.port or 0)
+    if chat.effective then
+        right = 'as ' .. chat.effective:sub(1,12) .. ' via ' .. cooloo.public_id():sub(1,12)
+    end
     o.text(L.w - cooloo.text_width(right, SIZE) - 8, L.h - L.status_h + 4,
            right, C.gray)
 end

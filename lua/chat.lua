@@ -67,6 +67,24 @@ function M.init(host, port)
     M.host, M.port = host, port
 end
 
+function M.identity()
+    return M.effective or cooloo.public_id()
+end
+
+-- One explicit identity per window. Clear streams/views before switching.
+function M.use_identity(id)
+    if id and (#id ~= 64 or not id:match('^[0-9a-f]+$')) then return false end
+    M.close_all()
+    M.effective = id ~= cooloo.public_id() and id or nil
+    M.auth_failed = false
+    M.rooms, M.order, M.by_conn = {}, {}, {}
+    M.sel, M.rooms_loaded = nil, false
+    M.sent_conns, M.sent_seen = {}, {}
+    M.want_reconnect = false
+    M.connect_ctrl()
+    return true
+end
+
 function M.current()
     return M.sel and M.rooms[M.sel] or nil
 end
@@ -127,6 +145,7 @@ function M.start_follows()
 end
 
 function M.ensure_conns()
+    if M.auth_failed then return end
     if not M.ctrl then M.connect_ctrl() end
     if M.rooms_loaded then M.start_follows() end
 end
@@ -136,7 +155,12 @@ local function add_msg(r, endoff, ts, nick, text)
     r.ends[endoff] = true
     local m = { endoff = endoff, ts = ts, nick = nick, text = text }
     local i = #r.buf + 1
-    if #r.buf > 0 and r.buf[#r.buf].endoff > endoff then
+    if r.name == M.identity() then
+        i = 1
+        while i <= #r.buf and (r.buf[i].ts < ts or
+            (r.buf[i].ts == ts and ((r.buf[i].to or r.name) < r.name or
+            ((r.buf[i].to or r.name) == r.name and r.buf[i].endoff < endoff)))) do i = i + 1 end
+    elseif #r.buf > 0 and r.buf[#r.buf].endoff > endoff then
         i = 1
         while i <= #r.buf and r.buf[i].endoff < endoff do i = i + 1 end
     end
@@ -145,7 +169,7 @@ local function add_msg(r, endoff, ts, nick, text)
     if not r.oldest_end or endoff < r.oldest_end then r.oldest_end = endoff end
     if #r.buf > ROOM_CAP then
         local old = table.remove(r.buf, 1)
-        r.ends[old.endoff] = nil
+        if not old.sent then r.ends[old.endoff] = nil end
         r.oldest_end = r.buf[1] and r.buf[1].endoff or nil
     end
     -- The durable JSONL prefix is the synchronization checkpoint.
@@ -153,6 +177,21 @@ local function add_msg(r, endoff, ts, nick, text)
 end
 
 function M.on_ready(conn, nick)
+    if M.effective then
+        M.as_pending = M.as_pending or {}
+        M.as_pending[conn] = nick
+        cooloo.net.send(conn, 'AS ' .. M.effective .. '\n')
+        return
+    end
+    M.ready_identity(conn, nick)
+end
+
+function M.ready_identity(conn, nick)
+    local s = (M.sent_conns or {})[conn]
+    if s then
+        cooloo.net.send(conn, 'SENT ' .. s.peer .. ' 0\n')
+        return
+    end
     if conn == M.ctrl then
         M.ctrl_up = true
         M.status = ""
@@ -171,12 +210,12 @@ function M.on_ready(conn, nick)
         r.read_requested = r.read_n
         r.read_received = 0
         r.server_fp = cooloo.net.fp(conn)
-        r.self_id = cooloo.public_id()
+        r.self_id = M.identity()
         local ok = cooloo.cache_read(r.server_fp, r.self_id, r.name, function(endoff, json)
             local msg = cooloo.record(json)
             if msg then
                 add_msg(r, endoff, msg.ts, (M.names or {})[msg.from] or msg.from, msg.content)
-                for _, m in ipairs(r.buf) do if m.endoff == endoff then m.from = msg.from end end
+                for _, m in ipairs(r.buf) do if not m.sent and m.endoff == endoff then m.from = msg.from end end
             end
         end)
         local offset = cooloo.cache_offset(r.server_fp, r.self_id, r.name)
@@ -191,6 +230,54 @@ function M.on_ready(conn, nick)
 end
 
 function M.on_line(conn, line)
+    if M.as_pending and M.as_pending[conn] then
+        local nick = M.as_pending[conn]
+        M.as_pending[conn] = nil
+        if line ~= 'OK' then
+            M.status = line
+            M.auth_failed = true
+            M.close_all() -- never fall back to login identity on failed delegation
+            return
+        end
+        M.auth_failed = false
+        M.ready_identity(conn, nick)
+        return
+    end
+    local s = (M.sent_conns or {})[conn]
+    if s then
+        if s.pending then
+            local h = s.pending; s.pending = nil
+            local msg = cooloo.record(line)
+            if not msg or #line ~= h.len or msg.from ~= M.identity() or msg.to ~= s.peer then
+                M.status = 'invalid sent history'; cooloo.net.close(conn); return
+            end
+            local key = s.peer .. ':' .. h.endoff
+            s.room.sent_ends = s.room.sent_ends or {}
+            if not s.room.sent_ends[key] then
+                s.room.sent_ends[key] = true
+                table.insert(s.room.buf, {endoff=h.endoff, ts=msg.ts, from=msg.from,
+                    nick=msg.from, text=msg.content, to=msg.to, sent=true})
+                table.sort(s.room.buf, function(a,b)
+                    if a.ts ~= b.ts then return a.ts < b.ts end
+                    if (a.to or s.room.name) ~= (b.to or s.room.name) then
+                        return (a.to or s.room.name) < (b.to or s.room.name)
+                    end
+                    return a.endoff < b.endoff
+                end)
+                if #s.room.buf > ROOM_CAP then table.remove(s.room.buf, 1) end
+            end
+            return
+        end
+        local off, len = line:match('^MSG (%d+) (%d+)$')
+        if off then s.pending = {endoff=tonumber(off),len=tonumber(len)}; return end
+        if line:match('^END %d+$') or line:sub(1,4) == 'ERR ' then
+            if line:sub(1,4) == 'ERR ' then M.status = line end
+            M.sent_conns[conn] = nil
+            cooloo.net.close(conn)
+            M.fetch_sent(s.room)
+        end
+        return
+    end
     if conn == M.ctrl then
         local room, nickname = line:match("^ROOM (%x+) (.+)$")
         if room then
@@ -200,7 +287,7 @@ function M.on_line(conn, line)
         end
         local meta = line:match("^META (.+)$")
         if meta then
-            if not cooloo.cache_meta(cooloo.net.fp(conn), cooloo.public_id(), meta) then
+            if not cooloo.cache_meta(cooloo.net.fp(conn), M.identity(), meta) then
                 M.status = "metadata cache failure"
             end
             return
@@ -237,7 +324,13 @@ function M.on_line(conn, line)
             if M.rooms_loaded then M.start_follows() end
             return
         end
-        if line:sub(1, 4) == "ERR " then M.status = line; return end
+        if line:sub(1, 4) == "ERR " then
+            M.status = line
+            if M.effective and line:match('^ERR forbidden') then
+                M.auth_failed = true; M.close_all()
+            end
+            return
+        end
         return -- OK / PONG: fine
     end
 
@@ -259,7 +352,8 @@ function M.on_line(conn, line)
             cooloo.net.send(M.ctrl, "META " .. msg.from .. "\n")
         end
         add_msg(r, h.endoff, msg.ts, M.names[msg.from], msg.content)
-        for _, m in ipairs(r.buf) do if m.endoff == h.endoff then m.from = msg.from end end
+        for _, m in ipairs(r.buf) do if not m.sent and m.endoff == h.endoff then m.from = msg.from end end
+        if r.following and r.name == M.identity() then M.fetch_sent(r) end
         return
     end
     local e, len = line:match("^MSG (%d+) (%d+)$")
@@ -279,10 +373,14 @@ function M.on_line(conn, line)
         end
         r.backfilling = false
         if not r.following then send_follow(r) end
+        if r.name == M.identity() then M.fetch_sent(r) end
         return
     end
     if line:sub(1, 4) == "ERR " then
         M.status = line
+        if M.effective and line:match('^ERR forbidden') then
+            M.auth_failed = true; M.close_all(); return
+        end
         -- an ERR before FOLLOW is terminal for the current op (e.g. D25
         -- not-registered): close so on_closed schedules a reconnect that
         -- re-opens the room conn once we're allowed (registered)
@@ -291,7 +389,32 @@ function M.on_line(conn, line)
     end
 end
 
+-- Peers come only from received messages. Filtered results stay outside the
+-- contiguous inbox cache. One query at a time, bounded to 256 peers per refresh.
+function M.fetch_sent(r)
+    M.sent_conns, M.sent_seen = M.sent_conns or {}, M.sent_seen or {}
+    if next(M.sent_conns) then return end
+    local count = 0; for _ in pairs(M.sent_seen) do count = count + 1 end
+    if count >= 256 then return end
+    for i = #r.buf, 1, -1 do
+        local peer = r.buf[i].from
+        if peer and peer ~= M.identity() and not M.sent_seen[peer] then
+            local conn = cooloo.net.connect(M.host, M.port)
+            if not conn then return end
+            M.sent_seen[peer] = true
+            M.sent_conns[conn] = {peer=peer, room=r}
+            return
+        end
+    end
+end
+
 function M.on_closed(conn, reason)
+    if M.as_pending then M.as_pending[conn] = nil end
+    if M.sent_conns and M.sent_conns[conn] then
+        M.sent_conns[conn] = nil
+        M.status = 'sent history interrupted: ' .. reason
+        return
+    end
     if conn == M.ctrl then
         M.ctrl = nil
         M.ctrl_up = false
@@ -312,6 +435,9 @@ function M.on_closed(conn, reason)
 end
 
 function M.send_text(text)
+    local as = text:match('^/as ([0-9a-f]+)$')
+    if as then return M.use_identity(as) end
+    if text == '/self' then return M.use_identity(nil) end
     local r = M.current()
     if not r or not M.ctrl_up or not M.registered or text == "" then
         return false
@@ -351,6 +477,8 @@ function M.cycle(d)
 end
 
 function M.close_all()
+    for conn in pairs(M.sent_conns or {}) do cooloo.net.close(conn) end
+    M.sent_conns, M.as_pending = {}, {}
     if M.ctrl then cooloo.net.close(M.ctrl); M.ctrl = nil end
     M.ctrl_up = false
     for conn, r in pairs(M.by_conn) do
@@ -365,6 +493,8 @@ end
 function M.reconnect()
     M.close_all()
     M.want_reconnect = false
+    M.auth_failed = false
+    M.sent_seen = {}
     M.connect_ctrl()
     if M.rooms_loaded then M.start_follows() end
 end

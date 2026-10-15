@@ -1,4 +1,4 @@
-# Protocol 2 client — v0.2.1
+# Protocol 2 client — v0.2.2
 
 Requires a protocol-2 server. Production uses Protocol 2; the new simple private
 room commands require server v0.2.1 or later. No old config/history migration
@@ -20,6 +20,11 @@ cooloo rename <id-or-alias> <nickname>
 cooloo send <id-or-alias> [text...]     # stdin preserves exact bytes
 cooloo read [--raw] <id-or-alias> <offset>
 cooloo follow <id-or-alias>            # durable catch-up then live stream
+cooloo delegate <child-id> read|write|read,write|none # replace grant; owner credential
+cooloo --as <owner-id> send <id> [text...] # explicit delegated sender
+cooloo --as <owner-id> read <owner-id> 0
+cooloo sent <peer-id> <scan-offset>    # only your messages in peer's inbox
+cooloo history                       # inbox + discovered peer sent history
 ```
 
 Simple private rooms require the matching updated server. Approve with:
@@ -48,6 +53,28 @@ Nicknames are presentation attributes. Use IDs for commands, not nicknames.
 sender IDs. Interactive CLI `chat` is temporarily unavailable; use GUI or
 separate send/follow terminals. FOLLOW resumes on the next invocation; automatic
 retry and idle keepalive are not implemented in this revision.
+
+## Delegated identities and history — v0.2.2
+
+Login identity remains the default. `--as <owner-id>` must precede the command;
+owner grants read/write separately to existing avatars, with `none` revoking both.
+Delegates cannot administer grants, avatars, names or room modes as the owner.
+No identity block or slot-based implicit permissions are introduced.
+
+GUI input `/as <owner-id>` selects the window's identity; `/self` restores login
+identity. Status shows effective/login IDs, and new connections must receive AS
+acknowledgment before sending/reading. Message caches use the effective identity.
+The GUI recovers sent messages from recent incoming peers into its inbox view;
+filtered records do not enter the contiguous room cache. This filtered view is
+in-memory and refreshed on reconnect, not continuously followed or persisted yet.
+
+`sent` prints filtered JSONL and a scan cursor on stderr. `history` prints a merged
+snapshot (max 10,000 messages/256 received peers, explicit error on overflow).
+No server-side sent index or duplicate body storage is added. **Peers that never
+replied are not automatically discovered**; their sent history is omitted unless
+queried explicitly. This is not complete multi-device synchronization. New clients
+require server v0.2.2 for delegation and filtered history. Read-only delegation can browse; write-only
+is usable via CLI but cannot populate the GUI's room list.
 
 ## Local files
 

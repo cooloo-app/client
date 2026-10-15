@@ -40,4 +40,36 @@ chat.registered=false
 chat.on_ready(1,'')
 chat.on_line(1,'NICK new-user')
 assert(sent[#sent]=='ROOMS\n')
-print('GUI state: cached history, incremental READ, JSON receive, persistence, nickname lookup and FOLLOW checkpoint passed')
+-- Explicit window identity handshake precedes ALL reads/sends/cache use.
+local owner = string.rep('d',64)
+assert(chat.use_identity(owner))
+chat.on_ready(2,'same')
+assert(sent[#sent]=='AS '..owner..'\n' and not chat.ctrl_up)
+chat.on_line(2,'OK')
+assert(sent[#sent]=='ROOMS\n' and chat.ctrl_up)
+chat.on_line(2,'ROOM '..R..' delegated-room')
+chat.sel=R
+assert(chat.send_text('as owner'))
+assert(sent[#sent]=='SEND '..R..' 8\nas owner')
+assert(chat.identity()==owner)
+-- Denied AS never silently falls back to B.
+assert(chat.use_identity(owner))
+chat.on_ready(2,'same')
+chat.on_line(2,'ERR forbidden revoked')
+assert(chat.auth_failed and not chat.ctrl_up)
+assert(not chat.send_text('must not send'))
+assert(chat.send_text('/self'))
+assert(chat.identity()==A)
+-- Filtered sent view cannot advance the inbox checkpoint or enter its cache.
+local inbox=chat.ensure_room(A)
+inbox.newest_end=200
+chat.sent_conns={[9]={peer=R,room=inbox}}
+cooloo.record=function()return {ts=123,from=A,to=R,content='outgoing'}end
+local old_count=#cached
+chat.on_line(9,'MSG 900 8')
+chat.on_line(9,'outgoing')
+assert(inbox.newest_end==200 and #cached==old_count)
+assert(#inbox.buf==1 and inbox.buf[1].sent)
+chat.on_line(9,'END 1200')
+assert(chat.sent_conns[9]==nil)
+print('GUI state: delegated window handshake, fail-closed identity, sparse sent view, cache and FOLLOW checkpoints passed')

@@ -3,6 +3,9 @@
 #define COOLOO_CLI_H
 
 int cooloo_cli_request(int argc, char **argv);
+int cooloo_cli_sent(int argc, char **argv);
+int cooloo_cli_history(int argc, char **argv);
+int cooloo_cli_set_as(const char *id);
 int cooloo_cli_keygen(int argc, char **argv);
 int cooloo_cli_send(int argc, char **argv);
 int cooloo_cli_read(int argc, char **argv);

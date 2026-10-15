@@ -16,6 +16,14 @@
 #include <unistd.h>
 #endif
 static int tofu;
+static char effective[65];
+int cooloo_cli_set_as(const char *id)
+{
+    size_t i;
+    if(strlen(id)!=64)return -1;
+    for(i=0;i<64;i++)if(!strchr("0123456789abcdef",id[i]))return -1;
+    strcpy(effective,id);return 0;
+}
 void cooloo_cli_set_tofu(int on) { tofu=on; }
 static void public_id(char id[65],const uint8_t sk[32])
 {uint8_t pk[32];int i;noise_public_key(pk,sk);for(i=0;i<32;i++)sprintf(id+i*2,"%02x",pk[i]);}
@@ -30,7 +38,15 @@ static int connect_client(netconn *c,char self[65])
         if(fgets(answer,sizeof answer,stdin)&&(answer[0]=='y'||answer[0]=='Y'))rc=net_connect_trust(c,host,port,sk,error,sizeof error);
     }
     memset(sk,0,sizeof sk);
-    if(rc){fprintf(stderr,"cooloo: %s\n",error);return -1;}return 0;
+    if(rc){fprintf(stderr,"cooloo: %s\n",error);return -1;}
+    if(effective[0]) {
+        char line[256];snprintf(line,sizeof line,"AS %s\n",effective);
+        if(net_send_line(c,line)||net_read_line(c,line,sizeof line)||strcmp(line,"OK")) {
+            fprintf(stderr,"identity selection failed: %s\n",line);net_close(c);return -1;
+        }
+        strcpy(self,effective);
+    }
+    return 0;
 }
 int cooloo_cli_keygen(int argc,char **argv)
 {
@@ -60,6 +76,10 @@ int cooloo_cli_request(int argc,char **argv)
         if(argc!=4 || (strcmp(argv[3],"public") && strcmp(argv[3],"private")))return 2;
         if(!strcmp(argv[3],"public"))fprintf(stderr,"Warning: this makes ALL room history public to registered users.\n");
         cmd="ROOMMODE";
+    }
+    else if(!strcmp(cmd,"delegate")) {
+        if(argc!=4)return 2;
+        cmd="DELEGATE";
     }
     else if(!strcmp(cmd,"create"))cmd="CREATE";
     else if(!strcmp(cmd,"avatar"))cmd="AVATAR";
@@ -161,6 +181,83 @@ int cooloo_cli_follow(int argc,char **argv)
     snprintf(line,sizeof line,"FOLLOW %s %lld\n",resolved,off);
     rc=net_send_line(&c,line)?1:receive(&c,self,0,1,1);
     net_close(&c);return rc;
+}
+/* Filtered history is a separate view: never append sparse peer inbox records
+ * to the contiguous room cache. The CLI prints a fresh, bounded merged snapshot. */
+struct history_item { char *json; long long ts,end; char to[65]; };
+struct history_view { struct history_item *items; size_t count,cap; char peers[256][65]; size_t npeers; };
+static int history_add(struct history_view *h,const struct record *r,long long end,const char *json)
+{
+    size_t i,n=strlen(json); char *copy;
+    for(i=0;i<h->count;i++)if(h->items[i].end==end&&!strcmp(h->items[i].to,r->to))return 0;
+    if(h->count==10000){fprintf(stderr,"history limit 10000 messages; use read/sent with offsets\n");return -1;}
+    if(h->count==h->cap) {
+        size_t cap=h->cap?h->cap*2:128;
+        struct history_item *items=realloc(h->items,cap*sizeof *items);
+        if(!items)return -1;
+        h->items=items;h->cap=cap;
+    }
+    copy=malloc(n+1);if(!copy)return -1;memcpy(copy,json,n+1);
+    h->items[h->count].json=copy;h->items[h->count].ts=r->ts;h->items[h->count].end=end;
+    strcpy(h->items[h->count++].to,r->to);return 0;
+}
+static int history_fetch(netconn *c,const char *self,const char *peer,const char *offset,int sent,struct history_view *h)
+{
+    char line[RECORD_MAX],json[RECORD_MAX];struct record r;long long end,last=0;size_t len;char extra;
+    snprintf(line,sizeof line,"%s %s %s\n",sent?"SENT":"READ",peer,offset);
+    if(net_send_line(c,line))return -1;
+    for(;;) {
+        if(net_read_line(c,line,sizeof line))return -1;
+        if((!sent&&!strcmp(line,"END")) || (sent&&sscanf(line,"END %lld %c",&end,&extra)==1&&end>=last)) {
+            if(!h&&sent)fprintf(stderr,"scan-offset: %lld\n",end);
+            return 0;
+        }
+        if(sscanf(line,"MSG %lld %zu %c",&end,&len,&extra)!=2 || end<=last) {fprintf(stderr,"%s\n",line);return -1;}
+        if(net_read_line(c,json,sizeof json)||strlen(json)!=len||record_parse(json,&r)||strcmp(r.to,peer)||(sent&&strcmp(r.from,self)))return -1;
+        last=end;
+        if(!h)puts(json);
+        else {
+            size_t i;
+            if(history_add(h,&r,end,json))return -1;
+            if(!sent&&strcmp(r.from,self)) {
+                for(i=0;i<h->npeers;i++)if(!strcmp(h->peers[i],r.from))break;
+                if(i==h->npeers) {
+                    if(h->npeers==256){fprintf(stderr,"history peer limit 256; use sent explicitly\n");return -1;}
+                    strcpy(h->peers[h->npeers++],r.from);
+                }
+            }
+        }
+    }
+}
+static int history_order(const void *x,const void *y)
+{
+    const struct history_item *a=x,*b=y;int c;
+    if(a->ts!=b->ts)return a->ts<b->ts?-1:1;
+    c=strcmp(a->to,b->to);if(c)return c;
+    return a->end==b->end?0:a->end<b->end?-1:1;
+}
+int cooloo_cli_sent(int argc,char **argv)
+{
+    netconn c;char self[65];int rc;size_t i;
+    if(argc!=4||strlen(argv[2])!=64||!argv[3][0])return 2;
+    for(i=0;i<64;i++)if(!strchr("0123456789abcdef",argv[2][i]))return 2;
+    for(i=0;argv[3][i];i++)if(argv[3][i]<'0'||argv[3][i]>'9')return 2;
+    if(connect_client(&c,self))return 1;
+    rc=history_fetch(&c,self,argv[2],argv[3],1,NULL);net_close(&c);return rc?1:0;
+}
+int cooloo_cli_history(int argc,char **argv)
+{
+    netconn c;char self[65];struct history_view h={0};size_t i;int rc=1;(void)argv;
+    if(argc!=2)return 2;
+    if(connect_client(&c,self))return 1;
+    if(history_fetch(&c,self,self,"0",0,&h))goto out;
+    for(i=0;i<h.npeers;i++)if(history_fetch(&c,self,h.peers[i],"0",1,&h))goto out;
+    qsort(h.items,h.count,sizeof *h.items,history_order);
+    for(i=0;i<h.count;i++)puts(h.items[i].json);
+    rc=0;
+out:
+    for(i=0;i<h.count;i++)free(h.items[i].json);
+    free(h.items);net_close(&c);return rc;
 }
 int cooloo_cli_chat(int argc,char **argv)
 {

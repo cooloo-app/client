@@ -35,7 +35,11 @@ static void usage(FILE *out)
             "  cooloo avatar <slot> <public-id> <nickname>\n"
             "  cooloo meta <id> | rename <id> <nickname>\n"
             "  cooloo whoami [--register <nick>]    show / register nick\n"
-            "  flags: -y/--tofu auto-trust new server fingerprint\n"
+            "  cooloo delegate <child-id> read|write|read,write|none\n"
+            "  cooloo sent <peer-id> <scan-offset>  own messages only\n"
+            "  cooloo history                     merge inbox and discovered sent history\n"
+            "  flags: --as <owner-id> select delegated message identity\n"
+            "         -y/--tofu auto-trust new server fingerprint\n"
             "  env:   COOLOO_HOST=host[:port] override server\n");
 }
 
@@ -78,15 +82,20 @@ int main(int argc, char **argv)
 #endif
     }
 
+    /* --as must precede the command; never consume message text as a flag. */
+    for(i=1;i<argc;) {
+        if(!strcmp(argv[i],"-y") || !strcmp(argv[i],"--tofu")) { i++; continue; }
+        if(strcmp(argv[i],"--as"))break;
+        if(i+1>=argc || cooloo_cli_set_as(argv[i+1]))return 2;
+        for(j=i;j+2<argc;j++)argv[j]=argv[j+2];
+        argc-=2;argv[argc]=NULL;
+    }
     /* pull global flags out of argv before dispatch */
-    for (i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-y") || !strcmp(argv[i], "--tofu")) {
-            cooloo_cli_set_tofu(1);
-            for (j = i; j + 1 < argc; j++)
-                argv[j] = argv[j + 1];
-            argc--;
-            i--;
-        }
+    while (argc > 1 && (!strcmp(argv[1], "-y") || !strcmp(argv[1], "--tofu"))) {
+        cooloo_cli_set_tofu(1);
+        for (j = 1; j + 1 < argc; j++) argv[j] = argv[j + 1];
+        argc--;
+        argv[argc] = NULL;
     }
     if (argc < 2) {
         usage(stderr);
@@ -95,8 +104,11 @@ int main(int argc, char **argv)
 
     if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
         !strcmp(argv[1], "meta") || !strcmp(argv[1], "rename") ||
-        !strcmp(argv[1], "join") || !strcmp(argv[1], "room-mode"))
+        !strcmp(argv[1], "join") || !strcmp(argv[1], "room-mode") ||
+        !strcmp(argv[1], "delegate"))
         return cooloo_cli_request(argc, argv);
+    if (!strcmp(argv[1], "sent"))return cooloo_cli_sent(argc,argv);
+    if (!strcmp(argv[1], "history"))return cooloo_cli_history(argc,argv);
     if (!strcmp(argv[1], "keygen"))
         return cooloo_cli_keygen(argc, argv);
     if (!strcmp(argv[1], "send"))

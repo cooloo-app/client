@@ -141,7 +141,70 @@ with tempfile.TemporaryDirectory(prefix='cooloo-client2-') as tmp:
             cli('f', 'send', room, 'historical participant')
             gate(f, f'room-mode {room} private')
             cli('f', 'send', room, 'included in snapshot')
-            print('client2: native/SSH interoperability, private-room CLI/join/approval, metadata ACL, exact JSONL cache and FOLLOW restart passed')
+            # Delegation is owner-authorized, read/write independent, and never
+            # inherited from child metadata or slot numbers.
+            cli('c', '--as', a, 'read', a, '0', ok=False)
+            cli('a', 'delegate', c, 'read')
+            cli('c', '--as', a, 'read', a, '0')
+            cli('c', '--as', a, 'send', b, 'forbidden write', ok=False)
+            cli('c', '--as', a, 'delegate', c, 'read,write', ok=False)
+            cli('c', '--as', a, 'rename', a, 'forbidden admin', ok=False)
+            cli('a', 'delegate', c, 'write')
+            cli('c', '--as', a, 'read', a, '0', ok=False)
+            cli('c', '--as', a, 'send', b, 'owner delegated write')
+            cli('c', 'send', b, 'child default write')
+            messages = [json.loads(x) for x in cli('b', 'read', '--raw', b, '0').splitlines()]
+            assert messages[-2]['from'] == a and messages[-1]['from'] == c
+            gate(a, f'delegate {c} read,write')
+            assert 'owner delegated write' in gate(c, f'--as {a} sent {b} 0')
+            cli('b', 'send', a, 'reply discovers peer')
+            cli('d', 'send', b, 'unrelated secret')
+            filtered = cli('c', '--as', a, 'sent', b, '0')
+            assert 'owner delegated write' in filtered
+            assert 'unrelated secret' not in filtered and 'child default write' not in filtered
+            merged = cli('c', '--as', a, 'history')
+            assert 'owner delegated write' in merged and 'reply discovers peer' in merged
+            assert 'unrelated secret' not in merged
+            cli('a', 'send', f, 'unreplied message remains undiscovered')
+            assert 'unreplied message remains undiscovered' not in cli('c', '--as', a, 'history')
+            assert 'unreplied message remains undiscovered' in cli('c', '--as', a, 'sent', f, '0')
+            peer_end = (data / 'rooms' / b / 'messages.jsonl').stat().st_size
+            assert cli('c', '--as', a, 'sent', b, str(peer_end)) == ''
+            cli('c', '--as', a, 'sent', b, '1', ok=False)
+            cli('c', '--as', a, 'sent', room, '0', ok=False)
+            # A live delegated FOLLOW must stop after owner revocation.
+            ce = dict(os.environ, COOLOO_CONFIG=str(base / 'c'), COOLOO_HOST=f'127.0.0.1:{port}')
+            with open(base / 'delegated-follow.log', 'w+') as follow_log:
+                follower = subprocess.Popen([str(client / 'cooloo-cli'), '-y', '--as', a, 'follow', a],
+                                            env=ce, stdout=follow_log, stderr=follow_log)
+                try:
+                    for _ in range(200):
+                        follow_log.seek(0)
+                        if 'reply discovers peer' in follow_log.read(): break
+                        time.sleep(.02)
+                    else: raise AssertionError('delegated follower not ready')
+                    cli('a', 'delegate', c, 'none')
+                    assert follower.wait(timeout=5) != 0
+                finally:
+                    if follower.poll() is None: follower.terminate(); follower.wait(timeout=5)
+            cli('c', '--as', a, 'send', b, 'revoked', ok=False)
+            gate(c, f'--as {a} read {a} 0', ok=False)
+            cli('c', 'send', b, 'own identity still works')
+            # Child-controlled properties cannot grant delegation.
+            child_meta = data / 'rooms' / c / '.meta'
+            saved_meta = child_meta.read_bytes()
+            child_meta.write_bytes(saved_meta.replace(f'"owner":"{a}"'.encode(), f'"owner":"{b}"'.encode()))
+            cli('c', '--as', b, 'read', b, '0', ok=False)
+            child_meta.write_bytes(saved_meta)
+            cli('a', 'delegate', c, 'read')
+            grant = data / 'authz' / a / c
+            saved_grant = grant.read_bytes()
+            grant.write_text('DELEGATE-1 999\n')
+            cli('c', '--as', a, 'read', a, '0', ok=False)
+            grant.write_bytes(saved_grant)
+            cli('a', 'delegate', c, 'none')
+            assert list((base / 'c' / 'cache').glob(f'*/{a}/rooms/{a}/messages.jsonl'))
+            print('client2: private rooms, independent delegation bits, filtered/merged history, cross-transport revocation and identity-isolated caches passed')
         finally:
             daemon.terminate()
             daemon.wait(timeout=5)
