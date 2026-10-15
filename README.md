@@ -1,4 +1,14 @@
-# Protocol 2 client — v0.2.2
+# Protocol 2 client — v0.2.3
+
+## Machine API and Python distribution
+
+`--json` enables noninteractive JSONL schema 1; machine READ/FOLLOW bypass normal caches,
+FOLLOW requires an explicit byte offset. `version` reports the local client version and
+`--json version` its capabilities. `--gui` explicitly opens the same embedded GUI.
+See [MACHINE_API.md](MACHINE_API.md) for results, errors, cursors and delivery uncertainty.
+The [Python SDK](https://github.com/cooloo-app/python-sdk) wraps this executable and ships
+platform wheels containing the GUI+CLI binary; it does not reimplement the Native protocol.
+
 
 Requires a protocol-2 server. Production uses Protocol 2; the new simple private
 room commands require server v0.2.1 or later. No old config/history migration

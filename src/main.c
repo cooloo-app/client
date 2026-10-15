@@ -14,6 +14,13 @@
 #include "cli.h"
 #include "gui.h"
 #include "win_console.h"
+#include "machine.h"
+#ifndef _WIN32
+#include <signal.h>
+#else
+#include <io.h>
+#include <fcntl.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -38,20 +45,33 @@ static void usage(FILE *out)
             "  cooloo delegate <child-id> read|write|read,write|none\n"
             "  cooloo sent <peer-id> <scan-offset>  own messages only\n"
             "  cooloo history                     merge inbox and discovered sent history\n"
-            "  flags: --as <owner-id> select delegated message identity\n"
+            "  cooloo --gui                       explicitly launch GUI\n"
+            "  cooloo version                     print client version\n"
+            "  flags: --json JSONL schema 1; noninteractive, no read/follow cache\n"
+            "         --json follow <id> <offset> explicit business cursor\n"
+            "         --as <owner-id> select delegated message identity\n"
             "         -y/--tofu auto-trust new server fingerprint\n"
             "  env:   COOLOO_HOST=host[:port] override server\n");
 }
 
-int main(int argc, char **argv)
+static int run(int argc, char **argv)
 {
-    int i, j, debug = 0;
+    int i, j, debug = 0, gui = 0;
     const char *dev = NULL;
 
     /* Parse startup flags before GUI selection: --debug alone still runs GUI. */
-    for (i = 1; i < argc; i++) {
+    for (i = 1; i < argc && argv[i][0]=='-'; i++) {
         int remove = 0;
-        if (!strcmp(argv[i], "--debug")) {
+        if (!strcmp(argv[i], "--json")) {
+            cooloo_machine = 1;
+            remove = 1;
+        } else if (!strcmp(argv[i], "--gui")) {
+            gui = 1;
+            remove = 1;
+        } else if (!strcmp(argv[i], "--as")) {
+            if(i+1<argc)i++;
+            continue;
+        } else if (!strcmp(argv[i], "--debug")) {
             debug = 1;
             remove = 1;
         } else if (!strcmp(argv[i], "--lua-dev")) {
@@ -71,7 +91,12 @@ int main(int argc, char **argv)
             i--;
         }
     }
-    cooloo_console_init(debug || argc >= 2);
+    cooloo_console_init(debug || argc >= 2 || cooloo_machine);
+#ifdef _WIN32
+    if(cooloo_machine){_setmode(_fileno(stdin),_O_BINARY);_setmode(_fileno(stdout),_O_BINARY);}
+#endif
+    if(gui&&(cooloo_machine||argc!=1))return 2;
+    if(cooloo_machine&&argc<2)return 2;
     if (argc < 2) {
 #ifdef COOLOO_CLI_ONLY
         (void)dev;
@@ -102,6 +127,10 @@ int main(int argc, char **argv)
         return 2;
     }
 
+    if (!strcmp(argv[1], "version") && argc==2) {
+        if(cooloo_machine)machine_version();else puts("cooloo 0.2.3");return 0;
+    }
+    if(cooloo_machine&&(!strcmp(argv[1],"history")||!strcmp(argv[1],"chat")||!strcmp(argv[1],"help")||!strcmp(argv[1],"--help")))return 2;
     if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
         !strcmp(argv[1], "meta") || !strcmp(argv[1], "rename") ||
         !strcmp(argv[1], "join") || !strcmp(argv[1], "room-mode") ||
@@ -132,4 +161,14 @@ int main(int argc, char **argv)
     fprintf(stderr, "cooloo: unknown command: %s\n", argv[1]);
     usage(stderr);
     return 2;
+}
+
+int main(int argc,char **argv)
+{
+    int status;
+#ifndef _WIN32
+    signal(SIGPIPE,SIG_IGN);
+#endif
+    status=run(argc,argv);
+    return cooloo_machine?machine_finish(status):status;
 }

@@ -29,7 +29,7 @@ SDL_WIN_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DSDL_RENDER=OFF -DSDL_METAL=OFF
 
 NOISE_SRC := src/noise_xx.c src/vendor/monocypher.c
 LUA_SRC   := $(filter-out src/vendor/lua/lua.c src/vendor/lua/luac.c,$(wildcard src/vendor/lua/*.c))
-CORE_SRC  := src/main.c src/win_console.c src/cli.c src/net.c src/config.c src/record.c $(NOISE_SRC)
+CORE_SRC  := src/main.c src/win_console.c src/cli.c src/machine.c src/net.c src/config.c src/record.c $(NOISE_SRC)
 GUI_SRC   := src/gui.c src/font.c src/luabind.c
 EMBED_SRC := src/embedded_lua.c src/embedded_font.c
 ALL_SRC   := $(CORE_SRC) $(GUI_SRC) $(LUA_SRC) $(EMBED_SRC)

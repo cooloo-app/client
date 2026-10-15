@@ -22,7 +22,9 @@ void cooloo_console_init(int enabled)
             DuplicateHandle(GetCurrentProcess(), h, GetCurrentProcess(),
                             &saved[i], 0, FALSE, DUPLICATE_SAME_ACCESS);
     }
-    if (!GetConsoleWindow() && !AttachConsole(ATTACH_PARENT_PROCESS))
+    /* Fully redirected SDK calls need CRT pipes, not a visible console. */
+    if (!(saved[0] && saved[1] && saved[2]) &&
+        !GetConsoleWindow() && !AttachConsole(ATTACH_PARENT_PROCESS))
         AllocConsole();
     for (i = 0; i < 3; ++i) {
         if (saved[i]) {
