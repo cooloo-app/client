@@ -1,5 +1,10 @@
 # Protocol 2 client — v0.2.3
 
+## License
+
+Project-owned client code is licensed under [MIT](LICENSE). Vendored components
+and fonts retain their respective licenses; see their notices under `src/vendor/`.
+
 ## Machine API and Python distribution
 
 `--json` enables noninteractive JSONL schema 1; machine READ/FOLLOW bypass normal caches,
