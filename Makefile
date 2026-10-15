@@ -23,7 +23,8 @@ SDL_CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON \
 # is served by the texture-framebuffer fallback, which only accepts a
 # hardware render driver -> needs the render subsystem + Metal backend.
 # (Still our own software canvas; Metal only presents the final bitmap.)
-SDL_MAC_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DSDL_RENDER=ON -DSDL_METAL=ON
+MACOS_MIN ?= 11.0
+SDL_MAC_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOS_MIN) -DSDL_RENDER=ON -DSDL_METAL=ON
 # Windows: the GDI window framebuffer is always available, keep render off.
 SDL_WIN_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DSDL_RENDER=OFF -DSDL_METAL=OFF
 
@@ -56,7 +57,7 @@ cooloo-cli: $(CORE_SRC) $(HEADERS)
 	$(CC) $(CFLAGS) -DCOOLOO_CLI_ONLY -Isrc -o $@ $(CORE_SRC)
 
 cooloo: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_MAC_LIB)
-	$(CC) $(CFLAGS) -Isrc $(SDL_MAC_INC) -o $@ $(ALL_SRC) $(MAC_LIBS)
+	$(CC) $(CFLAGS) -mmacosx-version-min=$(MACOS_MIN) -Isrc $(SDL_MAC_INC) -o $@ $(ALL_SRC) $(MAC_LIBS)
 
 $(SDL_MAC_LIB):
 	mkdir -p $(SDL_MAC)
