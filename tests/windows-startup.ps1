@@ -55,10 +55,14 @@ $r = Run-Test 'bogus'
 if ($r.Code -ne 2 -or $r.Err -notmatch 'unknown command') { throw 'stderr/exit failed' }
 $r = Run-Test 'keygen'
 if ($r.Code -ne 0 -or $r.Out.Trim() -notmatch '^[0-9a-f]{64}$') { throw 'keygen failed' }
-$r = Run-Test '--debug'
+$r = Run-Test '--gui --debug'
 if ($r.Code -ne 0 -or $r.Err -notmatch 'first frame') { throw 'debug GUI failed' }
 $r = Run-Test ''
-if ($r.Code -ne 0 -or $r.Err -notmatch 'first frame') { throw 'bare GUI failed' }
+if ($r.Code -ne 0 -or $r.Out -notmatch 'usage:' -or $r.Out -notmatch '--gui' -or $r.Err) { throw 'bare help/redirection failed' }
+$r = Run-Test '--debug'
+if ($r.Code -ne 0 -or $r.Out -notmatch 'usage:' -or $r.Err) { throw 'debug without GUI failed' }
+$r = Run-Test '--gui'
+if ($r.Code -ne 0 -or $r.Err -notmatch 'first frame') { throw 'explicit GUI failed' }
 $r = Run-Test '--lua-dev'
 if ($r.Code -ne 2 -or $r.Err -notmatch 'requires a directory') { throw 'argument error failed' }
 if ($env:COOLOO_TEST_HOST) {
@@ -76,4 +80,4 @@ if ($env:COOLOO_TEST_HOST) {
     Write-Output 'PASS: Windows piped TOFU, registration, multiline stdin send and readback'
 }
 Remove-Item -Recurse -Force $cfg
-Write-Output 'PASS: Windows help, stderr, exit code, keygen, debug GUI and bare GUI'
+Write-Output 'PASS: Windows bare/full help, stderr, exit code, keygen and explicit/debug GUI'

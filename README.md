@@ -9,7 +9,11 @@ and fonts retain their respective licenses; see their notices under `src/vendor/
 
 `--json` enables noninteractive JSONL schema 1; machine READ/FOLLOW bypass normal caches,
 FOLLOW requires an explicit byte offset. `version` reports the local client version and
-`--json version` its capabilities. `--gui` explicitly opens the same embedded GUI.
+`--json version` its capabilities. Bare `cooloo` prints a short help summary and exits
+successfully; `cooloo --help` prints full help. Neither starts the GUI or connects to
+a server. `cooloo --gui` opens the embedded GUI; add `--debug` for console logs or
+`--lua-dev DIR` for script hot reload. These options alone no longer start the GUI.
+Desktop shortcuts and launch scripts must pass `--gui` explicitly.
 See [MACHINE_API.md](MACHINE_API.md) for results, errors, cursors and delivery uncertainty.
 The [Python SDK](https://github.com/cooloo-app/python-sdk) wraps this executable and ships
 platform wheels containing the GUI+CLI binary; it does not reimplement the Native protocol.

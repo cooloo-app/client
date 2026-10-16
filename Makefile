@@ -1,5 +1,5 @@
 # cooloo client - single binary: v1 CLI + v2 GUI (04 doc D27-D31)
-# bare `cooloo` -> GUI (SDL3+Lua); subcommands -> v1 CLI.
+# bare `cooloo` -> short help; --gui -> GUI (SDL3+Lua); subcommands -> CLI.
 CC      ?= cc
 CFLAGS  ?= -O2 -Wall -Wextra -std=c99
 PREFIX  ?= /usr/local
@@ -78,6 +78,7 @@ src/embedded_lua.c src/embedded_font.c: lua/main.lua lua/chat.lua lua/ui.lua lua
 # loopback integration against the sibling server repo's coolood
 # (planner checkout layout: client and server are sibling submodules)
 test: cooloo-cli
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python3 tests/startup_test.py
 	python3 tests/protocol2_test.py
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -DLUA_USE_POSIX -I src/vendor/lua tests/lua_test.c $(LUA_SRC) -lm -o $(BUILD)/lua-test

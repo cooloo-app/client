@@ -15,7 +15,8 @@ foreach ($debug in @($false,$true)) {
  $s=New-Object Diagnostics.ProcessStartInfo
  $s.FileName=$exe
  $s.UseShellExecute=$false
- if ($debug) { $s.Arguments='--debug' }
+ $s.Arguments='--gui'
+ if ($debug) { $s.Arguments+=' --debug' }
  $s.EnvironmentVariables['COOLOO_CONFIG']=$cfg
  $s.EnvironmentVariables.Remove('COOLOO_PROBE_STARTUP')
  $s.EnvironmentVariables['COOLOO_HOST']='127.0.0.1:1'

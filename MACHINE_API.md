@@ -7,7 +7,8 @@ server protocol or long-running RPC service. Use server v0.2.2 for delegation/SE
 ## Invocation
 
 Global flags must precede the command: `--json`, `--tofu`/`-y`, `--as <owner-id>`.
-GUI-only flags are not message flags. `--gui` explicitly selects the default GUI;
+Bare `cooloo` prints short human help; `--help` prints full human help.
+GUI-only flags are not message flags. `--gui` explicitly launches the GUI;
 combining it with a command or --json is an error. `version` is local/offline.
 Use argv arrays, never shell command strings; SEND stdin preserves UTF-8 bytes including
 newlines (1–4096 bytes, no NUL). Machine stdin/stdout use binary mode on Windows.

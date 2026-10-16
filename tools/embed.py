@@ -7,7 +7,7 @@ Generates:
 
 usage: embed.py <lua_dir> <font_ttf> <out_lua.c> <out_font.c>
 Both outputs are build artifacts (gitignored). Runtime prefers embedded lua;
-`cooloo --lua-dev <dir>` loads from disk instead (hot reload, see luabind.c).
+`cooloo --gui --lua-dev <dir>` loads from disk instead (hot reload, see luabind.c).
 """
 import os
 import sys

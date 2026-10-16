@@ -7,9 +7,9 @@
  *   cooloo follow <room>                stream (persists offset, auto-resume)
  *   cooloo chat <room>                  interactive read/write
  *   cooloo rooms | whoami [--register <nick>]
- *   cooloo [--debug] [--lua-dev DIR]    GUI (default)
+ *   cooloo --gui [--debug] [--lua-dev DIR]  GUI
  *   global flag: -y/--tofu              auto-trust unknown server fingerprint
- * Running bare (no args) enters the v2 GUI (D31).
+ * Running bare (no args) prints a short help summary without side effects.
  */
 #include "cli.h"
 #include "gui.h"
@@ -34,7 +34,6 @@ static void usage(FILE *out)
             "  cooloo read [--raw] <id> <offset>    read messages\n"
             "  cooloo follow <room>                 stream new messages\n"
             "  cooloo chat <room>                   interactive chat\n"
-            "  cooloo [--debug] [--lua-dev DIR]     GUI (default)\n"
             "  cooloo rooms                         list rooms and own inbox\n"
             "  cooloo create <nickname>             create public room\n"
             "  cooloo join <room-id>                request membership\n"
@@ -45,7 +44,8 @@ static void usage(FILE *out)
             "  cooloo delegate <child-id> read|write|read,write|none\n"
             "  cooloo sent <peer-id> <scan-offset>  own messages only\n"
             "  cooloo history                     merge inbox and discovered sent history\n"
-            "  cooloo --gui                       explicitly launch GUI\n"
+            "  cooloo --gui [--debug] [--lua-dev DIR]  launch GUI\n"
+            "  cooloo --help                      show full help\n"
             "  cooloo version                     print client version\n"
             "  flags: --json JSONL schema 1; noninteractive, no read/follow cache\n"
             "         --json follow <id> <offset> explicit business cursor\n"
@@ -54,12 +54,26 @@ static void usage(FILE *out)
             "  env:   COOLOO_HOST=host[:port] override server\n");
 }
 
+static void quick_help(void)
+{
+    puts("cooloo - messaging client\n"
+         "\nusage: cooloo <command> [options]\n"
+         "       cooloo --gui [--debug] [--lua-dev DIR]\n"
+         "\nGet started:\n"
+         "  cooloo --gui                       launch GUI\n"
+         "  cooloo whoami                      show current identity\n"
+         "  cooloo rooms                       list rooms and own inbox\n"
+         "  cooloo send <id> [text...]          send a message\n"
+         "  cooloo read <id> <offset>           read messages\n"
+         "  cooloo --help                      show full help");
+}
+
 static int run(int argc, char **argv)
 {
     int i, j, debug = 0, gui = 0;
     const char *dev = NULL;
 
-    /* Parse startup flags before GUI selection: --debug alone still runs GUI. */
+    /* Parse startup flags; only --gui selects the GUI. */
     for (i = 1; i < argc && argv[i][0]=='-'; i++) {
         int remove = 0;
         if (!strcmp(argv[i], "--json")) {
@@ -91,20 +105,24 @@ static int run(int argc, char **argv)
             i--;
         }
     }
-    cooloo_console_init(debug || argc >= 2 || cooloo_machine);
+    cooloo_console_init(debug || !gui || argc >= 2 || cooloo_machine);
 #ifdef _WIN32
     if(cooloo_machine){_setmode(_fileno(stdin),_O_BINARY);_setmode(_fileno(stdout),_O_BINARY);}
 #endif
     if(gui&&(cooloo_machine||argc!=1))return 2;
     if(cooloo_machine&&argc<2)return 2;
-    if (argc < 2) {
+    if (gui) {
 #ifdef COOLOO_CLI_ONLY
         (void)dev;
-        usage(stderr);
+        fprintf(stderr, "cooloo: GUI is not available in this CLI-only build\n");
         return 2;
 #else
         return cooloo_gui_run(dev);
 #endif
+    }
+    if (argc < 2) {
+        quick_help();
+        return 0;
     }
 
     /* --as must precede the command; never consume message text as a flag. */
