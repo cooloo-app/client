@@ -1,4 +1,4 @@
-# Protocol 2 client — v0.2.3
+# Protocol 2 client — v0.2.4
 
 ## License
 
@@ -94,6 +94,21 @@ replied are not automatically discovered**; their sent history is omitted unless
 queried explicitly. This is not complete multi-device synchronization. New clients
 require server v0.2.2 for delegation and filtered history. Read-only delegation can browse; write-only
 is usable via CLI but cannot populate the GUI's room list.
+
+## Official server relocation — v0.2.4
+
+The default server is now Shanghai `123.206.215.121:4222`. A persisted config
+pointing to the old official `43.133.202.144:4222` is resolved to Shanghai without
+rewriting configuration, identity or cache files. Other hosts/ports are unchanged.
+Explicit `COOLOO_HOST` (including Python `Client(host=...)`) always wins: remove
+or update an explicit old-IP override when upgrading.
+
+An existing old-endpoint pin is reused only if it exactly matches the verified
+unchanged official fingerprint
+`e6da669a4763acc8e790c6c757f698eed8eeab2c56007a62d28fd48f421c06bf`.
+An explicit new-endpoint pin takes precedence, including conflicting pins; there
+is no silent trust reset. Fresh installations still require explicit first-use
+trust. Cache keys remain server fingerprint / identity, so history is preserved.
 
 ## Local files
 

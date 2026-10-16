@@ -78,6 +78,7 @@ src/embedded_lua.c src/embedded_font.c: lua/main.lua lua/chat.lua lua/ui.lua lua
 # loopback integration against the sibling server repo's coolood
 # (planner checkout layout: client and server are sibling submodules)
 test: cooloo-cli
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python3 tests/config_test.py
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python3 tests/startup_test.py
 	python3 tests/protocol2_test.py
 	mkdir -p $(BUILD)

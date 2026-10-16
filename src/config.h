@@ -15,7 +15,8 @@
 /* Config dir into buf (creates it 0700 if missing). 0 ok, -1 error. */
 int  cfg_dir(char *buf, size_t buflen);
 
-/* Effective server: config file host/port, defaults 43.133.202.144:4222,
+/* Effective server: config file host/port, defaults 123.206.215.121:4222,
+ * legacy official config host on port 4222 relocates unless env overrides,
  * env COOLOO_HOST (host[:port]) overrides everything. */
 void cfg_server(char *host, size_t host_cap, int *port);
 

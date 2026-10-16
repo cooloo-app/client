@@ -37,6 +37,10 @@ static int  win_rename(const char *a, const char *b)
 #define PATH_BUF 1024
 #define MAX_KV   256
 
+#define OFFICIAL_HOST "123.206.215.121"
+#define LEGACY_HOST "43.133.202.144"
+#define OFFICIAL_FP "e6da669a4763acc8e790c6c757f698eed8eeab2c56007a62d28fd48f421c06bf"
+
 static int cfg_path(char *buf, size_t buflen, const char *name)
 {
     char dir[PATH_BUF];
@@ -82,12 +86,16 @@ void cfg_server(char *host, size_t host_cap, int *port)
     char val[256];
     const char *env = getenv("COOLOO_HOST");
 
-    snprintf(host, host_cap, "43.133.202.144");
+    snprintf(host, host_cap, "%s", OFFICIAL_HOST);
     *port = 4222;
     if (cfg_get("host", val, sizeof val) == 0)
         snprintf(host, host_cap, "%s", val);
     if (cfg_get("port", val, sizeof val) == 0)
         *port = atoi(val);
+    /* Relocate only the old official persisted endpoint. Explicit environment
+     * overrides (including SDK host=) and nonstandard ports remain untouched. */
+    if ((!env || !env[0]) && *port == 4222 && !strcmp(host, LEGACY_HOST))
+        snprintf(host, host_cap, "%s", OFFICIAL_HOST);
     if (env && env[0]) {
         const char *colon = strrchr(env, ':');
         if (colon) {
@@ -234,6 +242,17 @@ int cfg_known_server_get(const char *hostport, char fp_out[65])
             snprintf(fp_out, 65, "%s", kv[i].val);
             return 1;
         }
+    /* The official server moved without rotating its key. Reuse only the
+     * independently verified legacy pin, never a custom/conflicting pin.
+     * An explicit pin for the new endpoint above always takes precedence. */
+    if (!strcmp(hostport, OFFICIAL_HOST ":4222")) {
+        for (i = 0; i < n; i++)
+            if (!strcmp(kv[i].key, LEGACY_HOST ":4222") &&
+                !strcmp(kv[i].val, OFFICIAL_FP)) {
+                snprintf(fp_out, 65, "%s", OFFICIAL_FP);
+                return 1;
+            }
+    }
     return 0;
 }
 
