@@ -15,6 +15,10 @@
 #include "gui.h"
 #include "win_console.h"
 #include "machine.h"
+#ifdef COOLOO_WORKBENCH
+#include "runtime.h"
+#include <SDL3/SDL.h>
+#endif
 #ifndef _WIN32
 #include <signal.h>
 #else
@@ -146,7 +150,7 @@ static int run(int argc, char **argv)
     }
 
     if (!strcmp(argv[1], "version") && argc==2) {
-        if(cooloo_machine)machine_version();else puts("cooloo 0.2.4");return 0;
+        if(cooloo_machine)machine_version();else puts("cooloo 0.3.0");return 0;
     }
     if(cooloo_machine&&(!strcmp(argv[1],"history")||!strcmp(argv[1],"chat")||!strcmp(argv[1],"help")||!strcmp(argv[1],"--help")))return 2;
     if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
@@ -186,6 +190,11 @@ int main(int argc,char **argv)
     int status;
 #ifndef _WIN32
     signal(SIGPIPE,SIG_IGN);
+#endif
+#ifdef COOLOO_WORKBENCH
+    status=runtime_dispatch(argc,argv);
+    if(status>=0)return status;
+    SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"COOLOO_EXECUTABLE",argv[0],true);
 #endif
     status=run(argc,argv);
     return cooloo_machine?machine_finish(status):status;

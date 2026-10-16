@@ -10,10 +10,17 @@
 #include "luabind.h"
 #include "gui.h"
 #include "font.h"
+#include "api.h"
+#include "runtime.h"
+#ifndef COOLOO_EDITOR_ONLY
 #include "net.h"
 #include "config.h"
 #include "record.h"
 #include "noise_xx.h"
+#ifdef COOLOO_WORKBENCH
+#include "../adapters/cooloo/cache.h"
+#endif
+#endif
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -36,15 +43,42 @@ extern const int cooloo_embedded_lua_count;
 
 #define MAX_CONNS 16
 
+#ifndef COOLOO_EDITOR_ONLY
 typedef struct {
     int used;
     int ready;
     int tofu;
+    int paused;
+    int token;
+    SDL_Thread *resolver;
+    SDL_AtomicInt resolving;
+    char host[256];
+    int port;
+    uint8_t key[32];
+    uint8_t output[64*1024];
+    size_t output_len,output_pos;
     net_async a;
 } conn_slot;
 
-static lua_State *L;
 static conn_slot conns[MAX_CONNS];
+static int next_token;
+static int resolve_connection(void *ctx) {
+    conn_slot *s=ctx;
+    net_async_start(&s->a,s->host,s->port,s->key);
+    memset(s->key,0,sizeof s->key);SDL_SetAtomicInt(&s->resolving,0);return 0;
+}
+static void abort_connection(conn_slot *s) {
+    /* A DNS worker owns its slot until finished; never reuse its memory early. */
+    if(s->resolver && SDL_GetAtomicInt(&s->resolving)){s->used=2;return;}
+    if(s->resolver){SDL_WaitThread(s->resolver,NULL);s->resolver=NULL;}
+    net_async_abort(&s->a);s->used=0;
+}
+static conn_slot *connection(int token) {
+    int i;for(i=0;i<MAX_CONNS;i++)if(conns[i].used==1 && conns[i].token==token)return &conns[i];
+    return NULL;
+}
+#endif
+static lua_State *L;
 static int quitting;
 static int ev_ref = LUA_NOREF;      /* current events array (registry ref) */
 static int ev_count;
@@ -143,6 +177,7 @@ void luabind_ev_quit(void)
     ev_commit();
 }
 
+#ifndef COOLOO_EDITOR_ONLY
 static void ev_net_ready(int conn, const char *nick)
 {
     ev_begin("net_ready");
@@ -184,8 +219,21 @@ void luabind_net_pump(void)
     int i;
     for (i = 0; i < MAX_CONNS; i++) {
         conn_slot *s = &conns[i];
-        if (!s->used)
-            continue;
+        if (!s->used)continue;
+        if(s->resolver) {
+            if(SDL_GetAtomicInt(&s->resolving))continue;
+            SDL_WaitThread(s->resolver,NULL);s->resolver=NULL;
+            if(s->used==2){abort_connection(s);continue;}
+        }
+        if(s->ready && s->output_pos<s->output_len) {
+            size_t wrote;
+            if(net_try_write(&s->a.c,s->output+s->output_pos,s->output_len-s->output_pos,&wrote)<0) {
+                ev_net_closed(s->token,"send failed; delivery may be unknown");abort_connection(s);continue;
+            }
+            s->output_pos+=wrote;
+            if(s->output_pos==s->output_len)s->output_pos=s->output_len=0;
+        }
+        if(s->paused)continue;
         if (!s->ready) {
             int rc;
             if (s->tofu)
@@ -193,23 +241,24 @@ void luabind_net_pump(void)
             rc = net_async_pump(&s->a);
             if (rc == 1) {
                 s->ready = 1;
-                ev_net_ready(i, s->a.c.nick);
+                ev_net_ready(s->token, s->a.c.nick);
             } else if (rc == 2) {
                 s->tofu = 1;
-                ev_net_tofu(i, s->a.c.server_fp);
+                ev_net_tofu(s->token, s->a.c.server_fp);
             } else if (rc < 0) {
-                ev_net_closed(i, s->a.err[0] ? s->a.err : "connect failed");
+                ev_net_closed(s->token, s->a.err[0] ? s->a.err : "connect failed");
                 net_async_abort(&s->a);
                 s->used = 0;
             }
             continue;
         }
-        for (;;) {
+        /* One decrypted frame per connection/tick: bounded UI event work. */
+        for (int budget=0; budget<1; budget++) {
             int rc = net_try_recv(&s->a.c);
             if (rc == 0)
                 break;
             if (rc < 0) {
-                ev_net_closed(i, "connection lost");
+                ev_net_closed(s->token, "connection lost");
                 net_async_abort(&s->a);
                 s->used = 0;
                 break;
@@ -217,7 +266,7 @@ void luabind_net_pump(void)
             {
                 char line[RECORD_MAX];
                 while (net_try_line(&s->a.c, line, sizeof line))
-                    ev_net_line(i, line);
+                    ev_net_line(s->token, line);
             }
         }
     }
@@ -247,17 +296,22 @@ static int l_net_connect(lua_State *l)
         lua_pushstring(l, "no identity (call ensure_identity first)");
         return 2;
     }
-    if (net_async_start(&conns[i].a, host, port, sk) != 0) {
-        lua_pushnil(l);
-        lua_pushstring(l, conns[i].a.err);
-        memset(sk, 0, sizeof sk);
-        return 2;
-    }
+    SDL_strlcpy(conns[i].host,host,sizeof conns[i].host);
+    conns[i].port=port;memcpy(conns[i].key,sk,sizeof sk);
     memset(sk, 0, sizeof sk);
+    SDL_SetAtomicInt(&conns[i].resolving,1);
+    conns[i].resolver=SDL_CreateThread(resolve_connection,"resolve",&conns[i]);
+    if(!conns[i].resolver){
+        memset(conns[i].key,0,sizeof conns[i].key);
+        lua_pushnil(l);lua_pushstring(l,SDL_GetError());return 2;
+    }
     conns[i].used = 1;
     conns[i].ready = 0;
     conns[i].tofu = 0;
-    lua_pushinteger(l, i);
+    conns[i].paused = 0;
+    conns[i].output_len=conns[i].output_pos=0;
+    conns[i].token = ++next_token;
+    lua_pushinteger(l, conns[i].token);
     return 1;
 }
 
@@ -267,20 +321,31 @@ static int l_net_send(lua_State *l)
     size_t len;
     const char *data = luaL_checklstring(l, 2, &len);
 
-    if (id < 0 || id >= MAX_CONNS || !conns[id].used || !conns[id].ready) {
+    conn_slot *s=connection(id);
+    if (!s || !s->ready) {
         lua_pushboolean(l, 0);
         return 1;
     }
-    lua_pushboolean(l, net_send(&conns[id].a.c, data, len) == 0);
+    if(s->output_pos){
+        memmove(s->output,s->output+s->output_pos,s->output_len-s->output_pos);
+        s->output_len-=s->output_pos;s->output_pos=0;
+    }
+    if(len>NOISE_FRAME_MAX_PT || len+NOISE_FRAME_OVERHEAD>sizeof s->output-s->output_len){
+        ev_net_closed(s->token,"send queue full; reconnect required");abort_connection(s);lua_pushboolean(l,0);return 1;
+    }
+    size_t n=noise_session_send(&s->a.c.sess,(const uint8_t *)data,len,s->output+s->output_len,sizeof s->output-s->output_len);
+    if(!n){ev_net_closed(s->token,"encrypt failed");abort_connection(s);}
+    else s->output_len+=n;
+    lua_pushboolean(l,n!=0);
     return 1;
 }
 
 static int l_net_close(lua_State *l)
 {
     int id = (int)luaL_checkinteger(l, 1);
-    if (id >= 0 && id < MAX_CONNS && conns[id].used) {
-        net_async_abort(&conns[id].a);
-        conns[id].used = 0;
+    conn_slot *s=connection(id);
+    if (s) {
+        abort_connection(s);
     }
     return 0;
 }
@@ -288,9 +353,10 @@ static int l_net_close(lua_State *l)
 static int l_net_trust(lua_State *l)
 {
     int id = (int)luaL_checkinteger(l, 1);
-    if (id >= 0 && id < MAX_CONNS && conns[id].used && conns[id].tofu) {
-        net_async_trust(&conns[id].a);
-        conns[id].tofu = 0;
+    conn_slot *s=connection(id);
+    if (s && s->tofu) {
+        net_async_trust(&s->a);
+        s->tofu = 0;
         lua_pushboolean(l, 1);
         return 1;
     }
@@ -302,8 +368,9 @@ static int l_net_state(lua_State *l)
 {
     int id = (int)luaL_checkinteger(l, 1);
     const char *st = "closed";
-    if (id >= 0 && id < MAX_CONNS && conns[id].used)
-        st = conns[id].ready ? "up" : (conns[id].tofu ? "tofu" : "connecting");
+    conn_slot *s=connection(id);
+    if (s)
+        st = s->ready ? "up" : (s->tofu ? "tofu" : "connecting");
     lua_pushstring(l, st);
     return 1;
 }
@@ -311,13 +378,19 @@ static int l_net_state(lua_State *l)
 static int l_net_fp(lua_State *l)
 {
     int id = (int)luaL_checkinteger(l, 1);
-    if (id >= 0 && id < MAX_CONNS && conns[id].used &&
-        conns[id].a.c.server_fp[0]) {
-        lua_pushstring(l, conns[id].a.c.server_fp);
+    conn_slot *s=connection(id);
+    if (s && !s->resolver && s->a.c.server_fp[0]) {
+        lua_pushstring(l, s->a.c.server_fp);
         return 1;
     }
     lua_pushnil(l);
     return 1;
+}
+
+static int l_net_pause(lua_State *l) {
+    conn_slot *s=connection((int)luaL_checkinteger(l,1));
+    if(s)s->paused=lua_toboolean(l,2);
+    return 0;
 }
 
 static int l_config_get(lua_State *l)
@@ -338,15 +411,13 @@ static int l_config_set(lua_State *l)
     return 1;
 }
 
+#else
+void luabind_net_pump(void) {}
+#endif
+
 static int l_time(lua_State *l)
 {
-#ifdef _WIN32
-    lua_pushnumber(l, (lua_Number)time(NULL));
-#else
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    lua_pushnumber(l, (lua_Number)tv.tv_sec + (lua_Number)tv.tv_usec / 1e6);
-#endif
+    lua_pushnumber(l, (lua_Number)SDL_GetTicksNS() / 1e9);
     return 1;
 }
 
@@ -374,10 +445,10 @@ static int l_line_height(lua_State *l)
 
 static int l_set_ime_rect(lua_State *l)
 {
-    gui_set_ime_rect((int)luaL_checkinteger(l, 1),
-                     (int)luaL_checkinteger(l, 2),
-                     (int)luaL_checkinteger(l, 3),
-                     (int)luaL_checkinteger(l, 4));
+    gui_set_ime_rect((int)luaL_checknumber(l, 1),
+                     (int)luaL_checknumber(l, 2),
+                     (int)luaL_checknumber(l, 3),
+                     (int)luaL_checknumber(l, 4));
     return 0;
 }
 
@@ -409,6 +480,7 @@ static int l_log(lua_State *l)
     return 1;
 }
 
+#ifndef COOLOO_EDITOR_ONLY
 static int read_random(uint8_t *out, size_t len)
 {
 #if defined(__APPLE__)
@@ -532,6 +604,8 @@ static int l_server(lua_State *l)
     return 2;
 }
 
+#endif
+
 static void register_api(void)
 {
     static const luaL_Reg top[] = {
@@ -540,6 +614,7 @@ static void register_api(void)
         { "text_width", l_text_width },
         { "line_height", l_line_height },
         { "set_ime_rect", l_set_ime_rect },
+#ifndef COOLOO_EDITOR_ONLY
         { "ensure_identity", l_ensure_identity },
         { "identity_fp", l_identity_fp },
         { "public_id", l_public_id },
@@ -549,10 +624,12 @@ static void register_api(void)
         { "cache_meta", l_cache_meta },
         { "cache_append", l_cache_append },
         { "server", l_server },
+#endif
         { "quit", l_quit },
         { "log", l_log },
         { NULL, NULL }
     };
+#ifndef COOLOO_EDITOR_ONLY
     static const luaL_Reg netf[] = {
         { "connect", l_net_connect },
         { "send", l_net_send },
@@ -560,6 +637,7 @@ static void register_api(void)
         { "trust", l_net_trust },
         { "state", l_net_state },
         { "fp", l_net_fp },
+        { "pause", l_net_pause },
         { NULL, NULL }
     };
     static const luaL_Reg cfgf[] = {
@@ -567,6 +645,7 @@ static void register_api(void)
         { "set", l_config_set },
         { NULL, NULL }
     };
+#endif
     static const luaL_Reg clipf[] = {
         { "get", l_clipboard_get },
         { "set", l_clipboard_set },
@@ -574,10 +653,22 @@ static void register_api(void)
     };
 
     luaL_newlib(L, top);
+    platform_register(L);
+    runtime_register(L);
+#ifdef COOLOO_WORKBENCH
+    /* Workers start only after platform socket initialization on the host. */
+    net_initialize();
+    workbench_cache_register(L);
+#endif
+#ifdef COOLOO_EDITOR_ONLY
+    lua_pushboolean(L, 1);
+    lua_setfield(L, -2, "offline");
+#else
     luaL_newlib(L, netf);
     lua_setfield(L, -2, "net");
     luaL_newlib(L, cfgf);
     lua_setfield(L, -2, "config");
+#endif
     luaL_newlib(L, clipf);
     lua_setfield(L, -2, "clipboard");
     lua_setglobal(L, "cooloo");
@@ -667,8 +758,7 @@ static void dev_hotreload(void)
     if (!changed)
         return;
     memcpy(dev_mtimes, cur, sizeof dev_mtimes);
-    fprintf(stderr, "cooloo gui: lua-dev reload\n");
-    run_scripts();
+    fprintf(stderr, "cooloo gui: workbench changed; restart to reload modules safely\n");
 }
 
 int luabind_init(const char *dir)
@@ -697,10 +787,18 @@ int luabind_init(const char *dir)
 
 void luabind_shutdown(void)
 {
+#ifndef COOLOO_EDITOR_ONLY
     int i;
     for (i = 0; i < MAX_CONNS; i++)
-        if (conns[i].used)
-            net_async_abort(&conns[i].a);
+        if (conns[i].used) {
+            if(conns[i].resolver){SDL_WaitThread(conns[i].resolver,NULL);conns[i].resolver=NULL;}
+            net_async_abort(&conns[i].a);conns[i].used=0;
+        }
+#endif
+    runtime_shutdown();
+#ifdef COOLOO_WORKBENCH
+    workbench_cache_shutdown();
+#endif
     if (L)
         lua_close(L);
     L = NULL;
@@ -714,7 +812,7 @@ static lua_Integer geti(const char *k)
 {
     lua_Integer v;
     lua_getfield(L, -1, k);
-    v = lua_tointeger(L, -1);
+    v = (lua_Integer)lua_tonumber(L, -1);
     lua_pop(L, 1);
     return v;
 }
@@ -723,7 +821,7 @@ static lua_Integer opti(const char *k, lua_Integer dflt)
 {
     lua_Integer v;
     lua_getfield(L, -1, k);
-    v = lua_isnumber(L, -1) ? lua_tointeger(L, -1) : dflt;
+    v = lua_isnumber(L, -1) ? (lua_Integer)lua_tonumber(L, -1) : dflt;
     lua_pop(L, 1);
     return v;
 }

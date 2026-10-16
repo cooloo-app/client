@@ -50,6 +50,8 @@ static int  sock_nonblock(int fd)
 static void net_platform_init(void) { }
 #endif
 
+void net_initialize(void) { net_platform_init(); }
+
 static int read_full(int fd, uint8_t *buf, size_t len)
 {
     size_t got = 0;
@@ -264,6 +266,15 @@ int net_send(netconn *c, const void *pt, size_t len)
     if (!n)
         return -1;
     return write_full(c->fd, frame, n);
+}
+
+/* Single nonblocking socket write; preserves partial encrypted frames in caller. */
+int net_try_write(netconn *c,const void *data,size_t len,size_t *written)
+{
+    long n=sock_write(c->fd,data,len);*written=0;
+    if(n<0)return sock_wouldblock()?0:-1;
+    if(!n)return -1;
+    *written=(size_t)n;return 0;
 }
 
 int net_send_line(netconn *c, const char *line)

@@ -5,6 +5,11 @@
 #include <errno.h>
 int cooloo_machine;
 static int failed;
+void machine_reset(void) { failed=0;cooloo_machine=0; }
+static size_t output_limit,output_bytes;
+static int output_limited;
+void machine_output_limit(size_t limit) { output_limit=limit;output_bytes=0;output_limited=0; }
+int machine_output_limited(void) { return output_limited; }
 void machine_string(const char *s)
 {
     const unsigned char *p=(const unsigned char *)s;
@@ -38,7 +43,11 @@ void machine_result(const char *field,const char *value)
 void machine_offset(const char *type,const char *field,long long offset)
 {printf("{\"schema\":1,\"type\":\"%s\",\"%s\":%lld}\n",type,field,offset);fflush(stdout);}
 void machine_message(long long end,const char *json)
-{printf("{\"schema\":1,\"type\":\"message\",\"end_offset\":%lld,\"message\":%s}\n",end,json);fflush(stdout);}
+{
+    if(output_limit && output_bytes+strlen(json)+100>output_limit){output_limited=1;return;}
+    output_bytes+=strlen(json)+100;
+    printf("{\"schema\":1,\"type\":\"message\",\"end_offset\":%lld,\"message\":%s}\n",end,json);fflush(stdout);
+}
 int machine_response(const char *command,const char *line)
 {
     char id[65],kind[16],owner[65],slot[8];int pos=0;
@@ -51,6 +60,8 @@ int machine_response(const char *command,const char *line)
     }
     if((!strcmp(command,"CREATE")||!strcmp(command,"AVATAR")||!strcmp(command,"ROOM")) &&
        sscanf(line,"%15s %64s %n",kind,id,&pos)==2 && strlen(id)==64 && pos>0) {
+        if(output_limit && output_bytes+strlen(line)+100>output_limit){output_limited=1;return machine_error("output-limit","script result exceeds 1 MiB");}
+        output_bytes+=strlen(line)+100;
         printf("{\"schema\":1,\"type\":\"%s\",\"id\":",!strcmp(command,"ROOM")?"room":"result");machine_string(id);
         printf(",\"nickname\":");machine_string(line+pos);puts("}");return 0;
     }
@@ -69,5 +80,5 @@ int machine_finish(int status)
 }
 void machine_version(void)
 {
-    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.2.4\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\"]}");
+    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.0\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\"]}");
 }

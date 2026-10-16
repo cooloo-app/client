@@ -65,10 +65,11 @@ end
 
 function M.init(host, port)
     M.host, M.port = host, port
+    M.login_id=cooloo.public_id()
 end
 
 function M.identity()
-    return M.effective or cooloo.public_id()
+    return M.effective or M.login_id or cooloo.public_id()
 end
 
 -- One explicit identity per window. Clear streams/views before switching.
@@ -80,6 +81,8 @@ function M.use_identity(id)
     M.rooms, M.order, M.by_conn = {}, {}, {}
     M.sel, M.rooms_loaded = nil, false
     M.sent_conns, M.sent_seen = {}, {}
+    M.names, M.registered, M.nick, M.want_register = {}, false, '', false
+    M.read_denied=false
     M.want_reconnect = false
     M.connect_ctrl()
     return true
@@ -133,7 +136,7 @@ function M.start_follows()
     if not M.registered then return end
     for _, name in ipairs(M.order) do
         local r = M.rooms[name]
-        if not r.conn then
+        if not r.conn and (not M.subscriptions or M.subscriptions[name]) and not r.denied then
             local conn = cooloo.net.connect(M.host, M.port)
             if conn then
                 r.conn = conn
@@ -150,16 +153,21 @@ function M.ensure_conns()
     if M.rooms_loaded then M.start_follows() end
 end
 
-local function add_msg(r, endoff, ts, nick, text)
+local function add_msg(r, endoff, ts, nick, text, from)
     if r.ends[endoff] then return end           -- dedupe (backfill overlap)
     r.ends[endoff] = true
-    local m = { endoff = endoff, ts = ts, nick = nick, text = text }
+    r.revision=(r.revision or 0)+1
+    local m = { endoff = endoff, ts = ts, nick = nick, text = text, from=from }
     local i = #r.buf + 1
     if r.name == M.identity() then
-        i = 1
-        while i <= #r.buf and (r.buf[i].ts < ts or
-            (r.buf[i].ts == ts and ((r.buf[i].to or r.name) < r.name or
-            ((r.buf[i].to or r.name) == r.name and r.buf[i].endoff < endoff)))) do i = i + 1 end
+        local lo,hi=1,#r.buf
+        while lo<=hi do
+            local mid=(lo+hi)//2;local old=r.buf[mid]
+            local less=old.ts<ts or (old.ts==ts and ((old.to or r.name)<r.name or
+                ((old.to or r.name)==r.name and old.endoff<endoff)))
+            if less then lo=mid+1 else hi=mid-1 end
+        end
+        i=lo
     elseif #r.buf > 0 and r.buf[#r.buf].endoff > endoff then
         i = 1
         while i <= #r.buf and r.buf[i].endoff < endoff do i = i + 1 end
@@ -167,7 +175,7 @@ local function add_msg(r, endoff, ts, nick, text)
     table.insert(r.buf, i, m)
     r.newest_end = math.max(r.newest_end or 0, endoff)
     if not r.oldest_end or endoff < r.oldest_end then r.oldest_end = endoff end
-    if #r.buf > ROOM_CAP then
+    if #r.buf > (r.display_cap or ROOM_CAP) then
         local old = table.remove(r.buf, 1)
         if not old.sent then r.ends[old.endoff] = nil end
         r.oldest_end = r.buf[1] and r.buf[1].endoff or nil
@@ -211,21 +219,32 @@ function M.ready_identity(conn, nick)
         r.read_received = 0
         r.server_fp = cooloo.net.fp(conn)
         r.self_id = M.identity()
+        local offset
+        local function loaded(ok, records, checkpoint)
+            if r.conn ~= conn or M.by_conn[conn] ~= r then return end
+            if not ok or checkpoint < 0 then
+                M.status='cache read failure';cooloo.net.close(conn);M.on_closed(conn,M.status);return
+            end
+            if records then
+                for _,v in ipairs(records) do
+                    local msg=cooloo.record(v.json)
+                    if msg then
+                        add_msg(r,v.offset,msg.ts,(M.names or {})[msg.from] or msg.from,msg.content,msg.from)
+                    end
+                end
+            end
+            r.newest_end=checkpoint
+            cooloo.net.send(conn,('READ %s %d\n'):format(r.name,checkpoint))
+        end
+        if M.load_cache then M.load_cache(r,loaded);return end
         local ok = cooloo.cache_read(r.server_fp, r.self_id, r.name, function(endoff, json)
             local msg = cooloo.record(json)
             if msg then
-                add_msg(r, endoff, msg.ts, (M.names or {})[msg.from] or msg.from, msg.content)
-                for _, m in ipairs(r.buf) do if not m.sent and m.endoff == endoff then m.from = msg.from end end
+                add_msg(r, endoff, msg.ts, (M.names or {})[msg.from] or msg.from, msg.content,msg.from)
             end
         end)
-        local offset = cooloo.cache_offset(r.server_fp, r.self_id, r.name)
-        if not ok or offset < 0 then
-            M.status = "cache read failure"
-            cooloo.net.close(conn)
-            return
-        end
-        r.newest_end = offset
-        cooloo.net.send(conn, ("READ %s %d\n"):format(r.name, offset))
+        offset = cooloo.cache_offset(r.server_fp, r.self_id, r.name)
+        loaded(ok,nil,offset)
     end
 end
 
@@ -255,6 +274,7 @@ function M.on_line(conn, line)
             s.room.sent_ends = s.room.sent_ends or {}
             if not s.room.sent_ends[key] then
                 s.room.sent_ends[key] = true
+                s.room.revision=(s.room.revision or 0)+1
                 table.insert(s.room.buf, {endoff=h.endoff, ts=msg.ts, from=msg.from,
                     nick=msg.from, text=msg.content, to=msg.to, sent=true})
                 table.sort(s.room.buf, function(a,b)
@@ -282,12 +302,13 @@ function M.on_line(conn, line)
         local room, nickname = line:match("^ROOM (%x+) (.+)$")
         if room then
             M.ensure_room(room).nickname = nickname
-            cooloo.net.send(conn, "METAFILE " .. room .. "\n")
+            if not M.subscriptions then cooloo.net.send(conn, "METAFILE " .. room .. "\n") end
             return
         end
         local meta = line:match("^META (.+)$")
         if meta then
-            if not cooloo.cache_meta(cooloo.net.fp(conn), M.identity(), meta) then
+            if M.metadata then M.metadata(meta)
+            elseif not cooloo.cache_meta(cooloo.net.fp(conn), M.identity(), meta) then
                 M.status = "metadata cache failure"
             end
             return
@@ -297,7 +318,7 @@ function M.on_line(conn, line)
             M.names = M.names or {}; M.names[id] = name
             for _, r in pairs(M.rooms) do
                 for _, m in ipairs(r.buf) do
-                    if m.from == id then m.nick = name; m.wrap = nil end
+                    if m.from == id then m.nick = name; m.wrap = nil;r.revision=(r.revision or 0)+1 end
                 end
             end
             return
@@ -327,7 +348,9 @@ function M.on_line(conn, line)
         if line:sub(1, 4) == "ERR " then
             M.status = line
             if M.effective and line:match('^ERR forbidden') then
-                M.auth_failed = true; M.close_all()
+                -- AS already succeeded. A read-only command denial must not
+                -- revoke an independent write grant for this identity.
+                M.read_denied=true
             end
             return
         end
@@ -340,10 +363,14 @@ function M.on_line(conn, line)
         local h = r.pending
         r.pending = nil
         local msg = cooloo.record(line)
-        if not msg or #line ~= h.len or msg.to ~= r.name or
-            not cooloo.cache_append(r.server_fp, r.self_id, r.name, h.endoff, line) then
-            M.status = "invalid message or cache write failure"
-            cooloo.net.close(conn)
+        if not msg or #line ~= h.len or msg.to ~= r.name then
+            M.status='invalid message';cooloo.net.close(conn);M.on_closed(conn,M.status);return
+        end
+        local function persisted(ok)
+        if M.by_conn[conn] ~= r then return end
+        if not ok then
+            M.status = "cache write failure"
+            cooloo.net.close(conn);M.on_closed(conn,M.status)
             return
         end
         M.names = M.names or {}
@@ -351,9 +378,11 @@ function M.on_line(conn, line)
             M.names[msg.from] = msg.from
             cooloo.net.send(M.ctrl, "META " .. msg.from .. "\n")
         end
-        add_msg(r, h.endoff, msg.ts, M.names[msg.from], msg.content)
-        for _, m in ipairs(r.buf) do if not m.sent and m.endoff == h.endoff then m.from = msg.from end end
+        add_msg(r, h.endoff, msg.ts, M.names[msg.from], msg.content,msg.from)
         if r.following and r.name == M.identity() then M.fetch_sent(r) end
+        end
+        if M.persist then M.persist(r,h.endoff,line,persisted)
+        else persisted(cooloo.cache_append(r.server_fp,r.self_id,r.name,h.endoff,line)) end
         return
     end
     local e, len = line:match("^MSG (%d+) (%d+)$")
@@ -378,13 +407,16 @@ function M.on_line(conn, line)
     end
     if line:sub(1, 4) == "ERR " then
         M.status = line
-        if M.effective and line:match('^ERR forbidden') then
-            M.auth_failed = true; M.close_all(); return
+        if line:match('^ERR forbidden') then
+            r.denied=true
+            cooloo.net.close(conn);M.on_closed(conn,line);return
         end
         -- an ERR before FOLLOW is terminal for the current op (e.g. D25
         -- not-registered): close so on_closed schedules a reconnect that
         -- re-opens the room conn once we're allowed (registered)
-        if not r.following then cooloo.net.close(conn) end
+        if not r.following then
+            cooloo.net.close(conn);r.denied=true;M.on_closed(conn,line)
+        end
         return
     end
 end
@@ -481,9 +513,11 @@ function M.close_all()
     M.sent_conns, M.as_pending = {}, {}
     if M.ctrl then cooloo.net.close(M.ctrl); M.ctrl = nil end
     M.ctrl_up = false
+    M.registered = false
     for conn, r in pairs(M.by_conn) do
         cooloo.net.close(conn)
         r.conn = nil
+        r.pending = nil
         r.phase = "idle"
         r.following = false
     end
@@ -494,7 +528,9 @@ function M.reconnect()
     M.close_all()
     M.want_reconnect = false
     M.auth_failed = false
+    M.read_denied = false
     M.sent_seen = {}
+    for _,r in pairs(M.rooms) do r.denied=nil end
     M.connect_ctrl()
     if M.rooms_loaded then M.start_follows() end
 end

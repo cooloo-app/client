@@ -1,6 +1,12 @@
 /cooloo
 /cooloo.exe
 /cooloo-cli
+/editor
+/editor.exe
+/cli.exe
+/editor-linux
+/cooloo-linux
+__pycache__/
 *.dSYM/
 /build/
 /src/embedded_lua.c

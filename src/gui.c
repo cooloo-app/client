@@ -12,7 +12,9 @@
 #include "gui.h"
 #include "font.h"
 #include "luabind.h"
+#ifndef COOLOO_EDITOR_ONLY
 #include "config.h"
+#endif
 #include "embedded_icon.h"
 
 /* SDL_MAIN_HANDLED: plain main() everywhere (single exe is CLI+GUI) */
@@ -226,7 +228,11 @@ static void translate(SDL_Event *ev)
     case SDL_EVENT_MOUSE_BUTTON_UP:
         luabind_ev_mouse(ev->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "down" : "up",
                          (int)ev->button.x, (int)ev->button.y,
-                         ev->button.button, 0, 0);
+                         ev->button.button, ev->button.clicks, 0);
+        break;
+    case SDL_EVENT_MOUSE_MOTION:
+        luabind_ev_mouse("move", (int)ev->motion.x, (int)ev->motion.y, 0,
+                         (int)ev->motion.xrel, (int)ev->motion.yrel);
         break;
     case SDL_EVENT_MOUSE_WHEEL: {
         int wx = ev->wheel.integer_x, wy = ev->wheel.integer_y;
@@ -252,7 +258,9 @@ static void translate(SDL_Event *ev)
 
 int cooloo_gui_run(const char *lua_dev_dir)
 {
+#ifndef COOLOO_EDITOR_ONLY
     char val[32];
+#endif
     int w = 960, h = 640, quit = 0;
     Uint64 last;
 
@@ -266,10 +274,12 @@ int cooloo_gui_run(const char *lua_dev_dir)
     if (getenv("COOLOO_PROBE_STARTUP"))
         fprintf(stderr, "probe: SDL_Init done %llu ms\n",
                 (unsigned long long)SDL_GetTicks());
+#ifndef COOLOO_EDITOR_ONLY
     if (cfg_get("gui.w", val, sizeof val) == 0)
         w = atoi(val);
     if (cfg_get("gui.h", val, sizeof val) == 0)
         h = atoi(val);
+#endif
     if (w < 320)
         w = 320;
     if (h < 240)
@@ -330,6 +340,7 @@ int cooloo_gui_run(const char *lua_dev_dir)
         }
     }
 
+#ifndef COOLOO_EDITOR_ONLY
     {
         char b[16];
         snprintf(b, sizeof b, "%d", scr_w);
@@ -337,6 +348,7 @@ int cooloo_gui_run(const char *lua_dev_dir)
         snprintf(b, sizeof b, "%d", scr_h);
         cfg_set("gui.h", b);
     }
+#endif
     luabind_shutdown();
     SDL_DestroyWindow(win);
     SDL_Quit();

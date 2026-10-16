@@ -19,6 +19,7 @@
 #endif
 static int tofu;
 static char effective[65];
+void cooloo_cli_reset(void) { tofu=0;effective[0]=0; }
 int cooloo_cli_set_as(const char *id)
 {
     size_t i;
@@ -169,6 +170,7 @@ static int receive(netconn *c,const char *self,int raw,int cache,int follow,long
         if(cache&&cache_append(c->server_fp,self,r.to,end,json)){fprintf(stderr,"cache failure (gap, conflict or I/O error)\n");return 1;}
         cursor=end;
         if(cooloo_machine)machine_message(end,json);else if(raw)puts(json);else printf("%lld <%s> %s\n",r.ts,r.from,r.content);
+        if(cooloo_machine && machine_output_limited())return machine_error("output-limit","script result exceeds 1 MiB");
         fflush(stdout);
         (void)follow;
     }
@@ -241,7 +243,12 @@ static int history_fetch(netconn *c,const char *self,const char *peer,const char
         if(sscanf(line,"MSG %lld %zu %c",&end,&len,&extra)!=2 || end<=last || len>=sizeof json) {if(cooloo_machine)machine_server_error(line);else fprintf(stderr,"%s\n",line);return -1;}
         if(net_read_line(c,json,sizeof json)||strlen(json)!=len||record_parse(json,&r)||strcmp(r.to,peer)||(sent&&strcmp(r.from,self)))return -1;
         last=end;
-        if(!h){if(cooloo_machine)machine_message(end,json);else puts(json);}
+        if(!h){
+            if(cooloo_machine){
+                machine_message(end,json);
+                if(machine_output_limited())return machine_error("output-limit","script result exceeds 1 MiB");
+            }else puts(json);
+        }
         else {
             size_t i;
             if(history_add(h,&r,end,json))return -1;

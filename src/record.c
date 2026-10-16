@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <time.h>
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
@@ -108,13 +109,22 @@ int cache_meta(const char *server,const char *self,const char *json)
     if(rc)remove(tmp);
     return rc;
 }
-static int lock(FILE *f)
+typedef int (*cancel_fn)(void *);
+static int lock(FILE *f, cancel_fn cancel, void *ctx)
 {
+    for (;;) {
+        if(cancel && cancel(ctx))return -1;
 #ifdef _WIN32
-    OVERLAPPED o={0};return LockFileEx((HANDLE)_get_osfhandle(_fileno(f)),LOCKFILE_EXCLUSIVE_LOCK,0,MAXDWORD,MAXDWORD,&o)?0:-1;
+        OVERLAPPED o={0};
+        if(LockFileEx((HANDLE)_get_osfhandle(_fileno(f)),LOCKFILE_EXCLUSIVE_LOCK | (cancel?LOCKFILE_FAIL_IMMEDIATELY:0),0,MAXDWORD,MAXDWORD,&o))return 0;
+        if(!cancel || GetLastError()!=ERROR_LOCK_VIOLATION)return -1;
+        Sleep(10);
 #else
-    return flock(fileno(f),LOCK_EX);
+        if(!flock(fileno(f),LOCK_EX | (cancel?LOCK_NB:0)))return 0;
+        if(!cancel || (errno!=EWOULDBLOCK && errno!=EAGAIN))return -1;
+        struct timespec delay={0,10000000};nanosleep(&delay,NULL);
 #endif
+    }
 }
 static int truncate_file(FILE *f,long long n)
 {
@@ -126,32 +136,36 @@ static int truncate_file(FILE *f,long long n)
 }
 /* Scan complete records under the process-shared file lock. Discard only an
  * incomplete final record; malformed complete records fail closed. */
-static long long scan(FILE *f)
+static long long scan(FILE *f, cancel_fn cancel, void *ctx)
 {
     char line[RECORD_MAX];struct record r;long long off=0;
     rewind(f);
     while(fgets(line,sizeof line,f)) {
+        if(cancel && cancel(ctx))return -1;
         size_t n=strlen(line);
         if(!n||line[n-1]!='\n') {if(!feof(f))return -1;if(truncate_file(f,off))return -1;break;}
         line[n-1]=0;if(record_parse(line,&r))return -1;off+=(long long)n;
     }
     return ferror(f)?-1:off;
 }
-static FILE *open_cache(const char *server,const char *self,const char *room)
+static FILE *open_cache(const char *server,const char *self,const char *room,cancel_fn cancel,void *ctx)
 {
     char p[1400];FILE *f;
     if(cache_path(p,sizeof p,server,self,room))return NULL;
-    f=fopen(p,"a+b");if(f&&lock(f)){fclose(f);return NULL;}return f;
+    f=fopen(p,"a+b");if(f&&lock(f,cancel,ctx)){fclose(f);return NULL;}return f;
 }
 long long cache_offset(const char *server,const char *self,const char *room)
-{FILE *f=open_cache(server,self,room);long long n;if(!f)return -1;n=scan(f);fclose(f);return n;}
+{FILE *f=open_cache(server,self,room,NULL,NULL);long long n;if(!f)return -1;n=scan(f,NULL,NULL);fclose(f);return n;}
 int cache_read(const char *server,const char *self,const char *room,cache_visit visit,void *ctx)
+{return cache_read_controlled(server,self,room,visit,ctx,NULL,NULL);}
+int cache_read_controlled(const char *server,const char *self,const char *room,cache_visit visit,void *ctx,cancel_fn cancel,void *cancel_ctx)
 {
-    FILE *f=open_cache(server,self,room);char line[RECORD_MAX];long long end=0;int rc=0;
+    FILE *f=open_cache(server,self,room,cancel,cancel_ctx);char line[RECORD_MAX];long long end=0;int rc=0;
     if(!f)return -1;
-    if(scan(f)<0){fclose(f);return -1;}
+    if(scan(f,cancel,cancel_ctx)<0){fclose(f);return -1;}
     rewind(f);
     while(fgets(line,sizeof line,f)) {
+        if(cancel && cancel(cancel_ctx)){rc=-1;break;}
         size_t n=strlen(line);end+=(long long)n;line[n-1]=0;
         rc=visit(ctx,end,line);if(rc)break;
     }
@@ -159,10 +173,12 @@ int cache_read(const char *server,const char *self,const char *room,cache_visit 
     fclose(f);return rc;
 }
 int cache_append(const char *server,const char *self,const char *room,long long end,const char *json)
+{return cache_append_controlled(server,self,room,end,json,NULL,NULL);}
+int cache_append_controlled(const char *server,const char *self,const char *room,long long end,const char *json,cancel_fn cancel,void *cancel_ctx)
 {
     FILE *f;struct record r;long long off;size_t n=strlen(json);int rc=-1;
     if(record_parse(json,&r)||strcmp(room,r.to)||end<(long long)n+1)return -1;
-    f=open_cache(server,self,room);if(!f)return -1;off=scan(f);if(off<0)goto out;
+    f=open_cache(server,self,room,cancel,cancel_ctx);if(!f)return -1;off=scan(f,cancel,cancel_ctx);if(off<0)goto out;
     if(end<=off) {
         char old[RECORD_MAX];
         if(n+2>sizeof old||end-(long long)n-1>LONG_MAX)goto out;

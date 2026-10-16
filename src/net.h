@@ -37,6 +37,7 @@ typedef struct {
 #define NET_ERR_TOFU_DIFF 3
 #define NET_TOFU_UNKNOWN  4
 
+void net_initialize(void);
 int  net_connect(netconn *c, const char *host, int port,
                  const uint8_t sk[32], int tofu_mode,
                  char *errbuf, size_t errcap);
@@ -49,6 +50,7 @@ int  net_connect_trust(netconn *c, const char *host, int port,
 
 /* Send helpers: whole plaintext chunk in one frame. 0 ok. */
 int  net_send(netconn *c, const void *pt, size_t len);
+int net_try_write(netconn *c,const void *data,size_t len,size_t *written);
 int  net_send_line(netconn *c, const char *line);
 
 /* Read one decrypted line (strips \n). Blocking. 0 ok, -1 closed/error. */

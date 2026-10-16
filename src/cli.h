@@ -2,6 +2,7 @@
 #ifndef COOLOO_CLI_H
 #define COOLOO_CLI_H
 
+void cooloo_cli_reset(void);
 int cooloo_cli_request(int argc, char **argv);
 int cooloo_cli_sent(int argc, char **argv);
 int cooloo_cli_history(int argc, char **argv);

@@ -1,4 +1,58 @@
-# Protocol 2 client — v0.2.4
+# Protocol 2 client — v0.3.0 text workbench
+
+The modular workbench replaces the v0.2 GUI. Protocol 2, Machine API schema 1,
+identity and cache formats remain compatible. See [modules/README.md](modules/README.md)
+for dependency boundaries and runner API, and [release/README.md](release/README.md)
+for artifact provenance, platform verification and manual acceptance limitations.
+
+## Workbench development
+
+```sh
+make cooloo-cli                  # headless, no SDL/editor dependencies
+make editor                     # native macOS offline workbench
+make editor.exe cli.exe         # MinGW Windows targets
+make editor-linux cooloo-linux  # Linux development builds, requires CMake
+make test-workbench             # Linux headless + SDL dummy + loopback tests
+make test-workbench-macos       # macOS workbench/runtime + SDL dummy + loopback tests
+```
+
+`editor` starts with an empty `<local>` conversation. It does not link the client
+network/identity/cache core or read/write `~/.cooloo`. `Workspace: Mock Load`
+explicitly imports a text file (one mock message per line); nothing is loaded or
+created implicitly in the current directory. Messages are in-memory mock data.
+
+Useful commands/keys (Cmd maps to Ctrl on macOS):
+
+- Ctrl+Shift+P: command palette; Ctrl+O/N/S/F: open/new/save/find.
+- Alt+Shift+J/L/I/K: split left/right/up/down; Ctrl+Tab: next tab.
+- Ctrl+Enter in a message draft: send; elsewhere it does not send hidden drafts.
+- F5: save and run the current named Lua file in a new child VM.
+- Ctrl+backtick: Lua console output/input split; Ctrl+Enter submits multiline input.
+- Alt+Up/Down in console input: history. `Console: Stop File`, `Stop Session`,
+  `Restart`, `Clear` are available in the command palette.
+- `Workspace: Switch`, `Address`, `History`, `Trust Server`, `Register`, `Identity`,
+  `Reconnect`: provider operations. Trust requires explicit fingerprint approval.
+
+Messages/output are read-only virtual documents with UTF-8 soft wrap, selection,
+copy and find. Lua files use the upstream unwrapped code view. History loads
+cached messages asynchronously in batches of 200, with a 10,000-message display
+limit. Initial display is the latest 2000 records. Disk scans/writes and lock
+waits run on a bounded worker queue; live sync pauses behind durable writes.
+Search covers loaded text. Drafts remain until acknowledgment; errors and unknown
+outcomes retain them, and the client never automatically resends. Delegated
+write capability is marked unverified until an operation establishes its outcome;
+known permission denial disables send until explicit reconnect/identity reset.
+
+The runner's explicit `cooloo.request_as(owner_id, command, ...)` selects delegated
+identity per request; `cooloo.request(...)` always uses login identity. Requests
+reuse the CLI core inside the runner, so Stop does not leave request subprocesses.
+
+`--lua-dev DIR` expects a generated `workbench.lua` bundle (use
+`python3 tools/embed_workbench.py DIR/workbench.lua --lua`, add `--offline` for
+editor). Changes are detected but require restart: destructive hot reload of
+live documents/connections is intentionally disabled. The old GUI entry/layout/input
+scripts have been removed; `lua/chat.lua` remains the shared protocol state model.
+
 
 ## License
 
@@ -11,8 +65,8 @@ and fonts retain their respective licenses; see their notices under `src/vendor/
 FOLLOW requires an explicit byte offset. `version` reports the local client version and
 `--json version` its capabilities. Bare `cooloo` prints a short help summary and exits
 successfully; `cooloo --help` prints full help. Neither starts the GUI or connects to
-a server. `cooloo --gui` opens the embedded GUI; add `--debug` for console logs or
-`--lua-dev DIR` for script hot reload. These options alone no longer start the GUI.
+a server. `cooloo --gui` opens the embedded workbench; add `--debug` for console logs or
+`--lua-dev DIR` for a development bundle (restart required after changes). These options alone no longer start the GUI.
 Desktop shortcuts and launch scripts must pass `--gui` explicitly.
 See [MACHINE_API.md](MACHINE_API.md) for results, errors, cursors and delivery uncertainty.
 The [Python SDK](https://github.com/cooloo-app/python-sdk) wraps this executable and ships
@@ -80,8 +134,8 @@ owner grants read/write separately to existing avatars, with `none` revoking bot
 Delegates cannot administer grants, avatars, names or room modes as the owner.
 No identity block or slot-based implicit permissions are introduced.
 
-GUI input `/as <owner-id>` selects the window's identity; `/self` restores login
-identity. Status shows effective/login IDs, and new connections must receive AS
+`Workspace: Identity` selects the window's effective identity (empty restores login).
+Status shows effective/login IDs, and new connections must receive AS
 acknowledgment before sending/reading. Message caches use the effective identity.
 The GUI recovers sent messages from recent incoming peers into its inbox view;
 filtered records do not enter the contiguous room cache. This filtered view is
@@ -131,12 +185,11 @@ complete lines fail closed. Cache files and server files are directly comparable
 Metadata is a snapshot, not a live change feed. Stop processes before backup;
 the directory includes private keys. Windows ACLs inherit from the user profile.
 
-GUI uses the existing C/SDL/Lua architecture. It loads cached history, resumes
-READ from the cache end, then FOLLOWs. Display memory is capped at 2000 messages;
-older history remains in JSONL, but scrolling older on-disk history is not yet
-implemented. Room creation/avatar administration currently use the CLI. The GUI
-registration form still restricts nicknames to `[a-z0-9_-]{1,16}` although native
-CLI supports up to 64 UTF-8 bytes.
+The previous v0.2 GUI used the existing C/SDL/Lua architecture. It loaded cached history, resumed
+READ from the cache end, then FOLLOWed. Its display was capped at 2000 messages;
+older history remained in JSONL without a paging UI. The v0.3 workbench above
+adds explicit local-cache paging and registration through commands. Room creation
+and avatar administration still use CLI; no dedicated GUI controls are added.
 
 ## Build and tests
 

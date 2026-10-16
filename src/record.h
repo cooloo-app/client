@@ -12,4 +12,9 @@ int cache_meta(const char *server, const char *self, const char *json);
 typedef int (*cache_visit)(void *ctx, long long end, const char *json);
 int cache_read(const char *server, const char *self, const char *room,
                cache_visit visit, void *ctx);
+/* Cancelable worker variants preserve the same format/locking semantics. */
+int cache_read_controlled(const char *server,const char *self,const char *room,
+    cache_visit visit,void *ctx,int (*cancel)(void *),void *cancel_ctx);
+int cache_append_controlled(const char *server,const char *self,const char *room,
+    long long end,const char *json,int (*cancel)(void *),void *cancel_ctx);
 #endif
