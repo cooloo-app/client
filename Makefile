@@ -24,6 +24,7 @@ SDL_CMAKE_FLAGS := -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON \
 # hardware render driver -> needs the render subsystem + Metal backend.
 # (Still our own software canvas; Metal only presents the final bitmap.)
 MACOS_MIN ?= 11.0
+NATIVE_PLATFORM_FLAGS := $(if $(filter Darwin,$(shell uname -s)),-mmacosx-version-min=$(MACOS_MIN))
 SDL_MAC_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOS_MIN) -DSDL_RENDER=ON -DSDL_METAL=ON
 # Windows: the GDI window framebuffer is always available, keep render off.
 SDL_WIN_CMAKE_FLAGS := $(SDL_CMAKE_FLAGS) -DSDL_RENDER=OFF -DSDL_METAL=OFF
@@ -62,7 +63,7 @@ all: cooloo
 
 # Portable CLI-only build for isolated Linux integration tests.
 cooloo-cli: $(CORE_SRC) $(HEADERS)
-	$(CC) $(CFLAGS) -DCOOLOO_CLI_ONLY -Isrc -o $@ $(CORE_SRC)
+	$(CC) $(CFLAGS) $(NATIVE_PLATFORM_FLAGS) -DCOOLOO_CLI_ONLY -Isrc -o $@ $(CORE_SRC)
 
 cooloo: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_MAC_LIB)
 	$(CC) $(CFLAGS) -DCOOLOO_WORKBENCH -mmacosx-version-min=$(MACOS_MIN) -Isrc $(SDL_MAC_INC) -o $@ $(ALL_SRC) $(MAC_LIBS)
@@ -91,7 +92,7 @@ $(BUILD)/embedded_workbench_cli.c: $(WORKBENCH_LUA) tools/embed_workbench.py too
 	python3 tools/embed_workbench.py $@ --profile cli
 
 cooloo-workbench: $(WORKBENCH_CLI_SRC) $(HEADERS)
-	$(CC) $(CFLAGS) -DCOOLOO_RECORD_ONLY -DLUA_USE_POSIX -Isrc -Isrc/vendor/lua -o $@ $(WORKBENCH_CLI_SRC) -lm
+	$(CC) $(CFLAGS) $(NATIVE_PLATFORM_FLAGS) -DCOOLOO_RECORD_ONLY -DLUA_USE_POSIX -Isrc -Isrc/vendor/lua -o $@ $(WORKBENCH_CLI_SRC) -lm
 
 cooloo-workbench.exe: $(WORKBENCH_CLI_SRC) $(HEADERS)
 	$(WIN_CC) $(CFLAGS) -DCOOLOO_RECORD_ONLY -Isrc -Isrc/vendor/lua -o $@ $(WORKBENCH_CLI_SRC) -static -lm
