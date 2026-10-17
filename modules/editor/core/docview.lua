@@ -303,7 +303,37 @@ function DocView:draw_line_text(idx, x, y)
 end
 
 
+-- Lite XL's underline / selected segment / caret decoration, applied to a
+-- display-only composition rather than inserting intermediate text into Doc.
+function DocView:draw_ime_line(x, y, line1, col1, line2, col2)
+  local ime = require 'core.ime'
+  local font, lh = self:get_font(), self:get_line_height()
+  local ty = y + self:get_line_text_y_offset()
+  local prefix = self.doc.lines[line1]:sub(1, col1 - 1)
+  local suffix = self.doc.lines[line2]:sub(col2)
+  x = renderer.draw_text(font, prefix, x, ty, style.text)
+  local right = renderer.draw_text(font, ime.text, x, ty, style.text)
+  renderer.draw_text(font, suffix, right, ty, style.text)
+  renderer.draw_rect(x, y + lh - 1, right - x, 1, style.text)
+  local from = x + font:get_width(ime.text:sub(1, ime.start))
+  local width = font:get_width(ime.text:sub(ime.start + 1, ime.start + ime.length))
+  if width > 0 then
+    renderer.draw_rect(from, y + lh - style.caret_width, width, style.caret_width, style.caret)
+  end
+  renderer.draw_rect(from, y, style.caret_width, lh, style.caret)
+end
+
 function DocView:draw_line_body(idx, x, y)
+  local ime = require 'core.ime'
+  if ime.view == self then
+    local l1, c1, l2, c2 = self.doc:get_selection(true)
+    if idx == l1 then
+      self:draw_ime_line(x, y, l1, c1, l2, c2)
+      return
+    elseif idx > l1 and idx <= l2 then
+      return
+    end
+  end
   local line, col = self.doc:get_selection()
 
   -- draw selection if it overlaps this line
@@ -355,6 +385,19 @@ function DocView:draw()
 
   local font = self:get_font()
   font:set_tab_width(font:get_width(" ") * config.indent_size)
+
+  if core.active_view == self and not self.doc.readonly then
+    local ime = require 'core.ime'
+    local line, col = self.doc:get_selection(ime.view == self)
+    local x, y = self:get_line_screen_position(line)
+    x = x + self:get_col_x_offset(line, col)
+    local width = style.caret_width
+    if ime.view == self then
+      x = x + font:get_width(ime.text:sub(1, ime.start))
+      width = math.max(width, font:get_width(ime.text:sub(ime.start + 1, ime.start + ime.length)))
+    end
+    ime.set_location(x, y, width, self:get_line_height())
+  end
 
   local minline, maxline = self:get_visible_line_range()
   local lh = self:get_line_height()

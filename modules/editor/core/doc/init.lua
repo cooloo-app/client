@@ -416,6 +416,7 @@ function Doc:set_projection(text, prepend_lines)
   self.projection_revision=(self.projection_revision or 0)+1
   self.projection_shift = (self.projection_shift or 0) + delta
   self:set_selection(a + delta, b, c + delta, d)
+  require('core').redraw = true
 end
 
 return Doc

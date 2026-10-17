@@ -1,9 +1,16 @@
 package.path='modules/editor/?.lua;modules/editor/?/init.lua;modules/?.lua;modules/?/init.lua;./?.lua;./?/init.lua;'..package.path
-cooloo={offline=true,time=os.clock,screen=function()return 960,640 end,
+local input={}
+local function frame_input(...)
+  input={...}
+  return cooloo.frame({},0.016)
+end
+cooloo={renderer=assert(native_renderer,'run with renderer-test (real font userdata)'),offline=true,time=os.clock,screen=function()return 960,640 end,
+ poll_event=function() local e=table.remove(input,1);if e then return table.unpack(e) end end,
+ clear_ime=function()end,
  text_width=function(s)return utf8.len(s)*8 end,line_height=function()return 18 end,
  set_ime_rect=function()end,clipboard={get=function()return '' end,set=function()end},
  quit=function()end,
- platform={exedir='.',exefile='',userdir='.',set_fps=function()end,focus=function()return true end,cursor=function()end,title=function()end,mode=function()end,
+ platform={fuzzy_match=native_platform.fuzzy_match,exedir='.',exefile='',userdir='.',set_fps=function()end,focus=function()return true end,cursor=function()end,title=function()end,mode=function()end,
  confirm=function()return false end,list_dir=function()return {} end,info=function()end,absolute_path=function(s)return s end},
  runtime={start=function()return true end,poll=function()return {} end,send=function()return true end,stop=function()end}}
 require('platform.lite')
@@ -33,6 +40,11 @@ view.selection_revision=messages.projection_revision
 view:scroll_to_make_visible(#messages.lines,1)
 assert(not view.follow and view.scroll.to.y>0)
 for _,row in ipairs(view.rows)do assert(utf8.len(messages.lines[row.line]:sub(row.first,row.last-1))) end
+local reflow_doc=Doc();reflow_doc.virtual=true;reflow_doc:set_projection(string.rep('abcdef ',20))
+local reflow=Wrapped(reflow_doc);reflow.size.x=120;reflow:layout();local small_rows=#reflow.rows
+local larger=native_renderer.font.load('embedded:monospace',28)
+reflow.get_font=function()return larger end
+reflow:layout();assert(#reflow.rows>small_rows,'font replacement must invalidate wrapped layout')
 -- Drafts survive rejection/uncertainty; ACK only clears the unchanged submission.
 local delivery={state='pending'}
 local fake={open=function()return {}end,send=function()return true,'pending'end,
@@ -64,9 +76,9 @@ con:submit('x=42');con:recall(-1);assert(con.input.lines[1]:find('x=42',1,true))
 con:append(string.rep('a',300000));assert(#con.output<=con.limit);assert(not con.doc:is_dirty())
 -- Exercise actual composition, event dispatch, drawing, editing and split commands.
 dofile('apps/workbench/gui.lua')
-for i=1,3 do assert(type(cooloo.frame({},0.016))=='table') end
-cooloo.frame({{type='key',key='n',mod=1}},0.016)
-cooloo.frame({{type='text',text='print("你好")'}},0.016)
+for i=1,3 do cooloo.frame({},0.016) end
+frame_input({'keypressed','left ctrl'},{'keypressed','n'},{'keyreleased','n'},{'keyreleased','left ctrl'})
+frame_input({'textinput','print("你好")'})
 local core=require 'core';assert(core.active_view.doc.lines[1]:find('你好',1,true))
 require('core.command').perform('root:split-right')
 cooloo.frame({},0.016)

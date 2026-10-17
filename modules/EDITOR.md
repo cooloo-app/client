@@ -16,6 +16,16 @@ uses Lite's poll → editor step → coroutine work → sleep-remaining-frame se
 not event-triggered frame scheduling. `config.fps` (1–1000, default 60) controls
 both host pacing and Lite's existing per-frame timers. There is no new dt/deadline
 scheduler. Frames that overrun their budget are not compensated by catch-up steps.
+`renderer.end_frame()` submits changed regions before coroutine work. Identical
+frames do not present; inactive text frames wait for events for up to 250 ms.
+Workbench retains its bounded fixed-frame network pump, with redraw requested by
+projection/status changes. Window, rendering, mouse and IME coordinates use the
+same surface pixels; the window is shown only after its first rendered frame.
+`LITE_SCALE` overrides the startup SDL window display scale.
+
+Input uses the [Lite C event bridge](EVENTS.md), with paired key press/release
+and an explicit Lite XL-derived IME increment. Intermediate composition is
+rendered without modifying the document; final text follows ordinary undo.
 
 ## Extension layout and order
 
@@ -46,16 +56,35 @@ For Lite-style portable layouts, `<exe-dir>/data/plugins/` is also scanned and
 module search order is USERDIR then `<exe-dir>/data`. Embedded core/default
 plugins remain authoritative (external plugins add new names rather than
 silently replace core). `user.*` resolves relative to USERDIR, then the portable
-layout. An example user module is in `vendor/lite/user-init.lua`.
+layout. An example user module is in `vendor/lite/user-init.lua`, also embedded as
+the string returned by `require 'user.example'`. Both upstream sample themes,
+`user.colors.fall` and `user.colors.summer`, are embedded; external USERDIR themes
+take precedence in normal text mode.
 
-`core:open-user-module` opens the selected user init file (or a new named document;
-create its parent directory before saving). Lua errors are caught, recorded in
+`core:open-user-module` opens the selected user init file (or a new named document
+filled with the upstream template; create its parent directory before saving). Lua errors are caught, recorded in
 Core: Open Log, and do not stop loading later plugins. Plugins may use ordinary
 Lite `core`, `Doc`, `View`, command/keymap/syntax APIs and `core.add_thread`.
 `system.chdir`, filesystem, clipboard, monotonic time and asynchronous shell
-`system.exec(command)` are available. The renderer still uses cooloo's embedded
-font/CJK fallback; arbitrary font-file loading/native Lite C plugins and every
-third-party plugin are **not** a compatibility guarantee.
+`system.exec(command)` are available. `system.absolute_path` canonicalizes existing
+paths and returns `nil,error` on failure; the separate `system.resolve_path`
+extension resolves new filenames. Directory/stat failures also return `nil,error`.
+
+The native Lite renderer uses independent, garbage-collected font objects and the
+upstream pixel tab/advance/height rules. `renderer.font.load(path,size)` loads real
+TTF/TTC files; `embedded:font`, `embedded:icons` and `embedded:monospace` select the
+bundled resources (the corresponding `EXEDIR/data/fonts/*.ttf` paths are aliases).
+Missing primary glyphs use the existing system CJK fallback chain; unavailable
+fallback glyphs retain blank replacement spacing. Font sizes may be fractional.
+`renderer.show_debug(true)` displays actual dirty regions. Arbitrary native Lite
+C plugins and every third-party Lua plugin are not a compatibility guarantee.
+
+Fatal startup/frame/thread/draw errors print a traceback, attempt `error.txt` and
+non-overwriting recovery copies of dirty ordinary documents, then exit nonzero.
+Untitled dirty documents also receive recovery copies; virtual projections are
+excluded. Write failures are diagnosed on stderr. Normal confirmed/forced exits
+and fatal recovery remove this session's temporary files. Plugin `core.try`
+errors remain locally recoverable; explicitly broken `--lua-dev` bundles fail.
 
 ## Trust and workbench boundaries
 
@@ -84,11 +113,18 @@ Build `cooloo-text` (macOS), `cooloo-text.exe` (MinGW), or the development
 `cooloo-text-linux`, then run:
 
 ```
+make test-renderer-macos test-event-bridge-macos
 python3 tests/editor_integration.py ./cooloo-text
+python3 tests/lifecycle_test.py ./cooloo-text
 make test-workbench-headless
-build/lua-runner --lua-run tests/workbench.lua
+SDL_VIDEODRIVER=dummy build/renderer-test-macos tests/workbench.lua
 build/lua-runner --lua-run tests/provider.lua
 ```
+
+On Linux, use `make test-renderer test-event-bridge`, `build/renderer-test`, and
+`cooloo-text-linux` instead. A Linux machine without desktop development libraries
+can configure SDL with `-DSDL_UNIX_CONSOLE_BUILD=ON` for dummy-only validation;
+that build does not validate a Linux desktop backend.
 
 The integration test uses SDL dummy and isolated temporary projects/user modules,
 checks fixed pacing, extension order/error recovery/safe mode, project scan and

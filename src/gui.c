@@ -1,368 +1,164 @@
-/*
- * gui.c - see gui.h.
- *
- * Framebuffer: own ARGB8888 software canvas blitted to the window surface
- * each present (D25 software rendering, no HiDPI scaling - 1:1 pixels,
- * documented minimal choice). Note: SDL3 has no Cocoa window framebuffer,
- * so on macOS SDL_GetWindowSurface is backed by SDL's texture framebuffer
- * (Metal render driver, enabled at SDL build time) - it only presents the
- * final bitmap; all drawing stays in our software canvas. Windows uses
- * SDL's GDI framebuffer, no render subsystem needed.
- */
+/* SDL3 host. Lite renderer/rencache own software drawing and presentation. */
 #include "gui.h"
 #include "font.h"
 #include "luabind.h"
 #include "api.h"
+#include "renderer.h"
+#include "rencache.h"
+#include <lua.h>
+#include <lauxlib.h>
 #ifndef COOLOO_EDITOR_ONLY
 #include "config.h"
 #endif
 #include "embedded_icon.h"
-
-/* SDL_MAIN_HANDLED: plain main() everywhere (single exe is CLI+GUI) */
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 extern const unsigned char cooloo_embedded_font[];
-extern const unsigned int  cooloo_embedded_font_len;
-
-static SDL_Window  *win;
-static SDL_Surface *canvas;
+extern const unsigned int cooloo_embedded_font_len;
+static SDL_Window *win;
 static int scr_w = 960, scr_h = 640;
-static SDL_Rect clip_rect;
-static int clip_active;
+static float pixel_x = 1, pixel_y = 1;
 
-int gui_screen_w(void) { return scr_w; }
-int gui_screen_h(void) { return scr_h; }
-
-static int make_canvas(int w, int h)
-{
-    if (canvas)
-        SDL_DestroySurface(canvas);
-    canvas = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
-    if (!canvas) {
-        fprintf(stderr, "cooloo gui: canvas: %s\n", SDL_GetError());
-        return -1;
-    }
-    SDL_SetSurfaceClipRect(canvas, NULL);
-    return 0;
+static void update_size(void) {
+    if (!win) return; /* standalone event-bridge harness */
+    int w,h;
+    SDL_GetWindowSize(win,&w,&h);
+    ren_get_size(&scr_w,&scr_h);
+    pixel_x = w ? (float)scr_w/w : 1;
+    pixel_y = h ? (float)scr_h/h : 1;
 }
-
-void gui_set_clip(int x, int y, int w, int h)
-{
-    clip_rect.x = x;
-    clip_rect.y = y;
-    clip_rect.w = w;
-    clip_rect.h = h;
-    clip_active = 1;
-    SDL_SetSurfaceClipRect(canvas, &clip_rect);
+int gui_screen_w(void) { update_size(); return scr_w; }
+int gui_screen_h(void) { update_size(); return scr_h; }
+void gui_set_ime_rect(int x,int y,int w,int h) {
+    SDL_Rect r={(int)(x/pixel_x),(int)(y/pixel_y),SDL_max(1,(int)(w/pixel_x)),SDL_max(1,(int)(h/pixel_y))};
+    SDL_SetTextInputArea(win,&r,0);
 }
+void gui_clear_ime(void) { SDL_ClearComposition(win); }
 
-void gui_clear_clip(void)
-{
-    clip_active = 0;
-    SDL_SetSurfaceClipRect(canvas, NULL);
+/* Port of rxi/lite src/api/system.c. SDL owns event strings. */
+static const char *button_name(int button) {
+    switch(button) { case 1:return "left"; case 2:return "middle"; case 3:return "right"; default:return "?"; }
 }
-
-void gui_draw_rect(int x, int y, int w, int h, unsigned rgb)
-{
-    SDL_Rect r = { x, y, w, h };
-    SDL_FillSurfaceRect(canvas, &r,
-                        SDL_MapSurfaceRGB(canvas, (rgb >> 16) & 0xff,
-                                          (rgb >> 8) & 0xff, rgb & 0xff));
+static const char *key_name(char *dst,size_t size,SDL_Keycode key) {
+    snprintf(dst,size,"%s",SDL_GetKeyName(key));
+    for(char *p=dst;*p;p++)*p=(char)tolower((unsigned char)*p);
+    return dst;
 }
-
-void gui_draw_text(int x, int y, const char *utf8, unsigned rgb, int size)
-{
-    const char *p = utf8, *end = utf8 + strlen(utf8);
-    int pen_x = x, base_y = y + font_ascent(size);
-    int fr = (int)((rgb >> 16) & 0xff), fg = (int)((rgb >> 8) & 0xff),
-        fb = (int)(rgb & 0xff);
-
-    /* canvas is a plain software surface: pixels directly accessible */
-    while (p < end && *p) {
-        uint32_t cp = font_utf8_next(&p, end);
-        const glyph *g;
-        int gx, gy, i, j;
-        if (!cp)
-            break;
-        if (cp < 0x20)
-            continue;
-        g = font_glyph(cp, size);
-        gx = pen_x + g->xoff;
-        gy = base_y + g->yoff;
-        if (g->bmp) {
-            for (j = 0; j < g->h; j++) {
-                int py = gy + j;
-                const uint8_t *row;
-                if (py < 0 || py >= canvas->h)
-                    continue;
-                if (clip_active &&
-                    (py < clip_rect.y || py >= clip_rect.y + clip_rect.h))
-                    continue;
-                row = g->bmp + j * g->w;
-                for (i = 0; i < g->w; i++) {
-                    int px = gx + i;
-                    unsigned a;
-                    uint8_t *px8;
-                    if (px < 0 || px >= canvas->w)
-                        continue;
-                    a = row[i];
-                    if (!a)
-                        continue;
-                    if (clip_active &&
-                        (px < clip_rect.x ||
-                         px >= clip_rect.x + clip_rect.w))
-                        continue;
-                    /* ARGB8888 little-endian bytes: B G R A */
-                    px8 = (uint8_t *)canvas->pixels +
-                          py * canvas->pitch + px * 4;
-                    if (a == 255) {
-                        px8[0] = (uint8_t)fb;
-                        px8[1] = (uint8_t)fg;
-                        px8[2] = (uint8_t)fr;
-                        px8[3] = 255;
-                    } else {
-                        px8[0] = (uint8_t)((a * (unsigned)fb +
-                                            (255 - a) * px8[0]) / 255);
-                        px8[1] = (uint8_t)((a * (unsigned)fg +
-                                            (255 - a) * px8[1]) / 255);
-                        px8[2] = (uint8_t)((a * (unsigned)fr +
-                                            (255 - a) * px8[2]) / 255);
-                        px8[3] = 255;
-                    }
-                }
-            }
-        }
-        pen_x += (int)(g->advance + 0.5f);
-    }
+int gui_wait_event(lua_State *L) {
+    double seconds=luaL_optnumber(L,1,0.25);
+    luaL_argcheck(L,seconds>=0 && seconds<=2147483,1,"invalid timeout");
+    /* SDL's NULL event argument waits without removing/reordering the event. */
+    lua_pushboolean(L,SDL_WaitEventTimeout(NULL,(int)(seconds*1000)));
+    return 1;
 }
-
-void gui_set_ime_rect(int x, int y, int w, int h)
-{
-    SDL_Rect r = { x, y, w, h };
-    SDL_SetTextInputArea(win, &r, 0);
-}
-
-void gui_present(void)
-{
-    SDL_Surface *ws = SDL_GetWindowSurface(win);
-    if (!ws)
-        return;
-    if (ws->w != canvas->w || ws->h != canvas->h)
-        if (make_canvas(ws->w, ws->h) != 0)
-            return;
-    SDL_BlitSurface(canvas, NULL, ws, NULL);
-    SDL_UpdateWindowSurface(win);
-}
-
-/* ---------------------------------------------------------------- */
-/* event translation                                                */
-/* ---------------------------------------------------------------- */
-
-static const char *special_key(SDL_Keycode k)
-{
-    switch (k) {
-    case SDLK_RETURN:    return "return";
-    case SDLK_KP_ENTER:  return "return";
-    case SDLK_BACKSPACE: return "backspace";
-    case SDLK_DELETE:    return "delete";
-    case SDLK_TAB:       return "tab";
-    case SDLK_ESCAPE:    return "escape";
-    case SDLK_SPACE:     return "space";
-    case SDLK_PAGEUP:    return "pageup";
-    case SDLK_PAGEDOWN:  return "pagedown";
-    case SDLK_UP:        return "up";
-    case SDLK_DOWN:      return "down";
-    case SDLK_LEFT:      return "left";
-    case SDLK_RIGHT:     return "right";
-    case SDLK_HOME:      return "home";
-    case SDLK_END:       return "end";
-    default:             return NULL;
-    }
-}
-
-static void on_keydown(SDL_Keycode key, SDL_Keymod kmod)
-{
-    char name[32];
-    const char *sp = special_key(key);
-    int mod = 0;
-
-    if (sp) {
-        snprintf(name, sizeof name, "%s", sp);
-    } else {
-        const char *sn = SDL_GetKeyName(key);
-        size_t i, n = sn ? strlen(sn) : 0;
-        if (!n || n >= sizeof name)
-            return;
-        for (i = 0; i < n; i++)
-            name[i] = (char)tolower((unsigned char)sn[i]);
-        name[n] = '\0';
-    }
-    if (kmod & SDL_KMOD_CTRL)  mod |= 1;
-    if (kmod & SDL_KMOD_ALT)   mod |= 2;
-    if (kmod & SDL_KMOD_SHIFT) mod |= 4;
-    if (kmod & SDL_KMOD_GUI)   mod |= 8;
-    luabind_ev_key(name, mod);
-}
-
-static void translate(SDL_Event *ev)
-{
-    switch (ev->type) {
-    case SDL_EVENT_QUIT:
-        luabind_ev_quit();
-        break;
-    case SDL_EVENT_KEY_DOWN:
-        on_keydown(ev->key.key, ev->key.mod);
-        break;
-    case SDL_EVENT_TEXT_INPUT:
-        luabind_ev_text(ev->text.text);
-        break;
-    case SDL_EVENT_TEXT_EDITING:
-        luabind_ev_ime(ev->edit.text, ev->edit.start);
-        break;
-    case SDL_EVENT_MOUSE_BUTTON_DOWN:
-    case SDL_EVENT_MOUSE_BUTTON_UP:
-        luabind_ev_mouse(ev->type == SDL_EVENT_MOUSE_BUTTON_DOWN ? "down" : "up",
-                         (int)ev->button.x, (int)ev->button.y,
-                         ev->button.button, ev->button.clicks, 0);
-        break;
-    case SDL_EVENT_MOUSE_MOTION:
-        luabind_ev_mouse("move", (int)ev->motion.x, (int)ev->motion.y, 0,
-                         (int)ev->motion.xrel, (int)ev->motion.yrel);
-        break;
-    case SDL_EVENT_MOUSE_WHEEL: {
-        int wx = ev->wheel.integer_x, wy = ev->wheel.integer_y;
-        if (ev->wheel.direction == SDL_MOUSEWHEEL_FLIPPED) {
-            wx = -wx;
-            wy = -wy;
-        }
-        luabind_ev_mouse("wheel", 0, 0, 0, wx, wy);
-        break;
-    }
-    case SDL_EVENT_DROP_FILE:
-        if (ev->drop.data)
-            luabind_ev_drop(ev->drop.data, (int)ev->drop.x, (int)ev->drop.y);
-        break;
+int gui_poll_event(lua_State *L) {
+    char buf[128];
+    SDL_Event e;
+top:
+    if(!SDL_PollEvent(&e))return 0;
+    switch(e.type) {
+    case SDL_EVENT_QUIT: lua_pushliteral(L,"quit");return 1;
     case SDL_EVENT_WINDOW_RESIZED:
-        scr_w = ev->window.data1;
-        scr_h = ev->window.data2;
-        if (make_canvas(scr_w, scr_h) == 0)
-            luabind_ev_resize(scr_w, scr_h);
-        break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        scr_w=e.window.data1;scr_h=e.window.data2;update_size();
+        rencache_invalidate();
+        lua_pushliteral(L,"resized");lua_pushnumber(L,scr_w);lua_pushnumber(L,scr_h);return 3;
+    case SDL_EVENT_WINDOW_EXPOSED:
+        rencache_invalidate();lua_pushliteral(L,"exposed");return 1;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        SDL_FlushEvent(SDL_EVENT_KEY_DOWN);goto top;
+    case SDL_EVENT_WINDOW_FOCUS_LOST:
+        lua_pushliteral(L,"focuslost");return 1;
+    case SDL_EVENT_DROP_FILE:
+        lua_pushliteral(L,"filedropped");lua_pushstring(L,e.drop.data);
+        lua_pushnumber(L,e.drop.x*pixel_x);lua_pushnumber(L,e.drop.y*pixel_y);return 4;
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
+        lua_pushstring(L,e.type==SDL_EVENT_KEY_DOWN?"keypressed":"keyreleased");
+        lua_pushstring(L,key_name(buf,sizeof buf,e.key.key));return 2;
+    case SDL_EVENT_TEXT_INPUT:
+        lua_pushliteral(L,"textinput");lua_pushstring(L,e.text.text);return 2;
+    case SDL_EVENT_TEXT_EDITING:
+        lua_pushliteral(L,"textediting");lua_pushstring(L,e.edit.text);
+        lua_pushinteger(L,e.edit.start);lua_pushinteger(L,e.edit.length);return 4;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        if(e.button.button==1)SDL_CaptureMouse(true);
+        lua_pushliteral(L,"mousepressed");lua_pushstring(L,button_name(e.button.button));
+        lua_pushnumber(L,e.button.x*pixel_x);lua_pushnumber(L,e.button.y*pixel_y);
+        lua_pushnumber(L,e.button.clicks);return 5;
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if(e.button.button==1)SDL_CaptureMouse(false);
+        lua_pushliteral(L,"mousereleased");lua_pushstring(L,button_name(e.button.button));
+        lua_pushnumber(L,e.button.x*pixel_x);lua_pushnumber(L,e.button.y*pixel_y);return 4;
+    case SDL_EVENT_MOUSE_MOTION:
+        lua_pushliteral(L,"mousemoved");lua_pushnumber(L,e.motion.x*pixel_x);lua_pushnumber(L,e.motion.y*pixel_y);
+        lua_pushnumber(L,e.motion.xrel*pixel_x);lua_pushnumber(L,e.motion.yrel*pixel_y);return 5;
+    case SDL_EVENT_MOUSE_WHEEL:
+        lua_pushliteral(L,"mousewheel");lua_pushnumber(L,e.wheel.integer_y);return 2;
+    default:goto top;
     }
 }
 
-/* ---------------------------------------------------------------- */
-/* main loop                                                        */
-/* ---------------------------------------------------------------- */
-
-int cooloo_gui_run(const char *lua_dev_dir)
-{
+int cooloo_gui_run(const char *lua_dev_dir) {
+    int w=960,h=640,quit=0,result=1;
 #ifndef COOLOO_EDITOR_ONLY
     char val[32];
+    if(cfg_get("gui.w",val,sizeof val)==0)w=atoi(val);
+    if(cfg_get("gui.h",val,sizeof val)==0)h=atoi(val);
 #endif
-    int w = 960, h = 640, quit = 0;
-    Uint64 last;
-
-    if (getenv("COOLOO_PROBE_STARTUP"))
-        fprintf(stderr, "probe: main enter %llu ms\n",
-                (unsigned long long)SDL_GetTicks());
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        fprintf(stderr, "cooloo gui: SDL_Init: %s\n", SDL_GetError());
-        return 1;
-    }
-    if (getenv("COOLOO_PROBE_STARTUP"))
-        fprintf(stderr, "probe: SDL_Init done %llu ms\n",
-                (unsigned long long)SDL_GetTicks());
-#ifndef COOLOO_EDITOR_ONLY
-    if (cfg_get("gui.w", val, sizeof val) == 0)
-        w = atoi(val);
-    if (cfg_get("gui.h", val, sizeof val) == 0)
-        h = atoi(val);
-#endif
-    if (w < 320)
-        w = 320;
-    if (h < 240)
-        h = 240;
-
+    SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,"1");
+    SDL_SetHint(SDL_HINT_IME_IMPLEMENTED_UI,"composition");
+    SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR,"0");
+    if(!SDL_Init(SDL_INIT_VIDEO)){fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
+    SDL_EnableScreenSaver();
+    w=SDL_max(320,w);h=SDL_max(240,h);
 #ifdef COOLOO_EDITOR_ONLY
-    win = SDL_CreateWindow("cooloo-text", w, h, SDL_WINDOW_RESIZABLE);
+    const char *title="cooloo-text";
 #else
-    win = SDL_CreateWindow("cooloo", w, h, SDL_WINDOW_RESIZABLE);
+    const char *title="cooloo";
 #endif
-    if (!win) {
-        fprintf(stderr, "cooloo gui: window: %s\n", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
-    {
-        SDL_Surface *icon = SDL_CreateSurfaceFrom(COOLOO_ICON_SIZE, COOLOO_ICON_SIZE,
-            SDL_PIXELFORMAT_RGBA32, (void *)cooloo_icon_rgba, COOLOO_ICON_SIZE * 4);
-        if (icon) {
-            if (!SDL_SetWindowIcon(win, icon))
-                fprintf(stderr, "cooloo gui: icon: %s\n", SDL_GetError());
-            SDL_DestroySurface(icon);
-        }
-    }
-    SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    SDL_GetWindowSize(win, &scr_w, &scr_h);
-    if (getenv("COOLOO_PROBE_STARTUP"))
-        fprintf(stderr, "probe: window created %llu ms\n",
-                (unsigned long long)SDL_GetTicks());
-    if (make_canvas(scr_w, scr_h) != 0)
-        return 1;
-    if (font_init(cooloo_embedded_font, cooloo_embedded_font_len) != 0) {
-        fprintf(stderr, "cooloo gui: bad embedded font\n");
-        return 1;
-    }
-    if (luabind_init(lua_dev_dir) != 0)
-        return 1;
+    win=SDL_CreateWindow(title,w,h,SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIDDEN|SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    if(!win){fprintf(stderr,"window: %s\n",SDL_GetError());goto done;}
+    SDL_Surface *icon=SDL_CreateSurfaceFrom(COOLOO_ICON_SIZE,COOLOO_ICON_SIZE,SDL_PIXELFORMAT_RGBA32,(void*)cooloo_icon_rgba,COOLOO_ICON_SIZE*4);
+    if(icon){SDL_SetWindowIcon(win,icon);SDL_DestroySurface(icon);}
+    SDL_SetWindowPosition(win,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED);
+    ren_init(win);update_size();
+    if(font_init(cooloo_embedded_font,cooloo_embedded_font_len)!=0)goto done;
+    if(luabind_init(lua_dev_dir)!=0)goto shutdown;
     SDL_StartTextInput(win);
-    if (getenv("COOLOO_PROBE_STARTUP"))
-        fprintf(stderr, "probe: lua+font ready %llu ms\n",
-                (unsigned long long)SDL_GetTicks());
-
-    last = SDL_GetTicksNS();
-    while (!quit) {
-        Uint64 now = SDL_GetTicksNS();
-        double dt = (double)(now - last) / 1e9;
-        SDL_Event ev;
-
-        last = now;
+    Uint64 last=SDL_GetTicksNS();
+    while(!quit) {
+        Uint64 now=SDL_GetTicksNS();
+        double dt=(double)(now-last)/1e9;last=now;
         luabind_events_begin();
-        /* Lite loop: poll, update/draw once, then sleep the remainder of 1/fps.
-         * Incoming events never accelerate the editor's per-frame timers. */
-        while (SDL_PollEvent(&ev))
-            translate(&ev);
         luabind_net_pump();
-        quit = luabind_frame(dt);
-        if (getenv("COOLOO_PROBE_STARTUP")) {   /* acceptance measurement */
-            fprintf(stderr, "cooloo gui: first frame in %llu ms\n",
-                    (unsigned long long)((SDL_GetTicksNS() - last) / 1000000));
-            break;
+        quit=luabind_frame(dt,(double)now/1e9);
+        if(getenv("COOLOO_PROBE_STARTUP")) {
+            fprintf(stderr,"cooloo gui: first frame in %llu ms\n",(unsigned long long)((SDL_GetTicksNS()-now)/1000000));break;
         }
-        Uint64 elapsed = SDL_GetTicksNS() - now;
-        Uint64 period = (Uint64)(platform_frame_period() * 1e9);
-        if (!quit && elapsed < period)
-            SDL_DelayNS(period - elapsed);
+        Uint64 elapsed=SDL_GetTicksNS()-now;
+        Uint64 period=(Uint64)(platform_frame_period()*1e9);
+        if(!quit && elapsed<period)SDL_DelayNS(period-elapsed);
     }
-
+    result=luabind_failed()?1:0;
 #ifndef COOLOO_EDITOR_ONLY
-    {
-        char b[16];
-        snprintf(b, sizeof b, "%d", scr_w);
-        cfg_set("gui.w", b);
-        snprintf(b, sizeof b, "%d", scr_h);
-        cfg_set("gui.h", b);
-    }
+    SDL_GetWindowSize(win,&w,&h);
+    snprintf(val,sizeof val,"%d",w);cfg_set("gui.w",val);
+    snprintf(val,sizeof val,"%d",h);cfg_set("gui.h",val);
 #endif
+shutdown:
+    if (luabind_failed() && strcmp(SDL_GetCurrentVideoDriver(), "dummy"))
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "cooloo fatal error",
+                                 luabind_last_error(), win);
     luabind_shutdown();
-    SDL_DestroyWindow(win);
-    SDL_Quit();
-    return 0;
+    rencache_shutdown();
+    ren_shutdown();
+done:
+    SDL_DestroyWindow(win);win=NULL;
+    SDL_Quit();return result;
 }

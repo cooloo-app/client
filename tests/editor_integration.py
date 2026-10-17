@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='cooloo-text-test-') as tmp:
         (project / '中文 file.lua').write_bytes(b'local hello = 1\n')
         (project / 'drop.txt').write_bytes(b'needle in project\n')
         (project / '.lite_project.lua').write_text("local c=require 'core';assert(c.test_user);c.test_project=true;c.test_order=c.test_order..',project'\n")
-        env = dict(os.environ, SDL_VIDEODRIVER='dummy', COOLOO_TEXT_USERDIR=str(user),
+        env = dict(os.environ, SDL_VIDEODRIVER='dummy', LITE_SCALE='1.25', COOLOO_TEXT_USERDIR=str(user),
                    COOLOO_EDITOR_TEST_MODE=mode, COOLOO_CONFIG=str(base / 'no-config'))
         env.pop('COOLOO_PROBE_STARTUP', None)
         args = [str(binary), '--lua-dev', str(dev)]

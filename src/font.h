@@ -21,11 +21,13 @@ typedef struct {
 } glyph;
 
 int          font_init(const void *ttf, size_t len);
-const glyph *font_glyph(uint32_t cp, int size);
-int          font_text_width_n(const char *utf8, size_t n, int size);
-int          font_text_width(const char *utf8, int size);
-int          font_line_height(int size);   /* even-rounded (doc 4.4) */
-int          font_ascent(int size);
+int          font_add(const char *name, const void *ttf, size_t len);
+int          font_select(const char *name);
+const glyph *font_glyph(uint32_t cp, float size);
+int          font_text_width_n(const char *utf8, size_t n, float size);
+int          font_text_width(const char *utf8, float size);
+int          font_line_height(float size);
+int          font_ascent(float size);
 
 /* decode one UTF-8 codepoint, advancing *p; U+FFFD on invalid sequences */
 uint32_t     font_utf8_next(const char **p, const char *end);

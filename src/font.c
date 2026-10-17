@@ -31,12 +31,14 @@
 typedef struct {
     stbtt_fontinfo info;
     uint8_t *data;                  /* owned */
-    const char *dbg;                /* source path or "embedded" */
+    size_t len;
+    char name[32];
+    const char *dbg;
 } ffont;
 
 typedef struct {
     uint32_t cp;                    /* 0 = empty slot */
-    int      size;
+    float    size;
     int      fi;                    /* font index, -1 = .notdef */
     glyph    g;
     uint8_t *bmp;                   /* owned (same pointer as g.bmp) */
@@ -44,9 +46,11 @@ typedef struct {
 
 static ffont fonts[MAX_FONTS];
 static int   nfonts;
+static int   active_font;
 static int   fallback_tried;
 static cent  cache[CACHE_SIZE];
 static int   cache_used;
+static void cache_flush(void);
 
 /* CJK fallback candidates per platform (doc 4.4: hardcoded paths probed
  * with fopen; first font containing the codepoint wins and is reused). */
@@ -85,10 +89,42 @@ int font_init(const void *ttf, size_t len)
         return -1;
     }
     fonts[0].data = copy;
+    fonts[0].len = len;
+    snprintf(fonts[0].name, sizeof fonts[0].name, "font");
     fonts[0].dbg = "embedded";
     nfonts = 1;
+    active_font = 0;
     fallback_tried = 0;
+    cache_flush();
     return 0;
+}
+
+int font_add(const char *name, const void *ttf, size_t len)
+{
+    uint8_t *copy;
+    int off;
+    ffont *f;
+    if (nfonts >= MAX_FONTS || !name || !ttf || !len) return -1;
+    copy = malloc(len);
+    if (!copy) return -1;
+    memcpy(copy, ttf, len);
+    off = stbtt_GetFontOffsetForIndex(copy, 0);
+    f = &fonts[nfonts];
+    if (off < 0 || !stbtt_InitFont(&f->info, copy, off)) { free(copy); return -1; }
+    f->data = copy; f->len = len; f->dbg = name;
+    snprintf(f->name, sizeof f->name, "%s", name);
+    return nfonts++;
+}
+
+int font_select(const char *name)
+{
+    int i;
+    if (!name) return -1;
+    for (i = 0; i < nfonts; i++) if (!strcmp(fonts[i].name, name)) {
+        if (active_font != i) { active_font = i; cache_flush(); }
+        return 0;
+    }
+    return -1;
 }
 
 /* fallback font file bytes: mmap on POSIX (pages fault in on demand -
@@ -172,10 +208,10 @@ static int load_fallback(void)
 static int font_for_cp(uint32_t cp)
 {
     int i;
-    if (stbtt_FindGlyphIndex(&fonts[0].info, (int)cp))
-        return 0;
-    for (i = 1; i < nfonts; i++)
-        if (stbtt_FindGlyphIndex(&fonts[i].info, (int)cp))
+    if (stbtt_FindGlyphIndex(&fonts[active_font].info, (int)cp))
+        return active_font;
+    for (i = 0; i < nfonts; i++)
+        if (i != active_font && stbtt_FindGlyphIndex(&fonts[i].info, (int)cp))
             return i;
     for (;;) {
         int idx = load_fallback();
@@ -186,10 +222,11 @@ static int font_for_cp(uint32_t cp)
     }
 }
 
-static uint32_t chash(uint32_t cp, int size)
+static uint32_t chash(uint32_t cp, float size)
 {
     uint32_t h = cp * 2654435761u;
     h ^= (uint32_t)size * 2246822519u;
+    h ^= (uint32_t)active_font * 3266489917u;
     h ^= h >> 13;
     return h & (CACHE_SIZE - 1);
 }
@@ -203,7 +240,7 @@ static void cache_flush(void)
     cache_used = 0;
 }
 
-static void rasterize(cent *e, uint32_t cp, int size)
+static void rasterize(cent *e, uint32_t cp, float size)
 {
     ffont *f;
     float scale;
@@ -226,7 +263,7 @@ static void rasterize(cent *e, uint32_t cp, int size)
     stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
     /* Quantize once: measuring whole strings, individual characters and
      * drawing token fragments must all use the same pixel advance. */
-    e->g.advance = (int)(scale * (float)adv + 0.5f);
+    e->g.advance = (int)(scale * (float)adv);
     bmp = stbtt_GetCodepointBitmap(&f->info, scale, scale, (int)cp,
                                    &w, &h, &xo, &yo);
     e->g.w = w;
@@ -237,7 +274,7 @@ static void rasterize(cent *e, uint32_t cp, int size)
     e->bmp = bmp;
 }
 
-const glyph *font_glyph(uint32_t cp, int size)
+const glyph *font_glyph(uint32_t cp, float size)
 {
     uint32_t h = chash(cp, size);
     uint32_t i;
@@ -310,7 +347,7 @@ uint32_t font_utf8_next(const char **p, const char *end)
     return cp;
 }
 
-int font_text_width_n(const char *utf8, size_t n, int size)
+int font_text_width_n(const char *utf8, size_t n, float size)
 {
     const char *p = utf8, *end = utf8 + n;
     int w = 0;
@@ -325,26 +362,26 @@ int font_text_width_n(const char *utf8, size_t n, int size)
     return w;
 }
 
-int font_text_width(const char *utf8, int size)
+int font_text_width(const char *utf8, float size)
 {
     return font_text_width_n(utf8, strlen(utf8), size);
 }
 
-int font_ascent(int size)
+int font_ascent(float size)
 {
     int a = 0, d = 0, g = 0;
-    stbtt_GetFontVMetrics(&fonts[0].info, &a, &d, &g);
-    return (int)(stbtt_ScaleForMappingEmToPixels(&fonts[0].info,
+    stbtt_GetFontVMetrics(&fonts[active_font].info, &a, &d, &g);
+    return (int)(stbtt_ScaleForMappingEmToPixels(&fonts[active_font].info,
                                                  (float)size) *
                  (float)a + 0.5f);
 }
 
-int font_line_height(int size)
+int font_line_height(float size)
 {
     int a = 0, d = 0, g = 0, h;
     float s;
-    stbtt_GetFontVMetrics(&fonts[0].info, &a, &d, &g);
-    s = stbtt_ScaleForMappingEmToPixels(&fonts[0].info, (float)size);
-    h = (int)(s * (float)(a - d + g) + 0.999f);
-    return (h + 1) & ~1;
+    stbtt_GetFontVMetrics(&fonts[active_font].info, &a, &d, &g);
+    s = stbtt_ScaleForMappingEmToPixels(&fonts[active_font].info, (float)size);
+    h = (int)(s * (float)(a - d + g) + 0.5f);
+    return h;
 }

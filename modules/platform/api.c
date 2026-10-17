@@ -8,6 +8,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <errno.h>
+#include <math.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
@@ -91,58 +94,153 @@ static SDL_Window *window(void) {
 }
 static int focus(lua_State *L) { lua_pushboolean(L,SDL_GetKeyboardFocus()!=NULL); return 1; }
 static int title(lua_State *L) { if(window())SDL_SetWindowTitle(window(),luaL_checkstring(L,1)); return 0; }
-static int mode(lua_State *L) { if(window())SDL_SetWindowFullscreen(window(),!strcmp(luaL_checkstring(L,1),"fullscreen")); return 0; }
+static int mode(lua_State *L) {
+    SDL_Window *w = window();
+    const char *name = luaL_optstring(L,1,"normal");
+    if (strcmp(name,"normal") && strcmp(name,"maximized") && strcmp(name,"fullscreen"))
+        return luaL_error(L,"unknown window mode: %s",name);
+    if (!w) return 0;
+    if (!strcmp(name, "fullscreen")) SDL_SetWindowFullscreen(w, true);
+    else if (!strcmp(name, "maximized")) { SDL_SetWindowFullscreen(w, false); SDL_MaximizeWindow(w); }
+    else if (!strcmp(name, "normal")) { SDL_SetWindowFullscreen(w, false); SDL_RestoreWindow(w); }
+    else return luaL_error(L, "unknown window mode: %s", name);
+    return 0;
+}
 static int cursor(lua_State *L) {
-    static SDL_Cursor *c[4];
-    const char *s=luaL_checkstring(L,1);
-    int i=!strcmp(s,"ibeam")?1:!strcmp(s,"sizeh")?2:!strcmp(s,"sizev")?3:0;
-    SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE};
+    static SDL_Cursor *c[5];
+    const char *s=luaL_optstring(L,1,"arrow");
+    int i=!strcmp(s,"arrow")?0:!strcmp(s,"ibeam")?1:!strcmp(s,"sizeh")?2:!strcmp(s,"sizev")?3:!strcmp(s,"hand")?4:-1;
+    SDL_SystemCursor ids[]={SDL_SYSTEM_CURSOR_DEFAULT,SDL_SYSTEM_CURSOR_TEXT,SDL_SYSTEM_CURSOR_EW_RESIZE,SDL_SYSTEM_CURSOR_NS_RESIZE,SDL_SYSTEM_CURSOR_POINTER};
+    if (i < 0) return luaL_error(L, "unknown cursor: %s", s);
     if(!c[i])c[i]=SDL_CreateSystemCursor(ids[i]);
     if(c[i])SDL_SetCursor(c[i]);
     return 0;
 }
 static int confirm(lua_State *L) {
-    SDL_MessageBoxButtonData buttons[]={{SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT,0,"Cancel"},{0,1,"Discard"}};
+    SDL_MessageBoxButtonData buttons[]={{SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT,0,"No"},{SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT,1,"Yes"}};
     SDL_MessageBoxData d={SDL_MESSAGEBOX_WARNING,window(),luaL_checkstring(L,1),luaL_checkstring(L,2),2,buttons,NULL};
     int result=0; SDL_ShowMessageBox(&d,&result); lua_pushboolean(L,result==1);return 1;
 }
 static SDL_EnumerationResult entry(void *ctx,const char *dir,const char *name) {
     lua_State *L=ctx;(void)dir;lua_pushstring(L,name);lua_rawseti(L,-2,(lua_Integer)lua_rawlen(L,-2)+1);return SDL_ENUM_CONTINUE;
 }
-static int list(lua_State *L) { const char *p=luaL_checkstring(L,1);lua_newtable(L);SDL_EnumerateDirectory(p,entry,L);return 1; }
+static int list(lua_State *L) { const char *p=luaL_checkstring(L,1);lua_newtable(L);if (!SDL_EnumerateDirectory(p,entry,L)) { lua_pop(L,1); lua_pushnil(L); lua_pushstring(L,SDL_GetError()); return 2; } return 1; }
 static int info(lua_State *L) {
-    SDL_PathInfo i;if(!SDL_GetPathInfo(luaL_checkstring(L,1),&i)){lua_pushnil(L);return 1;}
-    lua_newtable(L);lua_pushstring(L,i.type==SDL_PATHTYPE_DIRECTORY?"dir":"file");lua_setfield(L,-2,"type");
+    SDL_PathInfo i;if(!SDL_GetPathInfo(luaL_checkstring(L,1),&i)){lua_pushnil(L);lua_pushstring(L,SDL_GetError());return 2;}
+    lua_newtable(L);lua_pushstring(L,i.type==SDL_PATHTYPE_DIRECTORY?"dir":i.type==SDL_PATHTYPE_FILE?"file":NULL);lua_setfield(L,-2,"type");
     lua_pushinteger(L,(lua_Integer)i.size);lua_setfield(L,-2,"size");
     lua_pushnumber(L,(lua_Number)i.modify_time/1e9);lua_setfield(L,-2,"modified");return 1;
 }
-static int absolute(lua_State *L) {
+static int absolute(lua_State *L);
+static int resolve_path(lua_State *L) {
     const char *p=luaL_checkstring(L,1);
 #ifdef _WIN32
+    int results=absolute(L);
+    if(!lua_isnil(L,-results))return results;
+    lua_pop(L,results);
     wchar_t *w=wide(L,p), *full=_wfullpath(NULL,w,0);free(w);
     if(!full)return luaL_error(L,"cannot resolve path: %s",p);
     push_wide(L,full);free(full);
 #else
     char *resolved=realpath(p,NULL);
     if(resolved){lua_pushstring(L,resolved);free(resolved);}
-    else if(p[0]=='/')lua_pushstring(L,p);
-    else {char *cwd=SDL_GetCurrentDirectory();lua_pushfstring(L,"%s%s",cwd?cwd:"",p);SDL_free(cwd);}
+    else {
+        if(errno!=ENOENT && errno!=ENOTDIR){lua_pushnil(L);lua_pushstring(L,strerror(errno));return 2;}
+        char *cwd=SDL_GetCurrentDirectory();
+        size_t length=strlen(p)+(cwd?strlen(cwd):0)+2;
+        char *path=malloc(length),*out=calloc(length,1);
+        if(!path || !out){free(path);free(out);SDL_free(cwd);return luaL_error(L,"out of memory");}
+        snprintf(path,length,"%s%s",p[0]=='/'?"":(cwd?cwd:""),p);
+        SDL_free(cwd);
+        strcpy(out,"/");
+        char *save=NULL;
+        for(char *part=strtok_r(path,"/",&save);part;part=strtok_r(NULL,"/",&save)) {
+            if(!strcmp(part,"."))continue;
+            if(!strcmp(part,"..")) {
+                char *slash=strrchr(out,'/');
+                if(slash==out)out[1]=0;else if(slash)*slash=0;
+            } else {
+                if(strlen(out)>1)strcat(out,"/");
+                strcat(out,part);
+                char *canonical=realpath(out,NULL);
+                if(canonical) {
+                    size_t need=strlen(canonical)+strlen(p)+2;
+                    if(need>length){char *grown=realloc(out,need);if(!grown){free(canonical);free(out);free(path);return luaL_error(L,"out of memory");}out=grown;length=need;}
+                    strcpy(out,canonical);free(canonical);
+                }
+            }
+        }
+        lua_pushstring(L,out);free(out);free(path);
+    }
 #endif
     return 1;
 }
+static int absolute(lua_State *L) {
+    const char *p=luaL_checkstring(L,1);
+#ifdef _WIN32
+    wchar_t *w=wide(L,p);
+    HANDLE h=CreateFileW(w,0,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+    free(w);
+    if(h==INVALID_HANDLE_VALUE){lua_pushnil(L);lua_pushliteral(L,"cannot open path");return 2;}
+    DWORD n=GetFinalPathNameByHandleW(h,NULL,0,FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+    wchar_t *full=malloc(((size_t)n+1)*sizeof *full);
+    if(!full){CloseHandle(h);return luaL_error(L,"out of memory");}
+    DWORD got=GetFinalPathNameByHandleW(h,full,n+1,FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+    CloseHandle(h);
+    if(!got || got>n){free(full);lua_pushnil(L);lua_pushliteral(L,"cannot resolve path");return 2;}
+    /* Preserve extended UNC paths; strip the ordinary drive prefix. */
+    push_wide(L,!wcsncmp(full,L"\\\\?\\",4) && full[5]==L':'?full+4:full);
+    free(full);
+#else
+    char *resolved=realpath(p,NULL);
+    if(!resolved){lua_pushnil(L);lua_pushstring(L,strerror(errno));return 2;}
+    lua_pushstring(L,resolved);free(resolved);
+#endif
+    return 1;
+}
+
+/* rxi/lite system.c; unsigned char avoids ctype UB, and the terminal-space
+ * guard avoids the upstream one-past-NUL read. Scores otherwise unchanged. */
+static int fuzzy_match(lua_State *L) {
+    const unsigned char *str=(const unsigned char *)luaL_checkstring(L,1);
+    const unsigned char *ptn=(const unsigned char *)luaL_checkstring(L,2);
+    int score=0,run=0;
+    while(*str && *ptn) {
+        while(*str==' ')str++;
+        while(*ptn==' ')ptn++;
+        if(!*str || !*ptn)break;
+        if(tolower(*str)==tolower(*ptn)){score+=run*10-(*str!=*ptn);run++;ptn++;}
+        else {score-=10;run=0;}
+        str++;
+    }
+    if(*ptn)return 0;
+    lua_pushinteger(L,score-(int)strlen((const char *)str));return 1;
+}
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
+    lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
+    float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+    const char *scale_env=SDL_getenv("LITE_SCALE");
+    if(scale_env) {
+        char *end;
+        double requested=strtod(scale_env,&end);
+        while(isspace((unsigned char)*end))end++;
+        if(end!=scale_env && !*end && isfinite(requested) && requested>0)
+            scale=(float)requested;
+    }
+    if(!isfinite(scale) || scale<=0)scale=1;
+    lua_pushnumber(L,scale);lua_setfield(L,-2,"scale");
     const char *base=SDL_GetBasePath();
     lua_pushstring(L,base?base:".");lua_setfield(L,-2,"exedir");
 #ifdef COOLOO_EDITOR_ONLY
-    extern const char *cooloo_text_executable;
 #ifdef _WIN32
     wchar_t path[32768];
     DWORD n=GetModuleFileNameW(NULL,path,32768);
     if(!n || n>=32768)luaL_error(L,"cannot resolve executable path");
     push_wide(L,path);
 #else
+    extern const char *cooloo_text_executable;
     const char *name=strrchr(cooloo_text_executable,'/');
     lua_pushfstring(L,"%s%s",base?base:"",name?name+1:cooloo_text_executable);
 #endif
@@ -152,7 +250,7 @@ void platform_register(lua_State *L) {
     lua_setfield(L,-2,"exefile");
     const char *user=SDL_getenv("COOLOO_TEXT_USERDIR");
     if(user && *user) {
-        lua_pushcfunction(L,absolute);lua_pushstring(L,user);lua_call(L,1,1);
+        lua_pushcfunction(L,resolve_path);lua_pushstring(L,user);lua_call(L,1,1);
     } else {
         const char *home=SDL_GetUserFolder(SDL_FOLDER_HOME);
         lua_pushfstring(L,"%s.cooloo-text",home?home:"./");

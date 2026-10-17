@@ -14,7 +14,7 @@ if profile not in ('text', 'gui', 'cli'):
 modules = {}
 bases = []
 if profile != 'cli':
-    bases += [('modules/editor', ''), ('modules/platform', 'platform')]
+    bases += [('modules/editor', ''), ('modules/editor/user', 'user'), ('modules/platform', 'platform')]
 if profile != 'text':
     bases += [('modules/workbench', 'workbench')]
 if profile == 'gui':
@@ -31,6 +31,7 @@ if profile == 'gui':
     modules['adapters.cooloo'] = (root / 'adapters/cooloo/init.lua').read_text()
     modules['client.chat'] = (root / 'lua/chat.lua').read_text() + '\nreturn chat\n'
 if profile != 'cli':
+    modules['user.example'] = 'return [====[' + (root / 'vendor/lite/user-init.lua').read_text() + ']====]\n'
     plugins = sorted('plugins.' + p.stem for p in (root / 'modules/editor/plugins').glob('*.lua'))
     modules['core.plugin_manifest'] = 'return {' + ','.join(repr(p) for p in plugins) + '}\n'
 loader = []

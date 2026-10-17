@@ -5,6 +5,9 @@ local config=require 'core.config'
 local Doc=require 'core.doc'
 local mode=os.getenv('COOLOO_EDITOR_TEST_MODE')
 assert(core.project_dir==system.absolute_path('.'))
+assert(type(VERSION)=='string' and VERSION:find('cooloo',1,true))
+assert(type(PLATFORM)=='string' and SCALE==1.25,'fractional LITE_SCALE override')
+assert(ARGS[1] and ARGS[2]=='--lua-dev','ARGS must retain executable and product options')
 assert(cooloo.net==nil and cooloo.config==nil and cooloo.runtime==nil)
 assert(not package.preload['plugins.workspace'] and not package.preload['plugins.console'])
 assert(#require('core.plugin_manifest')==16)
@@ -30,6 +33,14 @@ assert(content(Doc('new file.txt'))=='new')
 local v=Doc();v.virtual=true;v.readonly=true;v:set_projection('message is not Lua\n  ')
 local before=content(v);v:insert(1,1,'bad');assert(content(v)==before)
 assert(not pcall(v.save,v,'virtual.txt'))
+-- Lua-level fixtures use Lite event tuples, not the removed host event array.
+local input={}
+local poll=system.poll_event
+system.poll_event=function()
+  local event=table.remove(input,1)
+  if event then return table.unpack(event) end
+  return poll()
+end
 local outer=cooloo.frame
 local frame=0
 local started=system.get_time()
@@ -41,7 +52,7 @@ function cooloo.frame(events,dt)
     command.perform('root:split-right')
     selected=core.root_view:get_active_node()
   elseif frame==3 then
-    events={{type='filedropped',path=system.absolute_path('drop.txt'),x=selected.position.x+20,y=selected.position.y+40}}
+    input={{'filedropped',system.absolute_path('drop.txt'),selected.position.x+20,selected.position.y+40}}
   elseif frame==4 then
     assert(core.active_view.doc.filename:find('drop.txt',1,true))
     assert(core.root_view:get_active_node()==selected,'drop must target pane')
@@ -51,7 +62,7 @@ function cooloo.frame(events,dt)
     core.on_event('filedropped','.',0,0);assert(called);system.open_project=open
     core.root_view:open_doc(file)
     command.perform('macro:toggle-record')
-    events={{type='text',text='-- macro\n'}}
+    input={{'textinput','-- macro\n'}}
   elseif frame==5 then
     command.perform('macro:toggle-record')
     local old=content(file);command.perform('macro:play');assert(#content(file)>#old)

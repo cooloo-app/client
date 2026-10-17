@@ -13,6 +13,9 @@
  */
 #include "cli.h"
 #include "gui.h"
+#ifndef COOLOO_CLI_ONLY
+#include "luabind.h"
+#endif
 #include "win_console.h"
 #include "machine.h"
 #ifdef COOLOO_WORKBENCH
@@ -76,6 +79,9 @@ static int run(int argc, char **argv)
 {
     int i, j, debug = 0, gui = 0;
     const char *dev = NULL;
+#ifndef COOLOO_CLI_ONLY
+    luabind_set_args(argc,argv);
+#endif
 
     /* Parse startup flags; only --gui selects the GUI. */
     for (i = 1; i < argc && argv[i][0]=='-'; i++) {

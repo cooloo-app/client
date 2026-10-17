@@ -3,7 +3,7 @@
 CC      ?= cc
 CFLAGS  ?= -O2 -Wall -Wextra -std=c99
 PREFIX  ?= /usr/local
-CMAKE   := $(shell command -v cmake 2>/dev/null || echo /opt/homebrew/bin/cmake)
+CMAKE   := $(shell command -v cmake 2>/dev/null || command -v cmake3 2>/dev/null || echo cmake)
 BUILD   := build
 
 # --- SDL3 static sub-build (vendored source, video+events only, sw rendering)
@@ -35,10 +35,10 @@ CLIENT_SRC := src/net.c src/config.c src/record.c $(NOISE_SRC)
 CLI_SRC := src/main.c src/win_console.c src/cli.c src/machine.c
 CORE_SRC  := $(CLI_SRC) $(CLIENT_SRC)
 RUNTIME_SRC := modules/runtime/runner.c modules/runtime/process.c
-TEXT_GUI_SRC := src/gui.c src/font.c src/luabind.c modules/platform/api.c
+TEXT_GUI_SRC := src/gui.c src/font.c src/renderer.c src/rencache.c src/luabind.c modules/platform/api.c modules/platform/renderer.c modules/platform/renderer_font.c
 GUI_SRC   := $(TEXT_GUI_SRC) $(RUNTIME_SRC)
-EMBED_SRC := $(BUILD)/embedded_workbench.c src/embedded_font.c
-EDITOR_SRC := apps/editor/main.c $(TEXT_GUI_SRC) $(LUA_SRC) $(BUILD)/embedded_editor.c src/embedded_font.c
+EMBED_SRC := $(BUILD)/embedded_workbench.c src/embedded_fonts.c
+EDITOR_SRC := apps/editor/main.c $(TEXT_GUI_SRC) $(LUA_SRC) $(BUILD)/embedded_editor.c src/embedded_fonts.c
 WORKBENCH_CLI_SRC := apps/workbench/main.c src/record.c modules/runtime/runner.c $(LUA_SRC) $(BUILD)/embedded_workbench_cli.c
 WORKBENCH_LUA := $(shell find modules adapters apps -name '*.lua')
 CFLAGS += -Imodules/platform -Imodules/runtime
@@ -79,8 +79,11 @@ $(SDL_WIN_LIB):
 		-DCMAKE_TOOLCHAIN_FILE=$(abspath tools/mingw-toolchain.cmake)
 	$(CMAKE) --build $(SDL_WIN) --parallel
 
-src/embedded_font.c: src/vendor/fonts/JetBrainsMono-Regular.ttf tools/embed.py
-	python3 tools/embed.py src/vendor/fonts/JetBrainsMono-Regular.ttf $@
+src/embedded_font.c: src/vendor/fonts/font.ttf tools/embed.py
+	python3 tools/embed.py src/vendor/fonts/font.ttf $@
+
+src/embedded_fonts.c: src/vendor/fonts/font.ttf src/vendor/fonts/icons.ttf src/vendor/fonts/monospace.ttf tools/embed_fonts.py
+	python3 tools/embed_fonts.py $@ src/vendor/fonts/font.ttf src/vendor/fonts/icons.ttf src/vendor/fonts/monospace.ttf
 
 $(BUILD)/embedded_workbench.c: $(WORKBENCH_LUA) lua/chat.lua tools/embed_workbench.py tools/embed.py
 	python3 tools/embed_workbench.py $@
@@ -132,8 +135,8 @@ $(BUILD)/runtime-test-macos: tests/runtime_test.c modules/runtime/process.c $(LU
 $(BUILD)/runtime-test.exe: tests/runtime_test.c modules/runtime/process.c $(LUA_SRC) $(SDL_WIN_LIB)
 	$(WIN_CC) $(CFLAGS) $(SDL_WIN_INC) -o $@ tests/runtime_test.c modules/runtime/process.c $(LUA_SRC) $(WIN_LIBS)
 
-test-workbench-macos: cooloo-cli $(BUILD)/lua-runner $(BUILD)/runtime-test-macos editor cooloo
-	$(BUILD)/lua-runner --lua-run tests/workbench.lua
+test-workbench-macos: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test-macos $(BUILD)/runtime-test-macos editor cooloo
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/workbench.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test-macos $(BUILD)/lua-runner tests/runtime.lua
 	COOLOO_TEST_EDITOR=$(CURDIR)/editor COOLOO_TEST_GUI=$(CURDIR)/cooloo python3 tests/workbench_integration.py
@@ -141,11 +144,49 @@ test-workbench-macos: cooloo-cli $(BUILD)/lua-runner $(BUILD)/runtime-test-macos
 $(BUILD)/runtime-test: tests/runtime_test.c modules/runtime/process.c $(LUA_SRC) $(SDL_LINUX)/libSDL3.a
 	$(CC) $(CFLAGS) -DLUA_USE_POSIX $(SDL_MAC_INC) -o $@ tests/runtime_test.c modules/runtime/process.c $(LUA_SRC) $(SDL_LINUX)/libSDL3.a -lm -ldl -lpthread
 
-test-workbench: cooloo-cli $(BUILD)/lua-runner $(BUILD)/runtime-test editor-linux cooloo-linux
-	$(BUILD)/lua-runner --lua-run tests/workbench.lua
+test-workbench: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test $(BUILD)/runtime-test editor-linux cooloo-linux
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/workbench.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test $(BUILD)/lua-runner tests/runtime.lua
 	python3 tests/workbench_integration.py
+
+RENDERER_TEST_SRC := tests/renderer_test.c $(filter-out apps/editor/main.c,$(EDITOR_SRC))
+$(BUILD)/renderer-test: $(RENDERER_TEST_SRC) $(HEADERS) $(SDL_LINUX)/libSDL3.a
+	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -DLUA_USE_POSIX -Isrc $(SDL_MAC_INC) -o $@ $(RENDERER_TEST_SRC) $(SDL_LINUX)/libSDL3.a -lm -ldl -lpthread
+
+$(BUILD)/renderer-test-macos: $(RENDERER_TEST_SRC) $(HEADERS) $(SDL_MAC_LIB)
+	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -DLUA_USE_POSIX -mmacosx-version-min=$(MACOS_MIN) -Isrc $(SDL_MAC_INC) -o $@ $(RENDERER_TEST_SRC) $(MAC_LIBS)
+
+$(BUILD)/renderer-test.exe: $(RENDERER_TEST_SRC) $(HEADERS) $(SDL_WIN_LIB)
+	$(WIN_CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -Isrc $(SDL_WIN_INC) -o $@ $(RENDERER_TEST_SRC) $(WIN_LIBS)
+
+$(BUILD)/rencache-test: tests/rencache_test.c src/rencache.c src/rencache.h src/renderer.h
+	$(CC) $(CFLAGS) -Isrc $(SDL_MAC_INC) -o $@ tests/rencache_test.c src/rencache.c
+
+test-renderer: $(BUILD)/renderer-test $(BUILD)/rencache-test
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/renderer.lua
+	$(BUILD)/rencache-test
+
+test-renderer-macos: $(BUILD)/renderer-test-macos $(BUILD)/rencache-test
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/renderer.lua
+	$(BUILD)/rencache-test
+
+# Native SDL event-contract test; injection exists only in this test executable.
+EVENT_TEST_SRC := tests/event_bridge_test.c $(filter-out apps/editor/main.c,$(EDITOR_SRC))
+$(BUILD)/event-bridge-test: $(EVENT_TEST_SRC) $(HEADERS) $(SDL_LINUX)/libSDL3.a
+	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -DLUA_USE_POSIX -Isrc $(SDL_MAC_INC) -o $@ $(EVENT_TEST_SRC) $(SDL_LINUX)/libSDL3.a -lm -ldl -lpthread
+
+$(BUILD)/event-bridge-test-macos: $(EVENT_TEST_SRC) $(HEADERS) $(SDL_MAC_LIB)
+	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -DLUA_USE_POSIX -mmacosx-version-min=$(MACOS_MIN) -Isrc $(SDL_MAC_INC) -o $@ $(EVENT_TEST_SRC) $(MAC_LIBS)
+
+$(BUILD)/event-bridge-test.exe: $(EVENT_TEST_SRC) $(HEADERS) $(SDL_WIN_LIB)
+	$(WIN_CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -Isrc $(SDL_WIN_INC) -o $@ $(EVENT_TEST_SRC) $(WIN_LIBS)
+
+test-event-bridge: $(BUILD)/event-bridge-test
+	SDL_VIDEODRIVER=dummy $(BUILD)/event-bridge-test tests/event_bridge.lua
+
+test-event-bridge-macos: $(BUILD)/event-bridge-test-macos
+	SDL_VIDEODRIVER=dummy $(BUILD)/event-bridge-test-macos tests/event_bridge.lua
 
 # Deliberately no GUI, SDL dummy, rendering or desktop tests in this target.
 test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner
@@ -184,9 +225,9 @@ install: cooloo
 clean:
 	rm -f cooloo cooloo.exe cooloo-cli editor editor.exe cli.exe editor-linux cooloo-linux \
 		cooloo-text cooloo-text.exe cooloo-text-linux cooloo-workbench cooloo-workbench.exe $(BUILD)/embedded_workbench_cli.c \
-		$(BUILD)/embedded_workbench.c $(BUILD)/embedded_editor.c src/embedded_lua.c src/embedded_font.c
+		$(BUILD)/embedded_workbench.c $(BUILD)/embedded_editor.c src/embedded_lua.c src/embedded_font.c src/embedded_fonts.c
 
 distclean: clean
 	rm -rf $(BUILD)
 
-.PHONY: all test test-workbench test-workbench-macos test-workbench-headless install clean distclean release-windows release-macos
+.PHONY: test-renderer test-renderer-macos all test test-workbench test-workbench-macos test-workbench-headless test-event-bridge test-event-bridge-macos install clean distclean release-windows release-macos

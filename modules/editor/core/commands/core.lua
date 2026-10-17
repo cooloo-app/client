@@ -85,9 +85,16 @@ command.add(nil, {
   end,
 
   ["core:open-user-module"] = function()
-      local filename = EXEDIR .. '/data/user/init.lua'
-      if not system.get_file_info( filename ) then filename = USERDIR .. '/init.lua' end
-      core.root_view:open_doc(core.open_doc(core.user_module or filename))
+      local filename = USERDIR .. '/init.lua'
+      if not system.get_file_info(filename) and system.get_file_info(EXEDIR .. '/data/user/init.lua') then
+        filename = EXEDIR .. '/data/user/init.lua'
+      end
+      filename = core.user_module or filename
+      local doc = core.open_doc(filename)
+      if not system.get_file_info(filename) and not doc:is_dirty() then
+        doc:text_input(require 'user.example')
+      end
+      core.root_view:open_doc(doc)
   end,
 
   ["core:open-project-module"] = function()

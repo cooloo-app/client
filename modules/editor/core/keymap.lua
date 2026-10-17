@@ -14,6 +14,11 @@ local modkey_map = {
   ["right alt"]   = "altgr",
 }
 
+-- Product policy: macOS Command aliases Ctrl, through the same paired events.
+if system.platform == "macOS" then
+  modkey_map["left gui"], modkey_map["right gui"] = "ctrl", "ctrl"
+end
+
 local modkeys = { "ctrl", "alt", "altgr", "shift" }
 
 local function key_to_stroke(k)
@@ -52,7 +57,7 @@ function keymap.get_binding(cmd)
 end
 
 
-function keymap.on_key_pressed(k)
+function keymap.on_key_pressed(k, commands_enabled)
   local mk = modkey_map[k]
   if mk then
     keymap.modkeys[mk] = true
@@ -60,7 +65,7 @@ function keymap.on_key_pressed(k)
     if mk == "altgr" then
       keymap.modkeys["ctrl"] = false
     end
-  else
+  elseif commands_enabled ~= false then
     local stroke = key_to_stroke(k)
     local commands = keymap.map[stroke]
     if commands then

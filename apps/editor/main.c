@@ -1,4 +1,5 @@
 #include "gui.h"
+#include "luabind.h"
 #include <stdio.h>
 #include <string.h>
 #ifdef _WIN32
@@ -29,6 +30,7 @@ int main(int argc,char **argv) {
 #endif
     const char *dev=NULL;
     int i=1;
+    luabind_set_args(argc,argv);
     cooloo_text_executable=argv[0];
     for(;i<argc;i++) {
         if(!strcmp(argv[i],"--")){i++;break;}

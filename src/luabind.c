@@ -11,6 +11,8 @@
 #include "gui.h"
 #include "font.h"
 #include "api.h"
+#include "renderer_api.h"
+#include "rencache.h"
 #include "runtime.h"
 #ifndef COOLOO_EDITOR_ONLY
 #include "net.h"
@@ -79,10 +81,21 @@ static conn_slot *connection(int token) {
 }
 #endif
 static lua_State *L;
+static int raw_argc;
+static char **raw_argv;
+void luabind_set_args(int argc, char **argv) {
+    free(raw_argv);
+    raw_argv = malloc((size_t)argc * sizeof *raw_argv);
+    if (!raw_argv && argc) abort();
+    memcpy(raw_argv, argv, (size_t)argc * sizeof *raw_argv);
+    raw_argc = argc;
+}
 static int quitting;
 static int ev_ref = LUA_NOREF;      /* current events array (registry ref) */
 static int ev_count;
-static int presented;
+static int failed;
+static char last_error[2048] = "Lua initialization failed; see stderr for details.";
+const char *luabind_last_error(void) { return last_error; }
 static char dev_dir[512];           /* --lua-dev dir; "" = embedded mode */
 static time_t dev_last_check;
 static long dev_mtimes[64];
@@ -100,6 +113,7 @@ void luabind_events_begin(void)
     ev_count = 0;
 }
 
+#ifndef COOLOO_EDITOR_ONLY
 static void ev_begin(const char *type)
 {
     lua_createtable(L, 0, 8);
@@ -127,66 +141,6 @@ static void ev_commit(void)
     lua_pop(L, 2);
 }
 
-void luabind_ev_key(const char *name, int mod)
-{
-    ev_begin("key");
-    ev_s("key", name);
-    ev_i("mod", mod);
-    ev_commit();
-}
-
-void luabind_ev_text(const char *text)
-{
-    ev_begin("text");
-    ev_s("text", text);
-    ev_commit();
-}
-
-void luabind_ev_ime(const char *text, int cursor)
-{
-    ev_begin("ime_edit");
-    ev_s("text", text);
-    ev_i("cursor", cursor);
-    ev_commit();
-}
-
-void luabind_ev_mouse(const char *kind, int x, int y, int button,
-                      int wx, int wy)
-{
-    ev_begin("mouse");
-    ev_s("kind", kind);
-    ev_i("x", x);
-    ev_i("y", y);
-    ev_i("button", button);
-    ev_i("wx", wx);
-    ev_i("wy", wy);
-    ev_commit();
-}
-
-void luabind_ev_drop(const char *path, int x, int y)
-{
-    ev_begin("filedropped");
-    ev_s("path", path);
-    ev_i("x", x);
-    ev_i("y", y);
-    ev_commit();
-}
-
-void luabind_ev_resize(int w, int h)
-{
-    ev_begin("resize");
-    ev_i("w", w);
-    ev_i("h", h);
-    ev_commit();
-}
-
-void luabind_ev_quit(void)
-{
-    ev_begin("quit");
-    ev_commit();
-}
-
-#ifndef COOLOO_EDITOR_ONLY
 static void ev_net_ready(int conn, const char *nick)
 {
     ev_begin("net_ready");
@@ -441,15 +395,24 @@ static int l_text_width(lua_State *l)
 {
     size_t n;
     const char *s = luaL_checklstring(l, 1, &n);
-    int size = (int)luaL_optinteger(l, 2, 15);
+    float size = (float)luaL_optnumber(l, 2, 15);
+    if (lua_isstring(l, 3)) font_select(lua_tostring(l, 3));
     lua_pushinteger(l, font_text_width_n(s, n, size));
     return 1;
 }
 
 static int l_line_height(lua_State *l)
 {
-    lua_pushinteger(l, font_line_height((int)luaL_optinteger(l, 1, 15)));
+    if (lua_isstring(l, 2)) font_select(lua_tostring(l, 2));
+    lua_pushinteger(l, font_line_height((float)luaL_optnumber(l, 1, 15)));
     return 1;
+}
+
+static int l_clear_ime(lua_State *l)
+{
+    (void)l;
+    gui_clear_ime();
+    return 0;
 }
 
 static int l_set_ime_rect(lua_State *l)
@@ -464,9 +427,9 @@ static int l_set_ime_rect(lua_State *l)
 static int l_clipboard_get(lua_State *l)
 {
     char *t = SDL_GetClipboardText();
-    lua_pushstring(l, t ? t : "");
-    if (t)
-        SDL_free(t);
+    if (!t) return 0;
+    lua_pushstring(l, t);
+    SDL_free(t);
     return 1;
 }
 
@@ -623,6 +586,9 @@ static void register_api(void)
         { "text_width", l_text_width },
         { "line_height", l_line_height },
         { "set_ime_rect", l_set_ime_rect },
+        { "clear_ime", l_clear_ime },
+        { "poll_event", gui_poll_event },
+        { "wait_event", gui_wait_event },
 #ifndef COOLOO_EDITOR_ONLY
         { "ensure_identity", l_ensure_identity },
         { "identity_fp", l_identity_fp },
@@ -663,6 +629,13 @@ static void register_api(void)
 
     luaL_newlib(L, top);
     platform_register(L);
+    luaopen_renderer(L);
+    lua_setfield(L, -2, "renderer");
+    lua_newtable(L);
+    for (int i=0;i<raw_argc;i++) {
+        lua_pushstring(L,raw_argv[i]);lua_rawseti(L,-2,i+1);
+    }
+    lua_setfield(L,-2,"args");
 #ifndef COOLOO_EDITOR_ONLY
     runtime_register(L);
 #endif
@@ -681,6 +654,7 @@ static void register_api(void)
         lua_pushstring(L,cooloo_text_files[i]);lua_rawseti(L,-2,i+1);
     }
     lua_setfield(L,-2,"text_files");
+
     lua_pushboolean(L, 1);
     lua_setfield(L, -2, "offline");
 #else
@@ -698,15 +672,42 @@ static void register_api(void)
 /* script loading (embedded, or --lua-dev dir with mtime hot reload) */
 /* ---------------------------------------------------------------- */
 
+/* Called as xpcall's handler while the failing Lua stack still exists. */
+static int fatal_error(lua_State *l)
+{
+    luaL_traceback(l, l, lua_tostring(l, 1), 1);
+    snprintf(last_error, sizeof last_error, "%s", lua_tostring(l, -1));
+    fprintf(stderr, "cooloo fatal: %s\n", lua_tostring(l, -1));
+    lua_getglobal(l, "package");
+    lua_getfield(l, -1, "loaded");
+    lua_getfield(l, -1, "core");
+    if (lua_istable(l, -1)) {
+        lua_getfield(l, -1, "on_error");
+        if (lua_isfunction(l, -1)) {
+            lua_pushvalue(l, 2);
+            if (lua_pcall(l, 1, 0, 0) != LUA_OK)
+                fprintf(stderr, "recovery failed: %s\n", lua_tostring(l, -1));
+        }
+    }
+    lua_settop(l, 2);
+    failed = quitting = 1;
+    return 1;
+}
+
 static int run_source(const char *name, const char *src)
 {
-    if (luaL_loadbuffer(L, src, strlen(src), name) != LUA_OK ||
-        lua_pcall(L, 0, 0, 0) != LUA_OK) {
-        fprintf(stderr, "cooloo gui: %s: %s\n", name, lua_tostring(L, -1));
-        lua_pop(L, 1);
-        return -1;
+    int base = lua_gettop(L);
+    lua_pushcfunction(L, fatal_error);
+    if (luaL_loadbuffer(L, src, strlen(src), name) != LUA_OK) {
+        lua_pushcfunction(L, fatal_error);
+        lua_pushvalue(L, -2);
+        lua_call(L, 1, 1);
+    } else if (lua_pcall(L, 0, 0, base + 1) == LUA_OK) {
+        lua_settop(L, base);
+        return 0;
     }
-    return 0;
+    lua_settop(L, base);
+    return -1;
 }
 
 static int run_disk_script(const char *name)
@@ -720,8 +721,7 @@ static int run_disk_script(const char *name)
     snprintf(path, sizeof path, "%s/%s", dev_dir, name);
     f = fopen(path, "rb");
     if (!f) {
-        fprintf(stderr, "cooloo gui: lua-dev: %s missing, embedded used\n",
-                path);
+        fprintf(stderr, "cooloo gui: lua-dev: %s missing\n", path);
         return -1;
     }
     fseek(f, 0, SEEK_END);
@@ -745,9 +745,9 @@ static void run_scripts(void)
     int i;
     for (i = 0; i < cooloo_embedded_lua_count; i++) {
         const char *name = cooloo_embedded_lua[i].name;
-        if (dev_dir[0] && run_disk_script(name) == 0)
-            continue;
-        run_source(name, cooloo_embedded_lua[i].src);
+        if (dev_dir[0]) {
+            if (run_disk_script(name) != 0) { failed = quitting = 1; return; }
+        } else if (run_source(name, cooloo_embedded_lua[i].src) != 0) return;
     }
 }
 
@@ -795,6 +795,7 @@ int luabind_init(const char *dir)
         dev_snapshot(dev_mtimes);
     }
     run_scripts();
+    if (failed) return -1;
     lua_getglobal(L, "cooloo");
     lua_getfield(L, -1, "frame");
     if (!lua_isfunction(L, -1)) {
@@ -821,118 +822,35 @@ void luabind_shutdown(void)
 #ifdef COOLOO_WORKBENCH
     workbench_cache_shutdown();
 #endif
-    if (L)
+    if (L) {
+        lua_getglobal(L, "package");
+        lua_getfield(L, -1, "loaded");
+        lua_getfield(L, -1, "core");
+        if (lua_istable(L, -1)) {
+            lua_getfield(L, -1, "cleanup");
+            if (lua_isfunction(L, -1) && lua_pcall(L, 0, 0, 0) != LUA_OK)
+                fprintf(stderr, "cleanup failed: %s\n", lua_tostring(L, -1));
+        }
         lua_close(L);
+    }
     L = NULL;
+    free(raw_argv);raw_argv=NULL;raw_argc=0;
 }
 
-/* ---------------------------------------------------------------- */
-/* draw list execution (tolerant: bad ops warn + skip, doc 4.2/6.2)  */
-/* ---------------------------------------------------------------- */
+/* Native renderer ends its frame during core.step, before coroutine work. */
+int luabind_failed(void) { return failed; }
 
-static lua_Integer geti(const char *k)
+int luabind_frame(double dt, double frame_start)
 {
-    lua_Integer v;
-    lua_getfield(L, -1, k);
-    v = (lua_Integer)lua_tonumber(L, -1);
-    lua_pop(L, 1);
-    return v;
-}
-
-static lua_Integer opti(const char *k, lua_Integer dflt)
-{
-    lua_Integer v;
-    lua_getfield(L, -1, k);
-    v = lua_isnumber(L, -1) ? (lua_Integer)lua_tonumber(L, -1) : dflt;
-    lua_pop(L, 1);
-    return v;
-}
-
-static void exec_draw_list(void)
-{
-    lua_Integer n, i;
-
-    presented = 0;
-    if (!lua_istable(L, -1)) {
-        if (!lua_isnil(L, -1))
-            fprintf(stderr, "cooloo gui: draw list is %s, want table\n",
-                    lua_typename(L, lua_type(L, -1)));
-        return;
-    }
-    n = (lua_Integer)luaL_len(L, -1);
-    if (n > 200000)
-        n = 200000;
-    for (i = 1; i <= n; i++) {
-        const char *op;
-        lua_geti(L, -1, i);
-        if (!lua_istable(L, -1)) {
-            fprintf(stderr, "cooloo gui: draw op #%lld not a table, skip\n",
-                    (long long)i);
-            lua_pop(L, 1);
-            continue;
-        }
-        lua_getfield(L, -1, "op");
-        op = lua_tostring(L, -1);
-        lua_pop(L, 1);
-        if (!op) {
-            fprintf(stderr, "cooloo gui: draw op #%lld missing op, skip\n",
-                    (long long)i);
-        } else if (!strcmp(op, "rect")) {
-            gui_draw_rect((int)geti("x"), (int)geti("y"),
-                          (int)geti("w"), (int)geti("h"),
-                          (unsigned)geti("color"));
-        } else if (!strcmp(op, "text")) {
-            /* read numeric fields BEFORE pushing "text": geti() indexes
-             * the stack top, which must still be the op table */
-            const char *t;
-            int x = (int)geti("x"), y = (int)geti("y");
-            unsigned color = (unsigned)geti("color");
-            int size = (int)opti("size", 15);
-            lua_getfield(L, -1, "text");
-            t = lua_tostring(L, -1);
-            if (t)
-                gui_draw_text(x, y, t, color, size);
-            lua_pop(L, 1);
-        } else if (!strcmp(op, "clip")) {
-            gui_set_clip((int)geti("x"), (int)geti("y"),
-                         (int)geti("w"), (int)geti("h"));
-        } else if (!strcmp(op, "unclip")) {
-            gui_clear_clip();
-        } else if (!strcmp(op, "present")) {
-            gui_present();
-            presented = 1;
-        } else {
-            fprintf(stderr, "cooloo gui: unknown draw op '%s', skip\n", op);
-        }
-        lua_pop(L, 1);
-    }
-}
-
-int luabind_frame(double dt)
-{
-    if (dev_dir[0])
-        dev_hotreload();
-
+    if (dev_dir[0]) dev_hotreload();
+    int base = lua_gettop(L);
+    lua_pushcfunction(L, fatal_error);
     lua_getglobal(L, "cooloo");
     lua_getfield(L, -1, "frame");
-    if (!lua_isfunction(L, -1)) {
-        fprintf(stderr, "cooloo gui: cooloo.frame missing\n");
-        lua_pop(L, 2);
-        gui_present();
-        return quitting;
-    }
     lua_rawgeti(L, LUA_REGISTRYINDEX, ev_ref);
     lua_pushnumber(L, dt);
-    if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
-        fprintf(stderr, "cooloo gui: lua error: %s\n", lua_tostring(L, -1));
-        lua_pop(L, 2);
-        gui_present();
-        return quitting;
-    }
-    /* stack: cooloo table, draw list */
-    exec_draw_list();
-    lua_pop(L, 2);
-    if (!presented)
-        gui_present();
+    lua_pushnumber(L, frame_start);
+    lua_pcall(L, 3, 0, base + 1);
+    lua_settop(L, base);
     return quitting;
 }

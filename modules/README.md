@@ -68,8 +68,10 @@ Provider contract:
 - Local mock import is incremental (4 KiB/tick), validates 4096-byte UTF-8 lines,
   and retains the latest 2000 in-memory messages. Fixture text is never executed.
 
-The platform C loop owns SDL events, network pump and Lite-style fixed FPS pacing
-(poll → step/draw → coroutine work → sleep remainder). Lite's `core.run()` is not
+The platform C loop owns the network pump and Lite-style fixed FPS pacing.
+`core.step` polls SDL directly through the Lite-derived C `system.poll_event`
+(step/poll/draw → coroutine work → sleep remainder); the frame event array is
+network-only. See [event contract](EVENTS.md) for SDL3 differences and IME. Lite's `core.run()` is not
 invoked; `core.host` reuses `core.init` and the upstream coroutine scheduler.
 Text enables project scanning, all default plugins, user and project modules;
 `--safe-mode` disables external extension loading. Full workbench retains the

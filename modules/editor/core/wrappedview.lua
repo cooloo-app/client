@@ -9,7 +9,12 @@ function W:new(doc) W.super.new(self,doc);self.rows={};self.follow=true end
 function W:layout()
   local width=math.max(20,self.size.x-style.padding.x*2)
   local stamp=self.doc.projection_revision or self.doc.projection or table.concat(self.doc.lines)
-  if self.layout_doc==self.doc and self.layout_width==width and self.layout_stamp==stamp then return end
+  local font=self:get_font()
+  local tab=font:get_width('\t')
+  if self.layout_doc==self.doc and self.layout_width==width and self.layout_stamp==stamp
+    and self.layout_font==font and self.layout_tab==tab then return end
+  self.layout_font,self.layout_tab=font,tab
+  core.redraw=true
   local oldrow=self.rows[math.floor(self.scroll.y/self:get_line_height())+1]
   self.rows={};self.line_rows={}
   local widths={};local font=self:get_font()

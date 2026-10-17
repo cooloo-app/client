@@ -11,6 +11,17 @@ local workspace=require('plugins.workspace.model').new(provider)
 local List=View:extend()
 function List:new() List.super.new(self);self.size.x=220 end
 function List:get_name() return 'Conversations' end
+function List:update()
+  List.super.update(self)
+  local parts={provider.status or '',provider.identity_label or ''}
+  local delivery=workspace.selected and provider.delivery and provider:delivery(workspace.selected)
+  parts[#parts+1]=delivery and delivery.state or ''
+  for _,room in ipairs(provider:list()) do
+    parts[#parts+1]=tostring(room.id)..':'..room.name..':'..tostring(room.unread or 0)
+  end
+  local stamp=table.concat(parts,'\n')
+  if stamp~=self.stamp then self.stamp=stamp;core.redraw=true end
+end
 function List:draw()
   self:draw_background(style.background2)
   renderer.draw_text(style.font,'Conversations',self.position.x+10,self.position.y+8,style.accent)
