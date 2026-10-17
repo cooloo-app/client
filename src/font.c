@@ -214,7 +214,7 @@ static void rasterize(cent *e, uint32_t cp, int size)
     e->g.w = e->g.h = e->g.xoff = e->g.yoff = 0;
     e->g.bmp = NULL;
     if (e->fi < 0) {                /* .notdef: blank box of spacing */
-        e->g.advance = (float)size * 0.6f;
+        e->g.advance = (int)((float)size * 0.6f + 0.5f);
         return;
     }
     /* em-to-pixels: size means em size (9px Latin advance at 15px).
@@ -224,7 +224,9 @@ static void rasterize(cent *e, uint32_t cp, int size)
     f = &fonts[e->fi];
     scale = stbtt_ScaleForMappingEmToPixels(&f->info, (float)size);
     stbtt_GetCodepointHMetrics(&f->info, (int)cp, &adv, &lsb);
-    e->g.advance = scale * (float)adv;
+    /* Quantize once: measuring whole strings, individual characters and
+     * drawing token fragments must all use the same pixel advance. */
+    e->g.advance = (int)(scale * (float)adv + 0.5f);
     bmp = stbtt_GetCodepointBitmap(&f->info, scale, scale, (int)cp,
                                    &w, &h, &xo, &yo);
     e->g.w = w;
@@ -311,7 +313,7 @@ uint32_t font_utf8_next(const char **p, const char *end)
 int font_text_width_n(const char *utf8, size_t n, int size)
 {
     const char *p = utf8, *end = utf8 + n;
-    float w = 0;
+    int w = 0;
     while (p < end && *p) {
         uint32_t cp = font_utf8_next(&p, end);
         if (!cp)
@@ -320,7 +322,7 @@ int font_text_width_n(const char *utf8, size_t n, int size)
             continue;
         w += font_glyph(cp, size)->advance;
     }
-    return (int)(w + 0.5f);
+    return w;
 }
 
 int font_text_width(const char *utf8, int size)

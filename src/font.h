@@ -16,7 +16,7 @@
 typedef struct {
     int      w, h;          /* bitmap size (0x0 for blank glyphs) */
     int      xoff, yoff;    /* draw offset; yoff is baseline-relative */
-    float    advance;       /* pen advance in px */
+    int      advance;       /* rounded pixel advance shared by measure/draw */
     const uint8_t *bmp;     /* w*h 8-bit coverage; NULL = blank */
 } glyph;
 
