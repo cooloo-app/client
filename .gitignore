@@ -6,6 +6,9 @@
 /cli.exe
 /editor-linux
 /cooloo-linux
+
+/release/lite-v1.11-windows/
+/release/lite-xl/
 __pycache__/
 *.dSYM/
 /build/
