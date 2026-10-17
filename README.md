@@ -50,9 +50,12 @@ errors return 2. UTF-8, CRLF and a final record without LF are supported.
 `--lua-console` retains the existing length-framed runner protocol; it is not a
 terminal emulator or interactive line-oriented shell. Scripts are not sandboxed.
 
-This is a development source change: headless checks have passed; GUI checks and
-cross-platform release verification are deferred, and release artifacts have not
-been refreshed.
+Development artifacts for all four products on macOS arm64 and Windows x86_64
+have been refreshed from committed source. Cross-platform builds and headless
+checks have passed; GUI/desktop acceptance remains deferred. See
+[release/README.md](release/README.md) for exact provenance, hashes and test scope.
+`make release-macos` / `make release-windows` build all four products without
+publishing, tagging or uploading a Release.
 
 Useful commands/keys (Cmd maps to Ctrl on macOS); workspace, console and runtime
 commands below are available only in the full workbench, not `cooloo-text`:

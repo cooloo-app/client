@@ -1,124 +1,132 @@
-# cooloo client v0.3.0 — development workbench binaries (untagged)
+# cooloo client — development artifact refresh (2026-10-17, untagged)
 
-GUI+CLI single binaries, Protocol 2 and Machine API schema 1.
-Source commit: `3bea7ad391681cd329ba1ca18b9ddd16cc4b4f43`.
+Source commit: `f768a1cc3e9ddb036f2a73e343b3d24d99824be9`.
 Integration server: `de4f3d21aecaa2190564c329608c02a9decd8010`.
-Built 2026-10-16 in isolated `/tmp/cooloo-workbench-v030` on m106.
-Installed into `release/` on 2026-10-17 after retrieving the original artifacts
-and matching both SHA-256 values against the stage-6 validation record.
-These are development refresh artifacts, not a tagged release. The user authorized
-replacement without a tag despite the remaining manual acceptance items below.
+Built from committed `git archive` exports in isolated sibling client/server trees
+at `/tmp/cooloo-text-refresh-f768a1c-20261017` on m106 (macOS arm64).
+Toolchain: Apple clang 21.0.0, mingw-w64 GCC 16.2.0, vendored SDL3/Lua.
+This is a development refresh, not a formal release. The client version remains
+0.3.0; no new tag, GitHub Release or Python SDK publication is part of this update.
 
-| File | Target | Bytes | SHA256 |
-|---|---|---:|---|
-| cooloo-darwin-arm64 | macOS arm64, deployment target 11.0 | 2724168 | a639c508b671e5b3fc35be54e3cf51b6f706db89ea77238daf052dda1717505f |
-| cooloo-windows-x86_64.exe | Windows x86_64 GUI subsystem | 4310356 | ed9864a52f15b99b6cb2580acaa25822bd7c6a6d804554da1e4400907a9b90d7 |
+## Products
 
-Git LFS tracked; unsigned/not notarized. Windows cross-built with mingw-w64,
-only system DLL imports. macOS deployment target is 11.0, not runtime-verified on 11.
+- **cooloo**: full communication CLI + GUI workbench. Bare invocation prints help;
+  use `--gui` to launch the GUI, optionally `--debug` for console logs.
+- **cooloo-text**: standalone general-purpose text editor, `cooloo-text [FILE ...]`.
+  No message workspace, execution console/runtime, client network/identity/cache
+  core or `~/.cooloo` access. The old `editor` source build names are aliases for
+  this pure editor, not the old offline mock-message workbench.
+- **cooloo-workbench**: headless message JSONL validate/render and Lua runner CLI.
+  No SDL or communication identity/config/network core. `--lua-run` and the
+  length-framed `--lua-console` live here, not in cooloo-text.
+- **cooloo-cli**: existing headless communication CLI, without SDL/editor modules.
 
-## Standalone offline editor — Windows development build (2026-10-17)
+The obsolete `editor-windows-x86_64.exe` offline workbench artifact has been
+removed; use `cooloo-text-windows-x86_64.exe` for ordinary text editing and
+`cooloo-workbench-windows-x86_64.exe` for headless projection/runner commands.
+Full GUI console and messaging remain in `cooloo-windows-x86_64.exe --gui`.
+Message projection timestamps now use UTC consistently in CLI and GUI.
+The planner's `windows/cooloo-dev.cmd` continues to use the unchanged full-client
+artifact path; no launcher update is required.
 
-`editor-windows-x86_64.exe` is an optional standalone offline workbench, not a
-replacement for the full cooloo client above. Launch it directly (no `--gui`
-argument). It includes file editing, the Lua runner/console and local mock
-messages, but no client network/identity/cache core or script messaging API.
-It does not read/write `~/.cooloo`.
+## Artifacts
 
-- Source commit: `3bea7ad391681cd329ba1ca18b9ddd16cc4b4f43` (committed source
-  exported with `git archive`; existing local release changes were excluded).
-- Built on m106 using mingw-w64, `make editor.exe`, in isolated directory
-  `/tmp/cooloo-editor-win-hD8Tl7n2/client` on 2026-10-17.
-- File: `editor-windows-x86_64.exe`; bytes: `4138999`.
-- SHA-256: `733a76783aebf2b14393d23a078e5d6bd75b49b6fff7b000970a5d48486077d6`.
-- Static checks: PE32+ x86_64, Windows GUI subsystem, only system DLL imports;
-  client network/identity/cache/crypto entry-point symbols absent.
-- Local Windows validation passed with isolated temporary HOME/config: SDL dummy
-  and native first-frame probes; workbench and provider Lua suites; runtime
-  persistence, traceback, stop/restart, output flood, file isolation and exit
-  status suite using the same-source runtime test harness; offline runner has
-  no `cooloo.request` / `cooloo.request_as`; no client config was created.
-- The dummy video driver reported unsupported window-icon setup (expected);
-  native first-frame startup passed. Manual desktop/IME/clipboard/file workflow,
-  complete window/icon/console acceptance and oldest-OS compatibility remain
-  unverified for this editor build. No server/network test was needed or run.
-- Git LFS tracked, unsigned, untagged; no commit, push or external publication.
-  Existing cooloo binaries were not replaced by this editor build.
+All macOS files are Mach-O arm64 with deployment target 11.0. Windows files are
+PE32+ x86_64: cooloo/text use the GUI subsystem, workbench/cli use console.
+Windows imports are system DLLs only (including Windows UCRT API-set DLLs).
+No separate SDL/Lua DLL is needed. Git LFS tracked; unsigned/not notarized.
+Deployment target and import checks do not prove oldest-OS runtime compatibility.
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| cooloo-darwin-arm64 | 2740680 | 19dbe8447c5c46d1a0ef572df8a4b704bbdab6ec401fc9b3ae4fc3c76e183bcd |
+| cooloo-windows-x86_64.exe | 4313940 | d62d3e6634ba4873a79c607bbcaa53f8c3161e6a3fab7f5e77d3716406b8e023 |
+| cooloo-text-darwin-arm64 | 2546888 | 8b7034f26ddbb4f32c8f265959b7fc50cb094296d2d8ca5703086e51f89435a5 |
+| cooloo-text-windows-x86_64.exe | 4119700 | e2df65bd3bdb7b88df25a069da7b32260c5f4e772459c0e2d3f2174ea989b83f |
+| cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
+| cooloo-workbench-windows-x86_64.exe | 645198 | 6bba542e60c7eef4d61094720f7ab8b4d18a917fe04d181d377f2baf7d4fe6c3 |
+| cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
+| cooloo-cli-windows-x86_64.exe | 603010 | a7c75d0ec7f39572f2c8eb72adf29c0adfb7b85dd0f5782ea1cdd6aebab9eb49 |
+
+SHA-256 values were computed on m106 and rechecked after retrieval to local
+staging. All four Windows artifact hashes also matched on m101.
+
+## This refresh's validation
+
+Passed on m106:
+
+- `make release-macos` and `make release-windows`: all four products per platform.
+- `make -C ../server all` then `make test`: config relocation/pin continuity,
+  offline help/errors and stub-only entry dispatch, Protocol 2 private rooms,
+  delegation, filtered/merged history, cross-transport revocation, identity-cache
+  isolation, Lua protocol state, cache gaps/duplicates/conflicts/crash-tail tests.
+  The current suite reports named groups rather than the historical 24-case count.
+- `make test-workbench-headless`: projection/anchors, console session, CLI
+  success/errors, UTF-8/size limits, bundle isolation, file/framed runners and
+  binary-symbol dependency isolation.
+- `build/lua-runner --lua-run tests/provider.lua`: async checkpoints,
+  subscriptions/overflow, stale identity, send ACK/rejection/uncertainty.
+- Binary formats, macOS system-library dependencies and 11.0 load commands,
+  Windows subsystem and DLL imports; both text-editor binaries exclude client
+  communication/cache and execution-runtime entry-point symbols.
+
+Passed on Windows m101 with temporary, isolated HOME/config and no network:
+
+- Full client and communication CLI: bare/full help, version, redirected
+  stdout/stderr, invalid-command/missing-argument exit codes and key generation.
+- Workbench: UTF-8 text/JSON projection and anchors, malformed/oversized input,
+  invalid UTF-8/NUL, record limits, CRLF/no-final-LF, missing file, Lua file runner,
+  length-framed console and malformed-frame exit code.
+
+**Intentionally skipped:** all GUI self-tests, SDL dummy/first-frame probes,
+Doc/View interaction, desktop window/icon/console acceptance, Chinese IME,
+clipboard, file workflows, tabs/splits and GUI runner/message interactions.
+The standalone text binary was built and statically inspected, not run.
+Windows network tests, full GUI-linked protocol integration, macOS 11 runtime
+and the complete supported-OS compatibility matrix were not tested this round.
+Previous artifacts' GUI acceptance results do not apply to these new binaries.
+No production service was accessed and no production messages were sent.
+
+Rebuild (sibling server required):
+
+```sh
+make -C ../server all
+make release-macos
+make test
+make test-workbench-headless
+build/lua-runner --lua-run tests/provider.lua
+make release-windows
+```
+
+These `release-*` targets build artifacts only; they do not publish anything.
+GUI validation remains a separate outstanding acceptance task.
 
 ## Upstream Lite — Windows comparison build
 
-`lite-v1.11-windows.zip` is the unmodified official rxi/lite v1.11 release
-archive, kept only for occasional UI/editor comparison. It is not Lite XL,
-not a cooloo build input, and does not replace any cooloo/editor binary.
+`lite-v1.11-windows.zip` is the unmodified official rxi/lite v1.11 archive,
+retained only for UI/editor comparison, not a cooloo build input.
 
 - Release: https://github.com/rxi/lite/releases/tag/v1.11
 - Download: https://github.com/rxi/lite/releases/download/v1.11/lite.zip
 - Bytes: `1072498`.
 - SHA-256: `da3701cf6985bc493cb11b37556325551c7ce8606f5502ff3f15199039835eef`.
-- The upstream archive includes `lite.exe`, `SDL2.dll`, `data/` and a Unix
-  executable named `lite`. Extract the complete archive into a separate folder
-  and run `lite.exe` there; the Windows executable needs its bundled DLL/data.
-- Download size and ZIP integrity checked locally. The checksum above is a
-  local fingerprint, not an independently published upstream checksum.
-  Windows execution and manual comparison have not been tested.
+- Extract the complete archive, including `SDL2.dll` and `data/`, separately.
+  It also contains a Unix executable named `lite`.
+- Previously checked download size and ZIP integrity; checksum is a local
+  fingerprint, not an independently published upstream checksum. Windows
+  execution/manual comparison not tested. This archive was not changed here.
 
 ## Upstream Lite XL — Windows comparison build
 
-`lite-xl-v2.1.8-windows-x86_64.zip` is the official Lite XL Windows x86_64
-archive, retained only for occasional comparison. It is not a cooloo build input.
+`lite-xl-v2.1.8-windows-x86_64.zip` is the official Lite XL Windows archive,
+retained only for comparison, not a cooloo build input.
 
 - Release: https://github.com/lite-xl/lite-xl/releases/tag/v2.1.8
 - Download: https://github.com/lite-xl/lite-xl/releases/download/v2.1.8/lite-xl-v2.1.8-windows-x86_64.zip
 - Bytes: `2303776`.
 - SHA-256: `de4983f8f537e3876d0c326423537914b576b6970e35b9c9cc62eafe72719ec2`.
-- The archive contains `lite-xl/lite-xl.exe` and an external `data/` tree
-  (including Lua modules and fonts). No non-system DLLs were found in the PE
-  import table. Extract the complete archive and run the exe beside `data/`;
-  it is not a self-contained editor exe. The separate `setup.exe` assets are
-  installers, not standalone editor builds.
-- Archive SHA-256 matched GitHub's published digest and ZIP integrity checked.
-  Windows execution and manual comparison have not been tested.
-
-## Changes
-
-- Replaces the legacy GUI with the modular Lite-based text workbench: file editing,
-  tabs/splits, command palette, message workspace, local-cache history paging,
-  independent Lua runner and persistent console.
-- Retains Protocol 2, Machine API schema 1, identity and cache format compatibility.
-- Keeps the Shanghai endpoint and verified official-server pin continuity from v0.2.4.
-- Bare invocation prints help; launch the workbench explicitly with `--gui`.
-- The planner's `windows/cooloo-dev.cmd` uses this fixed Windows artifact path;
-  replacing the file updates the next launch without changing the command script.
-
-## Validation
-
-Original 2026-10-16 validation (same artifacts, verified by SHA-256):
-
-- Linux client/workbench and Python SDK compatibility tests passed (7 SDK tests);
-  no SDK publication was performed.
-- macOS isolated server/client suites, full GUI-linked protocol integration and
-  workbench/runtime integration passed. Native first-frame probe passed (50 ms).
-- Windows m101 startup/redirection/exit/keygen, bare help, explicit/debug GUI
-  first-frame probes, and workbench/provider/runtime tests passed.
-- Windows desktop window/icon/console probe failed with `GUI window missing`
-  in SSH Session 0. It was not a passing desktop acceptance test.
-- Windows protocol network testing was not run in that validation round.
-
-2026-10-17 refresh checks:
-
-- Retrieved both original binaries from m106, verified sizes, SHA-256 and executable
-  formats; macOS binary reports `cooloo 0.3.0` on m106.
-- On the local Windows host, `tests/windows-startup.ps1` passed using an isolated
-  temporary config, without a network test host. Explicit/debug GUI first-frame
-  probes passed; this is not manual desktop/IME acceptance.
-- The unchanged `cooloo-dev.cmd version` reports `cooloo 0.3.0`; an invalid command
-  preserves exit code 2. No production registration or messages were sent.
-
-Still unverified: real Windows/macOS Chinese IME preedit/candidate placement and
-commit/cancel, clipboard, shortcuts, file open/save, tabs/splits, runner controls,
-window closing, complete window/icon/console acceptance, oldest supported OS and
-full compatibility matrix. Development replacement does not close these gates.
-No tag, GitHub Release or SDK publication was performed.
-
-Rebuild from the source commit with sibling server:
-`make release-macos; make test; make test-workbench-macos; make release-windows`.
+- Extract the whole archive and run `lite-xl/lite-xl.exe` beside its `data/`.
+  Previously found system DLL imports only; this is not a self-contained exe.
+  Separate `setup.exe` assets are installers.
+- Previously matched GitHub's published digest and checked ZIP integrity.
+  Windows execution/manual comparison not tested. This archive was not changed here.

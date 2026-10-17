@@ -1,5 +1,5 @@
 # Git LFS: dev-phase prebuilt binaries (see release/README.md)
 release/*.exe                filter=lfs diff=lfs merge=lfs -text
-release/cooloo-darwin-arm64  filter=lfs diff=lfs merge=lfs -text
+release/*-darwin-arm64       filter=lfs diff=lfs merge=lfs -text
 release/lite-v1.11-windows.zip filter=lfs diff=lfs merge=lfs -text
 release/lite-xl-v*-windows-x86_64.zip filter=lfs diff=lfs merge=lfs -text
