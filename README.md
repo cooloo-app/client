@@ -9,19 +9,53 @@ for artifact provenance, platform verification and manual acceptance limitations
 
 ```sh
 make cooloo-cli                  # headless, no SDL/editor dependencies
-make editor                     # native macOS offline workbench
-make editor.exe cli.exe         # MinGW Windows targets
-make editor-linux cooloo-linux  # Linux development builds, requires CMake
+make cooloo-text                # native macOS general-purpose editor
+make cooloo-workbench           # headless message projection / Lua runner CLI
+make cooloo-text.exe cooloo-workbench.exe cli.exe # MinGW Windows targets
+make cooloo-text-linux cooloo-linux # Linux development builds, requires CMake
+make test-workbench-headless    # no GUI/SDL dummy tests
 make test-workbench             # Linux headless + SDL dummy + loopback tests
 make test-workbench-macos       # macOS workbench/runtime + SDL dummy + loopback tests
 ```
 
-`editor` starts with an empty `<local>` conversation. It does not link the client
-network/identity/cache core or read/write `~/.cooloo`. `Workspace: Mock Load`
-explicitly imports a text file (one mock message per line); nothing is loaded or
-created implicitly in the current directory. Messages are in-memory mock data.
+`cooloo-text [FILE ...]` is the standalone general-purpose text editor, built on
+the same Lite-derived editor core and SDL3/Chinese-input platform as the full
+product. It opens an ordinary empty document when no files are supplied. It does
+not bundle message/workspace/console plugins, link the execution runtime or client
+network/identity/cache core, or read/write `~/.cooloo`. Existing `editor`,
+`editor.exe`, `editor-linux` build names remain aliases with this new pure-editor
+behavior; they no longer start a mock conversation or execute `--lua-run`.
 
-Useful commands/keys (Cmd maps to Ctrl on macOS):
+`cooloo --gui` explicitly installs the workspace and console plugins. The local
+mock provider remains a development fixture, not the text-editor product.
+
+`cooloo-workbench` is a separate headless binary (C + Lua, no SDL):
+
+```sh
+cooloo-workbench message validate messages.jsonl
+cooloo-workbench message render messages.jsonl --format text
+cooloo-workbench message render messages.jsonl --format json
+cooloo-workbench --lua-run script.lua
+```
+
+Input uses canonical Protocol 2 records (`ts/from/to/content`), validated by the
+same C decoder as the client. No network/config access is needed. Rendering is a
+read-only projection, not a JSONL round-trip editor. Time labels use UTC in both
+CLI and GUI. JSON output contains `text`, `anchors`, `ranges`, and
+`source_revision`; IDs/revision are source byte endpoints/length for file input,
+not display line numbers. Anchors/ranges use one-based logical lines. Limits:
+10,000 records, 25,088 bytes per input record, 4,096 decoded content bytes.
+Invalid input produces a nonzero exit without partial rendered stdout; usage
+errors return 2. UTF-8, CRLF and a final record without LF are supported.
+`--lua-console` retains the existing length-framed runner protocol; it is not a
+terminal emulator or interactive line-oriented shell. Scripts are not sandboxed.
+
+This is a development source change: headless checks have passed; GUI checks and
+cross-platform release verification are deferred, and release artifacts have not
+been refreshed.
+
+Useful commands/keys (Cmd maps to Ctrl on macOS); workspace, console and runtime
+commands below are available only in the full workbench, not `cooloo-text`:
 
 - Ctrl+Shift+P: command palette; Ctrl+O/N/S/F: open/new/save/find.
 - Alt+Shift+J/L/I/K: split left/right/up/down; Ctrl+Tab: next tab.
@@ -49,7 +83,7 @@ reuse the CLI core inside the runner, so Stop does not leave request subprocesse
 
 `--lua-dev DIR` expects a generated `workbench.lua` bundle (use
 `python3 tools/embed_workbench.py DIR/workbench.lua --lua`, add `--offline` for
-editor). Changes are detected but require restart: destructive hot reload of
+the pure text-editor bundle; `--profile text` is preferred). Changes are detected but require restart: destructive hot reload of
 live documents/connections is intentionally disabled. The old GUI entry/layout/input
 scripts have been removed; `lua/chat.lua` remains the shared protocol state model.
 

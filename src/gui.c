@@ -285,7 +285,11 @@ int cooloo_gui_run(const char *lua_dev_dir)
     if (h < 240)
         h = 240;
 
+#ifdef COOLOO_EDITOR_ONLY
+    win = SDL_CreateWindow("cooloo-text", w, h, SDL_WINDOW_RESIZABLE);
+#else
     win = SDL_CreateWindow("cooloo", w, h, SDL_WINDOW_RESIZABLE);
+#endif
     if (!win) {
         fprintf(stderr, "cooloo gui: window: %s\n", SDL_GetError());
         SDL_Quit();

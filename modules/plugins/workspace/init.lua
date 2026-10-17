@@ -1,16 +1,13 @@
-local platform=require 'platform.lite'
 local core=require 'core'
-require('core.host').init()
-platform.install()
+local M={}
+function M.install(provider)
 local command=require 'core.command'
 local keymap=require 'core.keymap'
 local DV=require 'core.docview'
 local Wrapped=require 'core.wrappedview'
 local View=require 'core.view'
 local style=require 'core.style'
-local provider=require(cooloo.offline and 'adapters.local' or 'adapters.cooloo').new()
-local workspace=require('workspace.model').new(provider)
-local console=require('console').new(cooloo.runtime)
+local workspace=require('plugins.workspace.model').new(provider)
 local List=View:extend()
 function List:new() List.super.new(self);self.size.x=220 end
 function List:get_name() return 'Conversations' end
@@ -60,14 +57,7 @@ local request_quit=system.request_quit
 system.request_quit=function()
   workspace:reset()
   if provider.close then provider:close() end
-  cooloo.runtime.stop(1);cooloo.runtime.stop(2)
   request_quit()
-end
-local function show_doc(doc,wrapped)
-  local view=wrapped and Wrapped(doc) or DV(doc)
-  local target=core.root_view:get_active_node()
-  if target.locked then target=find_edit(core.root_view.root_node) end
-  target:add_view(view)
 end
 local function prompt(title,fn) core.command_view:enter(title,function(text) fn(text) end) end
 command.add(nil,{
@@ -108,43 +98,11 @@ command.add(nil,{
     end) end
   end,
   ['workspace:reconnect']=function() if provider.reconnect then provider:reconnect() end end,
-  ['console:open']=function()
-    show_doc(console.doc,true)
-    local target=core.root_view:get_active_node()
-    target:split('down',DV(console.input))
-    target.divider=0.75
-  end,
-  ['console:stop-file']=function() console:stop(1) end,
-  ['console:stop-session']=function() console:stop(2) end,
-  ['console:restart']=function() console:restart() end,
-  ['console:clear']=function() console:clear() end,
 })
-command.add(function() return core.active_view.doc==console.input end,{
-  ['console:submit']=function()
-    local d=console.input;local text=d:get_text(1,1,#d.lines,#d.lines[#d.lines])
-    if console:submit(text) then d:set_projection('') end
-  end,
-  ['console:previous']=function() console:recall(-1) end,
-  ['console:next']=function() console:recall(1) end,
-})
-command.add(function() local d=core.active_view.doc;return d and not d.virtual end,{
-  ['runtime:run-file']=function()
-    local d=core.active_view.doc
-    if not d.filename then core.error('Save the Lua file before running');return end
-    if d:is_dirty() then d:save() end
-    console:start(1,d.filename);show_doc(console.doc,true)
-  end,
-})
-keymap.add{
-  ['ctrl+return']={'console:submit','workspace:send'},
-  ['f5']='runtime:run-file', ['ctrl+`']='console:open',
-  ['alt+up']='console:previous',['alt+down']='console:next',
-}
-function cooloo.frame(events,dt)
-  provider:poll(events);workspace:refresh();console:poll()
+keymap.add{['ctrl+return']='workspace:send'}
+return {poll=function(events)
+  provider:poll(events);workspace:refresh()
   if not workspace.selected then local r=provider:list();if r[1] then select_room(r[1].id) end end
-  platform.events_begin(events)
-  core.redraw=true
-  require('core.host').tick()
-  return platform.draws
+end}
 end
+return M

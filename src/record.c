@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <time.h>
+#ifndef COOLOO_RECORD_ONLY
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
@@ -39,6 +40,7 @@ static int win_cache_move(const char *a,const char *b){char wa[2048],wb[2048];re
 #include <unistd.h>
 #include <sys/file.h>
 #endif
+#endif /* !COOLOO_RECORD_ONLY */
 static int hex(char c) { return c >= '0' && c <= '9' ? c-'0' : c >= 'a' && c <= 'f' ? c-'a'+10 : -1; }
 static int id(const char *s) { size_t i; if (!s || strlen(s)!=64) return 0; for(i=0;i<64;i++) if(hex(s[i])<0)return 0; return 1; }
 static int string(const char **p, char *out, size_t cap)
@@ -74,6 +76,7 @@ int record_parse(const char *p,struct record *r)
        literal(&p,",\"content\":")||string(&p,r->content,sizeof r->content)||strcmp(p,"}"))return -1;
     return 0;
 }
+#ifndef COOLOO_RECORD_ONLY
 static int dir(const char *p){struct stat st;if(!mkdir(p,0700))return 0;if(errno==EEXIST&&!stat(p,&st)&&S_ISDIR(st.st_mode))return 0;fprintf(stderr,"cache directory failed: %s (errno=%d)\n",p,errno);return -1;}
 static int cache_path(char *p,size_t cap,const char *server,const char *self,const char *room)
 {
@@ -196,3 +199,4 @@ int cache_append_controlled(const char *server,const char *self,const char *room
 out:
     fclose(f);return rc;
 }
+#endif /* !COOLOO_RECORD_ONLY */

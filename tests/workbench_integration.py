@@ -23,32 +23,31 @@ with tempfile.TemporaryDirectory(prefix='cooloo-workbench-') as tmp:
     env = dict(os.environ, HOME=str(base), COOLOO_CONFIG=str(base/'config'), SDL_VIDEODRIVER='dummy')
     run([editor], dict(env, COOLOO_PROBE_STARTUP='1'))
     assert not (base/'config').exists() and not (base/'.cooloo').exists()
-    # A long-lived console child may spin forever without freezing the SDL host.
+    # Pure editor has neither message plugins nor a user execution runtime.
     offline_dev=base/'offline-dev';offline_dev.mkdir()
     run(['python3',root/'tools/embed_workbench.py',offline_dev/'workbench.lua','--lua','--offline'],env)
     with (offline_dev/'workbench.lua').open('a') as f:
         f.write('''
 local original=cooloo.frame
 local frames=0
-assert(cooloo.runtime.start(2))
-assert(cooloo.runtime.send(2,'while true do end'))
+assert(cooloo.runtime==nil)
+assert(not package.loaded['plugins.workspace'])
+assert(not package.loaded['plugins.console'])
 function cooloo.frame(events,dt)
   local draws=original(events,dt)
-  cooloo.runtime.poll(2)
   frames=frames+1
   if frames==30 then
-    cooloo.runtime.stop(2)
-    print('UI_ALIVE_AFTER_SPIN')
+    print('PURE_TEXT_READY')
     cooloo.quit()
   end
   return draws
 end
 ''')
     alive=run([editor,'--lua-dev',offline_dev],env)
-    assert 'UI_ALIVE_AFTER_SPIN' in alive.stdout
+    assert 'PURE_TEXT_READY' in alive.stdout
     assert not (base/'config').exists() and not (base/'.cooloo').exists()
     symbols = run(['nm', editor], env).stdout
-    for symbol in ['net_connect', 'cfg_identity_load', 'cache_read', 'noise_public_key']:
+    for symbol in ['net_connect', 'cfg_identity_load', 'cache_read', 'noise_public_key', 'runtime_dispatch', 'runtime_register']:
         assert symbol not in symbols, symbol
     for args in [[], ['--help'], ['--json','version']]:
         cli = run([root/'cooloo-cli', *args], env)

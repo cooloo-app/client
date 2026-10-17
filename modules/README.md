@@ -1,4 +1,8 @@
-# Client module boundaries (v0.3 development)
+# Client module boundaries (text/workbench separation)
+
+Development implementation: stages 1–4. Headless validation only; GUI testing
+and cross-platform release acceptance are deferred. `cooloo-text` is a full
+general-purpose editor product, not an offline messaging UI or a text widget.
 
 The Makefile's source sets, not directory names, enforce the link boundary.
 Existing stable client C files remain under `src/` to avoid unnecessary churn.
@@ -9,15 +13,23 @@ Existing stable client C files remain under `src/` to avoid unnecessary churn.
 | CLI | `src/main.c`, `cli.c`, `machine.c`, `win_console.c` | client |
 | platform | `src/gui.c`, `font.c`, `luabind.c`, `modules/platform/` | SDL3, Lua 5.4, fonts; client binding excluded for editor |
 | editor | `modules/editor/core/` | platform API, no messaging/config API |
-| workspace | `modules/workspace/` | editor + injected provider |
+| message model/projection | `modules/workbench/messages.lua` | Lua + injected record decoder; no editor |
+| workspace plugin | `modules/plugins/workspace/` | editor + message projection + injected provider |
 | runtime | `modules/runtime/` | Lua; SDL process API for host, no window/client dependency |
-| console | `modules/console/` | editor + injected runtime |
+| console session | `modules/workbench/console.lua` | Lua + injected runtime; no editor |
+| console plugin | `modules/plugins/console/` | editor + console session |
 | local adapter | `adapters/local/` | Lua standard library, explicit fixture file |
 | cooloo adapter | `adapters/cooloo/`, `lua/chat.lua` | client binding, same workspace contract |
-| composition | `apps/editor/workbench.lua` | selects provider, commands and panel layout |
+| text composition | `apps/editor/main.lua` | editor/platform only, ordinary documents |
+| full composition | `apps/workbench/gui.lua` | explicitly installs independent workspace/console plugins |
+| headless workbench | `apps/workbench/main.c`, `cli.lua` | model + shared record decoder + Lua runner; no SDL |
 
 `COOLOO_EDITOR_ONLY` excludes client includes, symbols, identity/config APIs and
-chat/provider embedded sources. `COOLOO_CLI_ONLY` excludes SDL, editor and runtime.
+chat/provider embedded sources. Its source set also excludes the runner/process
+runtime, and its explicit `text` bundle excludes all workbench business modules.
+`COOLOO_RECORD_ONLY` builds only the existing canonical record parser from
+`src/record.c`, without cache/config implementations; the CLI never needs to read
+credentials. `text`, `gui`, and `cli` bundle manifests are tested for isolation. `COOLOO_CLI_ONLY` excludes SDL, editor and runtime.
 `COOLOO_WORKBENCH` adds runner dispatch and explicit script client API to the full
 application, without changing normal CLI arguments or Machine API schema.
 
@@ -83,7 +95,17 @@ Send requires explicit text, never stdin. Script result capture is capped at
 or temporary-file growth. Request latency is the CLI's blocking latency inside
 the runner; Stop remains available in the UI. Trust is configured explicitly
 outside this API. Inspect JSONL errors and uncertainty; never blindly resend.
-Offline editor runners expose neither API.
+The pure editor has no runner. The standalone workbench runner exposes neither
+communication API; full-client runners retain their existing explicit APIs.
+
+Workspace and console plugins install their own commands and lifecycle handlers;
+the full composition only selects dependencies and schedules them. Virtual/read-only
+Doc and wrapped View remain editor mechanisms, not message-specific types.
+Message projections use UTC, stable message IDs and logical-line anchors. CLI file
+IDs use byte endpoints; source revisions are input byte lengths (not content hashes).
+Projection is not a write-back format. Console session state has no Doc dependency;
+only the plugin creates input/output documents. No arbitrary third-party plugin
+loading or hot-unload contract is introduced.
 
 For vendor provenance see `vendor/lite/README.md` and LICENSE. Lua core is based
 on rxi/lite, not Lite XL. Upstream module/plugin compatibility is not promised.

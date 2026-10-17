@@ -16,7 +16,7 @@ assert(table.concat(d.lines)==before and not d:is_dirty())
 assert(not pcall(function()d:save('/should-not-write')end))
 d:set_selection(2,2);d:set_projection('older\n中文\nhello',1);assert(select(1,d:get_selection())==3)
 local p=require('adapters.local').new()
-local w=require('workspace.model').new(p)
+local w=require('plugins.workspace.model').new(p)
 local messages,draft=w:select('<local>');draft:text_input('你好');assert(w:send());w:refresh()
 assert(messages.projection:find('你好',1,true));assert(#p:open('<local>')==1)
 local Wrapped=require 'core.wrappedview';local view=Wrapped(messages);view.size.x=90;view.size.y=100;view:layout()
@@ -37,7 +37,7 @@ for _,row in ipairs(view.rows)do assert(utf8.len(messages.lines[row.line]:sub(ro
 local delivery={state='pending'}
 local fake={open=function()return {}end,send=function()return true,'pending'end,
  delivery=function()return delivery end,subscribe=function()end,unsubscribe=function()end}
-local pending=require('workspace.model').new(fake)
+local pending=require('plugins.workspace.model').new(fake)
 local _,pd=pending:select('r');pd:text_input('keep me');assert(pending:send())
 delivery.state='rejected';pending:refresh();assert(pd.lines[1]:find('keep me',1,true))
 delivery.state='pending';assert(pending:send());pd:text_input(' edited')
@@ -49,21 +49,21 @@ local editdoc=Doc();editdoc:text_input('中文🙂');assert(utf8.len(editdoc.lin
 editdoc:undo();assert(editdoc.lines[1]=='\n');editdoc:redo();assert(editdoc.lines[1]=='中文🙂\n')
 local search=require 'core.doc.search'
 assert(search.find(editdoc,1,1,'文'))
-local busy=require('console').new{start=function()return true end,send=function()return false end}
+local busy=require('plugins.console').new{start=function()return true end,send=function()return false end}
 assert(not busy:submit('not queued') and #busy.history==0)
 local fixture=os.tmpname();local f=assert(io.open(fixture,'wb'));f:write('mock one\n中文 fixture\n');f:close()
 local imported=require('adapters.local').new();assert(imported:load(fixture));assert(#imported.messages==0)
 while imported.loading do imported:poll() end
 assert(#imported.messages==2 and imported.messages[2].text=='中文 fixture')
 imported:close();assert(not imported:send('<local>','closed'));os.remove(fixture)
-local con=require('console').new(cooloo.runtime)
+local con=require('plugins.console').new(cooloo.runtime)
 con:append('\228\184');assert(utf8.len(con.doc.projection))
 con:append('\173');assert(con.doc.projection=='中');con:clear()
 con:append('\255');assert(utf8.len(con.doc.projection));con:clear()
 con:submit('x=42');con:recall(-1);assert(con.input.lines[1]:find('x=42',1,true))
 con:append(string.rep('a',300000));assert(#con.output<=con.limit);assert(not con.doc:is_dirty())
 -- Exercise actual composition, event dispatch, drawing, editing and split commands.
-dofile('apps/editor/workbench.lua')
+dofile('apps/workbench/gui.lua')
 for i=1,3 do assert(type(cooloo.frame({},0.016))=='table') end
 cooloo.frame({{type='key',key='n',mod=1}},0.016)
 cooloo.frame({{type='text',text='print("你好")'}},0.016)

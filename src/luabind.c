@@ -654,13 +654,22 @@ static void register_api(void)
 
     luaL_newlib(L, top);
     platform_register(L);
+#ifndef COOLOO_EDITOR_ONLY
     runtime_register(L);
+#endif
 #ifdef COOLOO_WORKBENCH
     /* Workers start only after platform socket initialization on the host. */
     net_initialize();
     workbench_cache_register(L);
 #endif
 #ifdef COOLOO_EDITOR_ONLY
+    extern int cooloo_text_file_count;
+    extern char **cooloo_text_files;
+    lua_newtable(L);
+    for (int i=0;i<cooloo_text_file_count;i++) {
+        lua_pushstring(L,cooloo_text_files[i]);lua_rawseti(L,-2,i+1);
+    }
+    lua_setfield(L,-2,"text_files");
     lua_pushboolean(L, 1);
     lua_setfield(L, -2, "offline");
 #else
@@ -795,7 +804,9 @@ void luabind_shutdown(void)
             net_async_abort(&conns[i].a);conns[i].used=0;
         }
 #endif
+#ifndef COOLOO_EDITOR_ONLY
     runtime_shutdown();
+#endif
 #ifdef COOLOO_WORKBENCH
     workbench_cache_shutdown();
 #endif

@@ -400,7 +400,8 @@ function core.step()
 
   -- update window title
   local name = core.active_view:get_name()
-  local title = (name ~= "---") and (name .. " - cooloo") or "cooloo"
+  local app_name = core.app_name or 'cooloo-text'
+  local title = (name ~= "---") and (name .. " - " .. app_name) or app_name
   if title ~= core.window_title then
     system.set_window_title(title)
     core.window_title = title

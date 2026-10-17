@@ -5,7 +5,8 @@ local CommandView = require 'core.commandview'
 local StatusView = require 'core.statusview'
 local command = require 'core.command'
 local M = {}
-function M.init()
+function M.init(options)
+  core.app_name=(options and options.app_name) or 'cooloo'
   core.frame_start = 0
   core.clip_rect_stack = {{0, 0, 0, 0}}
   core.log_items, core.docs, core.project_files = {}, {}, {}

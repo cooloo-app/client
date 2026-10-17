@@ -34,9 +34,11 @@ CLIENT_SRC := src/net.c src/config.c src/record.c $(NOISE_SRC)
 CLI_SRC := src/main.c src/win_console.c src/cli.c src/machine.c
 CORE_SRC  := $(CLI_SRC) $(CLIENT_SRC)
 RUNTIME_SRC := modules/runtime/runner.c modules/runtime/process.c
-GUI_SRC   := src/gui.c src/font.c src/luabind.c modules/platform/api.c $(RUNTIME_SRC)
+TEXT_GUI_SRC := src/gui.c src/font.c src/luabind.c modules/platform/api.c
+GUI_SRC   := $(TEXT_GUI_SRC) $(RUNTIME_SRC)
 EMBED_SRC := $(BUILD)/embedded_workbench.c src/embedded_font.c
-EDITOR_SRC := apps/editor/main.c $(GUI_SRC) $(LUA_SRC) $(BUILD)/embedded_editor.c src/embedded_font.c
+EDITOR_SRC := apps/editor/main.c $(TEXT_GUI_SRC) $(LUA_SRC) $(BUILD)/embedded_editor.c src/embedded_font.c
+WORKBENCH_CLI_SRC := apps/workbench/main.c src/record.c modules/runtime/runner.c $(LUA_SRC) $(BUILD)/embedded_workbench_cli.c
 WORKBENCH_LUA := $(shell find modules adapters apps -name '*.lua')
 CFLAGS += -Imodules/platform -Imodules/runtime
 ALL_SRC   := $(CORE_SRC) $(GUI_SRC) adapters/cooloo/script.c adapters/cooloo/cache.c $(LUA_SRC) $(EMBED_SRC)
@@ -83,12 +85,21 @@ $(BUILD)/embedded_workbench.c: $(WORKBENCH_LUA) lua/chat.lua tools/embed_workben
 	python3 tools/embed_workbench.py $@
 
 $(BUILD)/embedded_editor.c: $(WORKBENCH_LUA) tools/embed_workbench.py tools/embed.py
-	python3 tools/embed_workbench.py $@ --offline
+	python3 tools/embed_workbench.py $@ --profile text
 
-editor: $(EDITOR_SRC) $(HEADERS) $(SDL_MAC_LIB)
-	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -Isrc $(SDL_MAC_INC) -o $@ $(EDITOR_SRC) $(MAC_LIBS)
+$(BUILD)/embedded_workbench_cli.c: $(WORKBENCH_LUA) tools/embed_workbench.py tools/embed.py
+	python3 tools/embed_workbench.py $@ --profile cli
 
-editor.exe: $(EDITOR_SRC) $(HEADERS) $(SDL_WIN_LIB) $(WIN_ICON)
+cooloo-workbench: $(WORKBENCH_CLI_SRC) $(HEADERS)
+	$(CC) $(CFLAGS) -DCOOLOO_RECORD_ONLY -DLUA_USE_POSIX -Isrc -Isrc/vendor/lua -o $@ $(WORKBENCH_CLI_SRC) -lm
+
+cooloo-workbench.exe: $(WORKBENCH_CLI_SRC) $(HEADERS)
+	$(WIN_CC) $(CFLAGS) -DCOOLOO_RECORD_ONLY -Isrc -Isrc/vendor/lua -o $@ $(WORKBENCH_CLI_SRC) -static -lm
+
+cooloo-text editor: $(EDITOR_SRC) $(HEADERS) $(SDL_MAC_LIB)
+	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -mmacosx-version-min=$(MACOS_MIN) -Isrc $(SDL_MAC_INC) -o $@ $(EDITOR_SRC) $(MAC_LIBS)
+
+cooloo-text.exe editor.exe: $(EDITOR_SRC) $(HEADERS) $(SDL_WIN_LIB) $(WIN_ICON)
 	$(WIN_CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(EDITOR_SRC) $(WIN_ICON) $(WIN_LIBS)
 
 cli.exe: $(CORE_SRC) $(HEADERS)
@@ -104,7 +115,7 @@ $(SDL_LINUX)/libSDL3.a:
 	$(CMAKE) -S src/vendor/sdl3 -B $(SDL_LINUX) $(SDL_CMAKE_FLAGS) -DSDL_RENDER=OFF -DSDL_METAL=OFF
 	$(CMAKE) --build $(SDL_LINUX) --parallel
 
-editor-linux: $(EDITOR_SRC) $(HEADERS) $(SDL_LINUX)/libSDL3.a
+cooloo-text-linux editor-linux: $(EDITOR_SRC) $(HEADERS) $(SDL_LINUX)/libSDL3.a
 	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -DLUA_USE_POSIX -Isrc $(SDL_MAC_INC) -o $@ $(EDITOR_SRC) $(SDL_LINUX)/libSDL3.a -lm -ldl -lpthread
 
 cooloo-linux: $(ALL_SRC) $(HEADERS) $(SDL_LINUX)/libSDL3.a
@@ -119,7 +130,7 @@ $(BUILD)/runtime-test.exe: tests/runtime_test.c modules/runtime/process.c $(LUA_
 test-workbench-macos: cooloo-cli $(BUILD)/lua-runner $(BUILD)/runtime-test-macos editor cooloo
 	$(BUILD)/lua-runner --lua-run tests/workbench.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
-	$(BUILD)/runtime-test-macos ./editor tests/runtime.lua
+	$(BUILD)/runtime-test-macos $(BUILD)/lua-runner tests/runtime.lua
 	COOLOO_TEST_EDITOR=$(CURDIR)/editor COOLOO_TEST_GUI=$(CURDIR)/cooloo python3 tests/workbench_integration.py
 
 $(BUILD)/runtime-test: tests/runtime_test.c modules/runtime/process.c $(LUA_SRC) $(SDL_LINUX)/libSDL3.a
@@ -128,8 +139,13 @@ $(BUILD)/runtime-test: tests/runtime_test.c modules/runtime/process.c $(LUA_SRC)
 test-workbench: cooloo-cli $(BUILD)/lua-runner $(BUILD)/runtime-test editor-linux cooloo-linux
 	$(BUILD)/lua-runner --lua-run tests/workbench.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
-	$(BUILD)/runtime-test ./editor-linux tests/runtime.lua
+	$(BUILD)/runtime-test $(BUILD)/lua-runner tests/runtime.lua
 	python3 tests/workbench_integration.py
+
+# Deliberately no GUI, SDL dummy, rendering or desktop tests in this target.
+test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner
+	$(BUILD)/lua-runner --lua-run tests/workbench_headless.lua
+	python3 tests/workbench_cli.py ./cooloo-workbench
 
 # loopback integration against the sibling server repo's coolood
 # (planner checkout layout: client and server are sibling submodules)
@@ -150,21 +166,22 @@ $(WIN_ICON): src/cooloo.rc assets/cooloo.ico
 	mkdir -p $(BUILD)
 	$(WIN_RC) -Isrc -i src/cooloo.rc -o $@
 
-release-windows: cooloo.exe
+release-windows: cooloo.exe cooloo-text.exe cooloo-workbench.exe cli.exe
 cooloo.exe: $(ALL_SRC) $(HEADERS) src/embedded_icon.h $(SDL_WIN_LIB) $(WIN_ICON)
 	$(WIN_CC) $(CFLAGS) -DCOOLOO_WORKBENCH -D__USE_MINGW_ANSI_STDIO=1 -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(ALL_SRC) $(WIN_ICON) $(WIN_LIBS)
 
-release-macos: cooloo
-	@echo "release-macos: ./cooloo (native $$(uname -m))"
+release-macos: cooloo cooloo-text cooloo-workbench cooloo-cli
+	@echo "release-macos: ./cooloo ./cooloo-text ./cooloo-workbench ./cooloo-cli (native $$(uname -m))"
 
 install: cooloo
 	install -m 0755 cooloo $(PREFIX)/bin/cooloo
 
 clean:
 	rm -f cooloo cooloo.exe cooloo-cli editor editor.exe cli.exe editor-linux cooloo-linux \
+		cooloo-text cooloo-text.exe cooloo-text-linux cooloo-workbench cooloo-workbench.exe $(BUILD)/embedded_workbench_cli.c \
 		$(BUILD)/embedded_workbench.c $(BUILD)/embedded_editor.c src/embedded_lua.c src/embedded_font.c
 
 distclean: clean
 	rm -rf $(BUILD)
 
-.PHONY: all test test-workbench test-workbench-macos install clean distclean release-windows release-macos
+.PHONY: all test test-workbench test-workbench-macos test-workbench-headless install clean distclean release-windows release-macos

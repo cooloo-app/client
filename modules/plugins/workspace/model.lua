@@ -1,4 +1,5 @@
 local Doc=require 'core.doc'
+local project=require('workbench.messages').project
 local M={}
 function M.new(provider)
   local self={provider=provider,documents={},drafts={},selected=nil,pending={}}
@@ -41,15 +42,8 @@ function M.new(provider)
     if revision and d.provider_revision==revision then return end
     d.provider_revision=revision
     local messages=self.provider:open(self.selected)
-    local lines, anchors, line = {}, {}, 1
-    for _,m in ipairs(messages) do
-      local block=('%s  %s\n%s\n'):format(os.date('%H:%M',m.ts or 0),m.from or '?',m.text)
-      lines[#lines+1]=block
-      anchors[m.id]=line
-      local _,count=block:gsub('\n','')
-      line=line+count+1
-    end
-    local text=table.concat(lines,'\n')
+    local projection=project(messages, {source_revision=revision})
+    local text,anchors=projection.text,projection.anchors
     if d.projection~=text then
       local delta=0
       for id,oldline in pairs(d.anchors or {}) do

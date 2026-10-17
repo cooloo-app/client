@@ -1,4 +1,4 @@
-local Doc=require 'core.doc'
+-- Headless console session; the injected runtime owns process execution.
 local function display_text(bytes)
   local out,i={},1
   while i<=#bytes do
@@ -17,14 +17,14 @@ end
 local M={}
 function M.new(runtime)
   local self={runtime=runtime,history={},history_index=1,output='',running={},limit=256*1024}
-  self.doc=Doc();self.doc.virtual=true;self.doc.readonly=true;self.doc.filename='Lua output'
-  self.input=Doc();self.input.virtual=true;self.input.filename='Lua console input'
+  self.visible=''
   function self:append(text)
     self.output=(self.output..text):sub(-self.limit)
     -- Drop a partial UTF-8 leading continuation after clipping the bounded buffer.
     self.output=self.output:gsub('^[\128-\191]+','')
     local visible=display_text(self.output)
-    self.doc:set_projection(visible);self.doc.projection=visible
+    self.visible=visible
+    if self.on_output then self.on_output(visible) end
   end
   function self:start(slot,file)
     local ok,err=self.runtime.start(slot,file)
@@ -44,7 +44,7 @@ function M.new(runtime)
   end
   function self:recall(delta)
     self.history_index=math.max(1,math.min(#self.history+1,self.history_index+delta))
-    self.input:set_projection(self.history[self.history_index] or '')
+    return self.history[self.history_index] or ''
   end
   function self:stop(slot)
     self.runtime.stop(slot);self.running[slot]=false;self:append('[stopped '..slot..']\n')

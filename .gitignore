@@ -6,6 +6,11 @@
 /cli.exe
 /editor-linux
 /cooloo-linux
+/cooloo-text
+/cooloo-text.exe
+/cooloo-text-linux
+/cooloo-workbench
+/cooloo-workbench.exe
 
 /release/lite-v1.11-windows/
 /release/lite-xl/
