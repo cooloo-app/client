@@ -1,6 +1,34 @@
-# cooloo client — development artifact refresh (2026-10-17, untagged)
+# cooloo client — development artifact refresh (2026-10-18, untagged)
 
-## Latest: Windows text editor Lite-baseline update
+## Latest: Windows text editor caret alignment fix (2026-10-18)
+
+Only `cooloo-text-windows-x86_64.exe` is refreshed. Other seven artifacts retain
+previous provenance. This supersedes earlier Windows text artifact notes below.
+
+- Font fix source commit: `b57a6407de83afdbb5381e1febbfb6aee84ce0b4`.
+  Glyph advances are rounded once in the font cache and shared by text width
+  and drawing, eliminating cumulative caret/selection/hit-test drift while
+  preserving the existing per-glyph drawing spacing.
+- Build includes pre-existing, uncommitted event-bridge/IME working-tree changes;
+  those changes are not part of the caret-fix commit. This is a working-tree
+  snapshot build, **not a clean-commit build or a tagged release**.
+- Exact input archive (client + sibling server, excluding release files) SHA-256:
+  `effc467f3c1ae47f61e6398de539182ad1aab9a04812b9d25bcac03b3554aa07`.
+  Server source: `de4f3d21aecaa2190564c329608c02a9decd8010`; not built or used.
+- Isolated m106 build: `/tmp/cooloo-caret-fix-cWFJR5/client`, MinGW GCC 16.2.0,
+  `make -j4 cooloo-text.exe` only.
+- Installed artifact: **4,167,201 bytes**, SHA-256
+  `5a33a47a2f16980df00aed9dfa6758069411d00a429d2632df2a450be46ba8ae`.
+  Transfer and installed-file hashes matched. Static inspection: PE32+ x86_64,
+  GUI subsystem, system DLL imports only.
+- **No tests or application execution performed, at explicit user request.**
+  Caret alignment, selection, mouse hit testing and IME desktop acceptance remain
+  unverified for this build. Earlier test results are not this build's results.
+- The running local editor was not terminated: its old executable was moved to
+  local temporary backup before installing the new artifact. Restart the editor
+  to use the refreshed binary. No tag, GitHub Release or Python publication.
+
+## Previous: Windows text editor Lite-baseline update
 
 Only `cooloo-text-windows-x86_64.exe` is replaced by this update. Other seven
 artifacts below retain their earlier provenance and behavior.
@@ -80,7 +108,7 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 | cooloo-darwin-arm64 | 2740680 | 19dbe8447c5c46d1a0ef572df8a4b704bbdab6ec401fc9b3ae4fc3c76e183bcd |
 | cooloo-windows-x86_64.exe | 4313940 | d62d3e6634ba4873a79c607bbcaa53f8c3161e6a3fab7f5e77d3716406b8e023 |
 | cooloo-text-darwin-arm64 | 2546888 | 8b7034f26ddbb4f32c8f265959b7fc50cb094296d2d8ca5703086e51f89435a5 |
-| cooloo-text-windows-x86_64.exe | 4164921 | e19f842d07ac76b58fcde34155ea0c8056abcd8b2b729d0d79b1350775fe4bd6 |
+| cooloo-text-windows-x86_64.exe | 4167201 | 5a33a47a2f16980df00aed9dfa6758069411d00a429d2632df2a450be46ba8ae |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
 | cooloo-workbench-windows-x86_64.exe | 645198 | 6bba542e60c7eef4d61094720f7ab8b4d18a917fe04d181d377f2baf7d4fe6c3 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
