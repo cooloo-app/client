@@ -1,6 +1,32 @@
 # cooloo client — development artifact refresh (2026-10-18, untagged)
 
-## Latest: Windows text editor caret alignment fix (2026-10-18)
+## Latest: Lite native baseline restoration — all products (2026-10-18)
+
+All eight product artifacts were rebuilt from committed client source
+`2fc9021f48ab343a8e1c46893eca711d43ab8643` using `git archive` exports.
+This supersedes all older artifact provenance and pending-replacement notes below.
+
+- Isolated m106 directory: `/tmp/cooloo-lite-release.gbPiU3/client`.
+  Apple clang 21.0.0 and MinGW GCC 16.2.0; vendored SDL3/Lua; macOS target 11.0.
+- Commands: `make release-macos release-windows`; exit code 0.
+  Native renderer/font userdata, dirty-region cache, event bridge/IME and fatal
+  recovery changes are included in the GUI and standalone text products.
+- Client input archive SHA-256:
+  `27914b3b224cc4efbb4d703ccd7d35e66d84a5c9e14b4bbdcad7c6e91fc65640`.
+  Sibling server export: `de4f3d21aecaa2190564c329608c02a9decd8010`;
+  not built, run or used by this artifact refresh.
+- All eight remote, staging and installed-file SHA-256 values matched; see the
+  current artifact table below. Both macOS headless files are byte-identical to
+  their prior versions; they were rebuilt and installed nonetheless.
+- Static inspection only: Mach-O arm64 / PE32+ x86_64, expected GUI/console
+  subsystems, macOS system libraries and Windows system DLL imports only.
+- **No tests or application execution performed, at explicit user request.**
+  Earlier source-validation results do not constitute acceptance of these newly
+  built artifacts. Real IME/candidates, drag/drop, cross-window key release,
+  multi-display DPI, clipboard and visual acceptance remain outstanding.
+- Development refresh only: no new tag, GitHub Release or Python publication.
+
+## Historical: Windows text editor caret alignment fix (2026-10-18)
 
 Only `cooloo-text-windows-x86_64.exe` is refreshed. Other seven artifacts retain
 previous provenance. This supersedes earlier Windows text artifact notes below.
@@ -28,7 +54,53 @@ previous provenance. This supersedes earlier Windows text artifact notes below.
   local temporary backup before installing the new artifact. Restart the editor
   to use the refreshed binary. No tag, GitHub Release or Python publication.
 
-## Previous: Windows text editor Lite-baseline update
+## Historical pending note: Windows text editor Lite event bridge + IME fix
+
+The pending/replacement status in this historical note is superseded by the
+installed caret-fix artifact above.
+
+The new Windows text artifact is validated and staged, **not installed here yet**.
+Replacement was blocked by a running local editor holding the existing exe open.
+Save and close it before replacement. All eight release binaries currently retain
+previous provenance; shared-source fixes do not update those binaries.
+The intended replacement is only `cooloo-text-windows-x86_64.exe`.
+
+- Source: `3e7a07961c758face3e0975eb9e06789b7925972` **plus uncommitted working-tree
+  changes**. This is not a clean-commit build or a tagged release.
+- Build input archive (client + sibling server sources, excluding release files)
+  SHA-256: `f794848d18cbea4aeff82f2995ec003d9e19cc4edf4e4dc9eaa29f2b14621868`.
+  Release documentation was updated after building; code inputs were compared
+  against the archive before attempting replacement.
+- Isolated m106 build: `/tmp/cooloo-event-fix-13L1ON/client`, Apple clang 21.0.0
+  and MinGW GCC 16.2.0. macOS text/full GUI and Windows text/test harness built.
+- Staged Windows text (`temp/event-artifacts/cooloo-text.exe` in planner):
+  **4,167,201 bytes**, SHA-256
+  `29191b8147a777b7bb606ebdd14fb8c4e99abdbda37a802186330b2f1d099f47`.
+  PE32+ x86_64, GUI subsystem, system DLL imports only. Transfer hashes verified.
+- Input now ports Lite's C `system.poll_event` to SDL3, removing the GUI event
+  array, modifier snapshots and facade event filtering. Key press/release,
+  mouse, resize/expose and focus handling follow Lite. IME is a separate
+  Lite XL-derived increment; see [event contract](../modules/EVENTS.md).
+- Passed **macOS and native Windows SDL dummy event-bridge regression**:
+  SDL_PushEvent → production C poll → Lua core/keymap/DocView, four split
+  shortcuts then plain/Shift click, releases/AltGr, drag release, IME ordering,
+  UTF-8 composition, commit/undo, cancellation and event-driven redraw.
+- Passed macOS `tests/editor_integration.py` (normal + safe),
+  `make test-workbench-macos` (including runtime and isolated loopback provider
+  integration), and local headless/workbench/provider tests. Integration server
+  source: `de4f3d21aecaa2190564c329608c02a9decd8010`; no production service used.
+- **Windows editor application integration did not pass**: the temporary
+  PowerShell fixture/argument wrapper failed startup assertions and timed out.
+  Further Windows GUI/dummy application attempts were stopped at user request.
+  Two residual isolated test editor processes were stopped; none remained.
+  This does not invalidate the independently passed Windows event-bridge test.
+- **Not verified on either desktop:** real IME preedit/candidates, Alt-Tab,
+  activation click-through, outside-window capture, OS drops or clipboard.
+  SDL dummy is not desktop acceptance. Preedit uses plain text on the affected
+  line, clips at the pane edge and does not collapse multi-line selection layout.
+- No commit, push, tag, GitHub Release or Python publication performed.
+
+## Previous: Windows text editor Lite-baseline update (2026-10-17)
 
 Only `cooloo-text-windows-x86_64.exe` is replaced by this update. Other seven
 artifacts below retain their earlier provenance and behavior.
@@ -105,17 +177,17 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
-| cooloo-darwin-arm64 | 2740680 | 19dbe8447c5c46d1a0ef572df8a4b704bbdab6ec401fc9b3ae4fc3c76e183bcd |
-| cooloo-windows-x86_64.exe | 4313940 | d62d3e6634ba4873a79c607bbcaa53f8c3161e6a3fab7f5e77d3716406b8e023 |
-| cooloo-text-darwin-arm64 | 2546888 | 8b7034f26ddbb4f32c8f265959b7fc50cb094296d2d8ca5703086e51f89435a5 |
-| cooloo-text-windows-x86_64.exe | 4167201 | 5a33a47a2f16980df00aed9dfa6758069411d00a429d2632df2a450be46ba8ae |
+| cooloo-darwin-arm64 | 2827080 | 59eb85349b4b87a70ef275d8869cf235dec0fe819280cd91b508032572d3bc16 |
+| cooloo-windows-x86_64.exe | 4401747 | 3f90764aa16b814e0ff57f63c82f666528a986dfef93999623d2ba411bc56e6d |
+| cooloo-text-darwin-arm64 | 2650056 | ddfe93aadf4102b0f12c3797db66905922d0ddf58251c8c23a7eb4aac2aa1351 |
+| cooloo-text-windows-x86_64.exe | 4207980 | 2fbd527db8c63bcc27a4ef192020d57f4567280ea7606d8fb08edc38f334720e |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
-| cooloo-workbench-windows-x86_64.exe | 645198 | 6bba542e60c7eef4d61094720f7ab8b4d18a917fe04d181d377f2baf7d4fe6c3 |
+| cooloo-workbench-windows-x86_64.exe | 645198 | d45e0de2ce1dc74e9f10aa58ce3836ef1a8c312b2b21b28f2c8e65f2a7fae8f7 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
-| cooloo-cli-windows-x86_64.exe | 603010 | a7c75d0ec7f39572f2c8eb72adf29c0adfb7b85dd0f5782ea1cdd6aebab9eb49 |
+| cooloo-cli-windows-x86_64.exe | 603010 | ce51f081e29f7c3c80239e13303f281279c19093387cf6f9f0828dfa41b3954f |
 
 SHA-256 values were computed on m106 and rechecked after retrieval to local
-staging. All four Windows artifact hashes also matched on m101.
+staging and installation. This refresh did not transfer or run artifacts on m101.
 
 ## Earlier refresh's validation (not the latest text test scope)
 
