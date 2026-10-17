@@ -12,6 +12,7 @@
 #include "gui.h"
 #include "font.h"
 #include "luabind.h"
+#include "api.h"
 #ifndef COOLOO_EDITOR_ONLY
 #include "config.h"
 #endif
@@ -243,6 +244,10 @@ static void translate(SDL_Event *ev)
         luabind_ev_mouse("wheel", 0, 0, 0, wx, wy);
         break;
     }
+    case SDL_EVENT_DROP_FILE:
+        if (ev->drop.data)
+            luabind_ev_drop(ev->drop.data, (int)ev->drop.x, (int)ev->drop.y);
+        break;
     case SDL_EVENT_WINDOW_RESIZED:
         scr_w = ev->window.data1;
         scr_h = ev->window.data2;
@@ -322,26 +327,29 @@ int cooloo_gui_run(const char *lua_dev_dir)
         fprintf(stderr, "probe: lua+font ready %llu ms\n",
                 (unsigned long long)SDL_GetTicks());
 
-    last = SDL_GetTicks();
+    last = SDL_GetTicksNS();
     while (!quit) {
-        Uint64 now = SDL_GetTicks();
-        double dt = (double)(now - last) / 1000.0;
+        Uint64 now = SDL_GetTicksNS();
+        double dt = (double)(now - last) / 1e9;
         SDL_Event ev;
 
         last = now;
         luabind_events_begin();
-        if (SDL_WaitEventTimeout(&ev, 16)) {        /* ~60fps cap (D30) */
+        /* Lite loop: poll, update/draw once, then sleep the remainder of 1/fps.
+         * Incoming events never accelerate the editor's per-frame timers. */
+        while (SDL_PollEvent(&ev))
             translate(&ev);
-            while (SDL_PollEvent(&ev))
-                translate(&ev);
-        }
         luabind_net_pump();
         quit = luabind_frame(dt);
         if (getenv("COOLOO_PROBE_STARTUP")) {   /* acceptance measurement */
             fprintf(stderr, "cooloo gui: first frame in %llu ms\n",
-                    (unsigned long long)(SDL_GetTicks() - last));
+                    (unsigned long long)((SDL_GetTicksNS() - last) / 1000000));
             break;
         }
+        Uint64 elapsed = SDL_GetTicksNS() - now;
+        Uint64 period = (Uint64)(platform_frame_period() * 1e9);
+        if (!quit && elapsed < period)
+            SDL_DelayNS(period - elapsed);
     }
 
 #ifndef COOLOO_EDITOR_ONLY

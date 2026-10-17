@@ -1,7 +1,26 @@
 -- Lite API facade over the SDL3 host. Drawing is emitted to the existing canvas.
 local api = cooloo
 local M = {draws={}, events={}, event_index=0}
-SCALE, EXEDIR, PATHSEP, EXEFILE, ARGS = 1, '.', '/', '', {}
+SCALE, EXEDIR, PATHSEP, EXEFILE, ARGS = 1, api.platform.exedir, package.config:sub(1,1), api.platform.exefile, {}
+USERDIR = api.platform.userdir
+-- External Lua is opt-in for the workbench, enabled by default only for text.
+if api.text_files and not api.safe_mode then
+  package.path = USERDIR .. '/?.lua;' .. USERDIR .. '/?/init.lua;'
+    .. EXEDIR .. '/data/?.lua;' .. EXEDIR .. '/data/?/init.lua'
+  -- Embedded modules remain authoritative; user plugins may add new modules.
+  table.insert(package.searchers, 2, function(name)
+    local relative = name:match('^user%.(.+)$')
+    if not relative then return '\n\tnot a user module' end
+    local path = USERDIR .. '/' .. relative:gsub('%.', '/')
+    local filename
+    if api.platform.info(path .. '.lua') then filename = path .. '.lua'
+    elseif api.platform.info(path .. '/init.lua') then filename = path .. '/init.lua' end
+    if filename then return assert(loadfile(filename)), filename end
+    return '\n\tno user module ' .. name
+  end)
+elseif api.safe_mode then
+  package.path, package.cpath = '', ''
+end
 local function color(c) return (c[1] or 0)*65536 + (c[2] or 0)*256 + (c[3] or 0) end
 local function emit(op) M.draws[#M.draws+1] = op end
 local Font = {}
@@ -30,7 +49,9 @@ system = {
   set_cursor=api.platform.cursor, set_window_title=api.platform.title,
   set_window_mode=api.platform.mode, show_confirm_dialog=api.platform.confirm,
   list_dir=api.platform.list_dir, get_file_info=api.platform.info,
-  absolute_path=api.platform.absolute_path,
+  absolute_path=api.platform.absolute_path, chdir=api.platform.chdir,
+  exec=api.platform.exec, open_project=api.platform.open_project,
+  sleep=api.platform.sleep,
   fuzzy_match=function(s,query)
     s,query=s:lower(),query:lower()
     local at, score=1,0
@@ -50,14 +71,15 @@ system = {
 -- Strict globals are installed by core after the facade is initialized.
 local keymap
 function M.events_begin(events)
-  M.events, M.event_index = {}, 0
+  M.events, M.event_index, M.draws = {}, 0, {}
   keymap=keymap or require 'core.keymap'
   local function push(...) M.events[#M.events+1]={...} end
   for _, e in ipairs(events) do
     if e.type=='key' then
       -- Modifiers belong to each key event; no sticky modifier state on focus loss.
-      push('hostkey',e.key,e.mod)
+      if not M.preedit or M.preedit=='' then push('keypressed',e.key,e.mod) end
     elseif e.type=='text' then M.preedit='';push('textinput',e.text)
+    elseif e.type=='filedropped' then push('filedropped',e.path,e.x,e.y)
     elseif e.type=='quit' then push('quit')
     elseif e.type=='mouse' then
       local button=({[1]='left',[2]='middle',[3]='right'})[e.button] or 'left'
@@ -70,17 +92,16 @@ function M.events_begin(events)
 end
 function M.install()
   local core=require 'core'
-  local old=core.on_event
-  core.on_event=function(kind,...)
-    if kind=='hostkey' then
-      local key,mod=...
-      keymap.modkeys.ctrl=(mod & 9)~=0
-      keymap.modkeys.alt=(mod & 2)~=0
-      keymap.modkeys.shift=(mod & 4)~=0
-      if M.preedit and M.preedit~='' then return false end
-      return old('keypressed',key)
+  local on_event=core.on_event
+  core.on_event=function(kind, ...)
+    if kind=='keypressed' then
+      local _,mod=...
+      if mod then
+        local keys=require('core.keymap').modkeys
+        keys.ctrl=(mod & 9)~=0; keys.alt=(mod & 2)~=0; keys.shift=(mod & 4)~=0
+      end
     end
-    return old(kind,...)
+    return on_event(kind,...)
   end
   local DV=require 'core.docview'
   local draw=DV.draw

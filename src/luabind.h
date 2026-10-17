@@ -17,6 +17,7 @@ void luabind_ev_text(const char *text);
 void luabind_ev_ime(const char *text, int cursor);
 void luabind_ev_mouse(const char *kind, int x, int y, int button,
                       int wx, int wy);
+void luabind_ev_drop(const char *path, int x, int y);
 void luabind_ev_resize(int w, int h);
 void luabind_ev_quit(void);
 

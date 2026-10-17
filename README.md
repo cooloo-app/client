@@ -18,9 +18,13 @@ make test-workbench             # Linux headless + SDL dummy + loopback tests
 make test-workbench-macos       # macOS workbench/runtime + SDL dummy + loopback tests
 ```
 
-`cooloo-text [FILE ...]` is the standalone general-purpose text editor, built on
-the same Lite-derived editor core and SDL3/Chinese-input platform as the full
-product. It opens an ordinary empty document when no files are supplied. It does
+`cooloo-text [--safe-mode] [FILE|DIR ...]` is the standalone general-purpose text editor, built on
+ the same Lite-derived editor core and SDL3/Chinese-input platform as the full
+product. It supports project scanning, file/directory drops, Lite's 16 default
+plugins and user/project Lua extensions. See [editor guide](modules/EDITOR.md)
+for directory layout, trust policy and validation. Normal mode executes trusted
+user/project modules; `--safe-mode` skips external extensions. It opens an
+ordinary empty document when no files are supplied. It does
 not bundle message/workspace/console plugins, link the execution runtime or client
 network/identity/cache core, or read/write `~/.cooloo`. Existing `editor`,
 `editor.exe`, `editor-linux` build names remain aliases with this new pure-editor
@@ -51,8 +55,10 @@ errors return 2. UTF-8, CRLF and a final record without LF are supported.
 terminal emulator or interactive line-oriented shell. Scripts are not sandboxed.
 
 Development artifacts for all four products on macOS arm64 and Windows x86_64
-have been refreshed from committed source. Cross-platform builds and headless
-checks have passed; GUI/desktop acceptance remains deferred. See
+were refreshed from committed source; the Windows text exe has a subsequent
+Lite-baseline update built from the documented working-tree snapshot.
+Cross-platform builds, headless checks and text SDL dummy integration have passed;
+real GUI/desktop acceptance remains deferred. See
 [release/README.md](release/README.md) for exact provenance, hashes and test scope.
 `make release-macos` / `make release-windows` build all four products without
 publishing, tagging or uploading a Release.

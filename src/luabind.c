@@ -163,6 +163,15 @@ void luabind_ev_mouse(const char *kind, int x, int y, int button,
     ev_commit();
 }
 
+void luabind_ev_drop(const char *path, int x, int y)
+{
+    ev_begin("filedropped");
+    ev_s("path", path);
+    ev_i("x", x);
+    ev_i("y", y);
+    ev_commit();
+}
+
 void luabind_ev_resize(int w, int h)
 {
     ev_begin("resize");
@@ -664,6 +673,8 @@ static void register_api(void)
 #endif
 #ifdef COOLOO_EDITOR_ONLY
     extern int cooloo_text_file_count;
+    extern int cooloo_text_safe_mode;
+    lua_pushboolean(L,cooloo_text_safe_mode);lua_setfield(L,-2,"safe_mode");
     extern char **cooloo_text_files;
     lua_newtable(L);
     for (int i=0;i<cooloo_text_file_count;i++) {

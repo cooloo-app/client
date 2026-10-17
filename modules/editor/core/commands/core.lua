@@ -85,7 +85,9 @@ command.add(nil, {
   end,
 
   ["core:open-user-module"] = function()
-    core.root_view:open_doc(core.open_doc(EXEDIR .. "/data/user/init.lua"))
+      local filename = EXEDIR .. '/data/user/init.lua'
+      if not system.get_file_info( filename ) then filename = USERDIR .. '/init.lua' end
+      core.root_view:open_doc(core.open_doc(core.user_module or filename))
   end,
 
   ["core:open-project-module"] = function()

@@ -27,9 +27,13 @@ local function project_scan_thread()
     return a.filename < b.filename
   end
 
+  local visited
   local function get_files(path, t)
     coroutine.yield()
     t = t or {}
+    local absolute = system.absolute_path(path)
+    if visited[absolute] then return t end
+    visited[absolute] = true
     local size_limit = config.file_size_limit * 10e5
     local all = system.list_dir(path) or {}
     local dirs, files = {}, {}
@@ -62,6 +66,7 @@ local function project_scan_thread()
   while true do
     -- get project files and replace previous table if the new table is
     -- different
+    visited = {}
     local t = get_files(".")
     if diff_files(core.project_files, t) then
       core.project_files = t
@@ -74,7 +79,11 @@ local function project_scan_thread()
 end
 
 
-function core.init()
+function core.init(options)
+  options = options or {}
+  core.app_name = options.app_name or 'cooloo'
+  core.safe_mode = options.safe_mode or false
+  core.project_enabled = options.project or false
   command = require "core.command"
   keymap = require "core.keymap"
   RootView = require "core.rootview"
@@ -82,18 +91,22 @@ function core.init()
   CommandView = require "core.commandview"
   Doc = require "core.doc"
 
-  local project_dir = EXEDIR
+  -- Resolve every argument before chdir, including files that do not exist yet.
+  local project_dir = system.absolute_path('.')
   local files = {}
-  for i = 2, #ARGS do
-    local info = system.get_file_info(ARGS[i]) or {}
-    if info.type == "file" then
-      table.insert(files, system.absolute_path(ARGS[i]))
-    elseif info.type == "dir" then
-      project_dir = ARGS[i]
+  for _, path in ipairs(options.files or {}) do
+    local absolute = system.absolute_path(path)
+    local info = system.get_file_info(absolute) or {}
+    if info.type == 'dir' then
+      project_dir = absolute
+    else
+      table.insert(files, absolute)
     end
   end
-
-  system.chdir(project_dir)
+  if core.project_enabled then
+    system.chdir(project_dir)
+    core.project_dir = system.absolute_path('.')
+  end
 
   core.frame_start = 0
   core.clip_rect_stack = {{ 0,0,0,0 }}
@@ -110,14 +123,22 @@ function core.init()
   core.root_view.root_node:split("down", core.command_view, true)
   core.root_view.root_node.b:split("down", core.status_view, true)
 
-  core.add_thread(project_scan_thread)
+  if core.project_enabled then core.add_thread(project_scan_thread) end
   command.add_defaults()
-  local got_plugin_error = not core.load_plugins()
-  local got_user_error = not core.try(require, "user")
-  local got_project_error = not core.load_project_module()
+  local got_plugin_error, got_user_error, got_project_error = false, false, false
+  if core.project_enabled then
+    got_plugin_error = not core.load_plugins()
+    if not core.safe_mode then
+      got_user_error = not core.load_user_module()
+      got_project_error = not core.load_project_module()
+    end
+  else
+    -- Full workbench does not discover or execute external editor extensions.
+    require 'plugins.language_lua'
+  end
 
   for _, filename in ipairs(files) do
-    core.root_view:open_doc(core.open_doc(filename))
+    core.try(function() core.root_view:open_doc(core.open_doc(filename)) end)
   end
 
   if got_plugin_error or got_user_error or got_project_error then
@@ -174,9 +195,24 @@ end
 
 function core.load_plugins()
   local no_errors = true
-  local files = system.list_dir(EXEDIR .. "/data/plugins")
-  for _, filename in ipairs(files) do
-    local modname = "plugins." .. filename:gsub(".lua$", "")
+  local names = {}
+  for _, name in ipairs(require 'core.plugin_manifest') do names[name] = true end
+  if not core.safe_mode then
+    for _, dir in ipairs { EXEDIR .. '/data/plugins', USERDIR .. '/plugins' } do
+      for _, filename in ipairs(system.list_dir(dir) or {}) do
+        local name = filename:match('^(.*)%.lua$')
+        if not name then
+          local info = system.get_file_info(dir .. '/' .. filename .. '/init.lua')
+          if info and info.type == 'file' then name = filename end
+        end
+        if name then names['plugins.' .. name] = true end
+      end
+    end
+  end
+  local sorted = {}
+  for name in pairs(names) do table.insert(sorted, name) end
+  table.sort(sorted)
+  for _, modname in ipairs(sorted) do
     local ok = core.try(require, modname)
     if ok then
       core.log_quiet("Loaded plugin %q", modname)
@@ -185,6 +221,18 @@ function core.load_plugins()
     end
   end
   return no_errors
+end
+
+
+function core.load_user_module()
+  for _, filename in ipairs { USERDIR .. '/init.lua', EXEDIR .. '/data/user/init.lua' } do
+    if system.get_file_info(filename) then
+      core.user_module = filename
+      package.preload.user = function() return assert(loadfile(filename))() end
+      return core.try(require, 'user')
+    end
+  end
+  return true
 end
 
 
@@ -259,7 +307,17 @@ function core.open_doc(filename)
     end
   end
   -- no existing doc for filename; create new
-  local doc = require('core.doc')(filename)
+  local doc = require('core.doc')()
+  if filename then
+    local info = system.get_file_info(filename)
+    if info then
+      assert(info.type == 'file', 'not a regular file: ' .. filename)
+      doc:load(filename)
+    else
+      doc.filename = filename
+      doc:reset_syntax()
+    end
+  end
   table.insert(core.docs, doc)
   core.log_quiet(filename and "Opened doc \"%s\"" or "Opened new doc", filename)
   return doc
@@ -342,12 +400,14 @@ function core.on_event(type, ...)
     local filename, mx, my = ...
     local info = system.get_file_info(filename)
     if info and info.type == "dir" then
-      system.exec(string.format("%q %q", EXEFILE, filename))
+      assert(core.project_enabled, 'Directory projects are opened by cooloo-text, not the workbench')
+      system.open_project(filename, core.safe_mode)
     else
       local ok, doc = core.try(core.open_doc, filename)
       if ok then
         local node = core.root_view.root_node:get_child_overlapping_point(mx, my)
-        node:set_active_view(node.active_view)
+        -- Locked sidebars/status bars are not document panes.
+        if node and not node.locked then node:set_active_view(node.active_view) end
         core.root_view:open_doc(doc)
       end
     end
@@ -401,6 +461,7 @@ function core.step()
   -- update window title
   local name = core.active_view:get_name()
   local app_name = core.app_name or 'cooloo-text'
+  if core.project_dir then app_name = app_name .. ' [' .. core.project_dir .. ']' end
   local title = (name ~= "---") and (name .. " - " .. app_name) or app_name
   if title ~= core.window_title then
     system.set_window_title(title)
@@ -448,6 +509,8 @@ local run_threads = coroutine.wrap(function()
   end
 end)
 
+
+core.run_threads = run_threads
 
 function core.run()
   while true do

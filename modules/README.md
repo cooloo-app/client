@@ -68,9 +68,13 @@ Provider contract:
 - Local mock import is incremental (4 KiB/tick), validates 4096-byte UTF-8 lines,
   and retains the latest 2000 in-memory messages. Fixture text is never executed.
 
-The platform C loop owns SDL events, network pump and frame pacing. Lite's
-`core.run()` is not invoked. `core.host` schedules editor coroutines. No automatic
-execution of `.lite_project.lua`, user modules or received message text.
+The platform C loop owns SDL events, network pump and Lite-style fixed FPS pacing
+(poll → step/draw → coroutine work → sleep remainder). Lite's `core.run()` is not
+invoked; `core.host` reuses `core.init` and the upstream coroutine scheduler.
+Text enables project scanning, all default plugins, user and project modules;
+`--safe-mode` disables external extension loading. Full workbench retains the
+stricter no-discovery/no-project-script policy. Received message text is never
+executed. See [EDITOR.md](EDITOR.md) for the extension and trust contract.
 
 Runtime modes:
 
@@ -105,8 +109,11 @@ Doc and wrapped View remain editor mechanisms, not message-specific types.
 Message projections use UTC, stable message IDs and logical-line anchors. CLI file
 IDs use byte endpoints; source revisions are input byte lengths (not content hashes).
 Projection is not a write-back format. Console session state has no Doc dependency;
-only the plugin creates input/output documents. No arbitrary third-party plugin
-loading or hot-unload contract is introduced.
+only the plugin creates input/output documents. Third-party Lua editor plugins
+are loaded only by text's explicit composition policy; no hot-unload contract
+or OS sandbox is introduced.
 
 For vendor provenance see `vendor/lite/README.md` and LICENSE. Lua core is based
-on rxi/lite, not Lite XL. Upstream module/plugin compatibility is not promised.
+on rxi/lite, not Lite XL. The 16 default plugins and Lite-style Lua extension
+model are supported as described in EDITOR.md; arbitrary native/third-party
+plugin compatibility is not promised.

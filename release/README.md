@@ -1,5 +1,43 @@
 # cooloo client — development artifact refresh (2026-10-17, untagged)
 
+## Latest: Windows text editor Lite-baseline update
+
+Only `cooloo-text-windows-x86_64.exe` is replaced by this update. Other seven
+artifacts below retain their earlier provenance and behavior.
+
+- Source: `6d3b4fd64b23e3c2a48377ee701eeecbd55cde15` **plus uncommitted working-tree
+  changes** implementing Lite host/project/plugins stages 0–5. Not a clean-commit
+  build and not a tagged release.
+- Snapshot (tracked + new source, excluding release binaries) SHA-256:
+  `4bbfe7482f6dd037085d1eafc55c7684ceb59739d9eba0e9f67c6641d366dab2`.
+- Isolated m106 tree: `/tmp/cooloo-text-lite-20261017-2241/client`; Apple clang
+  21.0.0 and MinGW GCC 16.2.0. `make cooloo-text.exe cooloo-text build/lua-runner`
+  passed. macOS text was built/tested for validation, not copied to release.
+- Windows artifact: 4,164,921 bytes; SHA-256
+  `e19f842d07ac76b58fcde34155ea0c8056abcd8b2b729d0d79b1350775fe4bd6`.
+  Rechecked after transfer to local staging and Windows m101. PE32+ x86_64 GUI,
+  system DLL imports only; no communication/cache/runner entry-point symbols.
+- Passed `tests/editor_integration.py` on m106 and native Windows m101 with SDL
+  dummy: normal + safe mode, 16 plugins, extension order and load-error recovery,
+  user helper modules, project scan/Ctrl+P/project search, pane drop dispatch,
+  macro replay, dirty-file reload protection, final newline/CRLF, virtual/readonly,
+  Chinese file/project paths, 60-frame pacing and actual argv directory child
+  launch with spaces/Unicode/shell metacharacters.
+- Passed workbench Doc/View/composition and provider tests on m106 and locally;
+  local `make test-workbench-headless` passed. No client/server protocol changes;
+  no server or production service used for this refresh (server checkout remains
+  `de4f3d21aecaa2190564c329608c02a9decd8010`).
+- **Not verified:** real OS drag-and-drop delivery, visual blink, desktop
+  clipboard/Chinese IME, window/icon/console behavior, older Windows/macOS matrix.
+  SDL dummy's unsupported-icon warning is expected, not a desktop icon test.
+  UTF-8 filename manifest requires Windows 10 1903+.
+- User/project Lua now executes in normal text mode; see
+  [extension/trust guide](../modules/EDITOR.md). `--safe-mode` skips external
+  extensions, not an OS sandbox. Full workbench still has no automatic discovery.
+- No commit, push, tag, GitHub Release or Python publication performed.
+
+## Earlier all-product refresh (unchanged artifacts except Windows text)
+
 Source commit: `f768a1cc3e9ddb036f2a73e343b3d24d99824be9`.
 Integration server: `de4f3d21aecaa2190564c329608c02a9decd8010`.
 Built from committed `git archive` exports in isolated sibling client/server trees
@@ -42,7 +80,7 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 | cooloo-darwin-arm64 | 2740680 | 19dbe8447c5c46d1a0ef572df8a4b704bbdab6ec401fc9b3ae4fc3c76e183bcd |
 | cooloo-windows-x86_64.exe | 4313940 | d62d3e6634ba4873a79c607bbcaa53f8c3161e6a3fab7f5e77d3716406b8e023 |
 | cooloo-text-darwin-arm64 | 2546888 | 8b7034f26ddbb4f32c8f265959b7fc50cb094296d2d8ca5703086e51f89435a5 |
-| cooloo-text-windows-x86_64.exe | 4119700 | e2df65bd3bdb7b88df25a069da7b32260c5f4e772459c0e2d3f2174ea989b83f |
+| cooloo-text-windows-x86_64.exe | 4164921 | e19f842d07ac76b58fcde34155ea0c8056abcd8b2b729d0d79b1350775fe4bd6 |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
 | cooloo-workbench-windows-x86_64.exe | 645198 | 6bba542e60c7eef4d61094720f7ab8b4d18a917fe04d181d377f2baf7d4fe6c3 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
@@ -51,7 +89,7 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 SHA-256 values were computed on m106 and rechecked after retrieval to local
 staging. All four Windows artifact hashes also matched on m101.
 
-## This refresh's validation
+## Earlier refresh's validation (not the latest text test scope)
 
 Passed on m106:
 

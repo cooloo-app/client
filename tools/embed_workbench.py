@@ -30,6 +30,9 @@ for base, prefix in bases:
 if profile == 'gui':
     modules['adapters.cooloo'] = (root / 'adapters/cooloo/init.lua').read_text()
     modules['client.chat'] = (root / 'lua/chat.lua').read_text() + '\nreturn chat\n'
+if profile != 'cli':
+    plugins = sorted('plugins.' + p.stem for p in (root / 'modules/editor/plugins').glob('*.lua'))
+    modules['core.plugin_manifest'] = 'return {' + ','.join(repr(p) for p in plugins) + '}\n'
 loader = []
 for name, source in sorted(modules.items()):
     loader.append('package.preload[%r] = function(...)\n%s\nend\n' % (name, source))

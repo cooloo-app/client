@@ -100,8 +100,12 @@ cooloo-workbench.exe: $(WORKBENCH_CLI_SRC) $(HEADERS)
 cooloo-text editor: $(EDITOR_SRC) $(HEADERS) $(SDL_MAC_LIB)
 	$(CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -mmacosx-version-min=$(MACOS_MIN) -Isrc $(SDL_MAC_INC) -o $@ $(EDITOR_SRC) $(MAC_LIBS)
 
-cooloo-text.exe editor.exe: $(EDITOR_SRC) $(HEADERS) $(SDL_WIN_LIB) $(WIN_ICON)
-	$(WIN_CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(EDITOR_SRC) $(WIN_ICON) $(WIN_LIBS)
+cooloo-text.exe editor.exe: $(EDITOR_SRC) $(HEADERS) $(SDL_WIN_LIB) $(BUILD)/text-icon.o
+	$(WIN_CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(EDITOR_SRC) $(BUILD)/text-icon.o $(WIN_LIBS)
+
+$(BUILD)/text-icon.o: apps/editor/windows.rc apps/editor/windows.manifest assets/cooloo.ico
+	mkdir -p $(BUILD)
+	$(WIN_RC) -Iapps/editor -i apps/editor/windows.rc -o $@
 
 cli.exe: $(CORE_SRC) $(HEADERS)
 	$(WIN_CC) $(CFLAGS) -DCOOLOO_CLI_ONLY -Isrc -o $@ $(CORE_SRC) -lws2_32 -ladvapi32 -static

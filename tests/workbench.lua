@@ -3,7 +3,7 @@ cooloo={offline=true,time=os.clock,screen=function()return 960,640 end,
  text_width=function(s)return utf8.len(s)*8 end,line_height=function()return 18 end,
  set_ime_rect=function()end,clipboard={get=function()return '' end,set=function()end},
  quit=function()end,
- platform={focus=function()return true end,cursor=function()end,title=function()end,mode=function()end,
+ platform={exedir='.',exefile='',userdir='.',set_fps=function()end,focus=function()return true end,cursor=function()end,title=function()end,mode=function()end,
  confirm=function()return false end,list_dir=function()return {} end,info=function()end,absolute_path=function(s)return s end},
  runtime={start=function()return true end,poll=function()return {} end,send=function()return true end,stop=function()end}}
 require('platform.lite')
