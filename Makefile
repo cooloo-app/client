@@ -35,7 +35,7 @@ CLIENT_SRC := src/net.c src/config.c src/record.c $(NOISE_SRC)
 CLI_SRC := src/main.c src/win_console.c src/cli.c src/machine.c
 CORE_SRC  := $(CLI_SRC) $(CLIENT_SRC)
 RUNTIME_SRC := modules/runtime/runner.c modules/runtime/process.c
-TEXT_GUI_SRC := src/gui.c src/font.c src/renderer.c src/rencache.c src/luabind.c modules/platform/api.c modules/platform/renderer.c modules/platform/renderer_font.c
+TEXT_GUI_SRC := src/gui.c src/font.c src/renderer.c src/rencache.c src/luabind.c modules/platform/api.c modules/platform/file.c modules/platform/renderer.c modules/platform/renderer_font.c
 GUI_SRC   := $(TEXT_GUI_SRC) $(RUNTIME_SRC)
 EMBED_SRC := $(BUILD)/embedded_workbench.c src/embedded_fonts.c
 EDITOR_SRC := apps/editor/main.c $(TEXT_GUI_SRC) $(LUA_SRC) $(BUILD)/embedded_editor.c src/embedded_fonts.c
@@ -187,6 +187,13 @@ test-event-bridge: $(BUILD)/event-bridge-test
 
 test-event-bridge-macos: $(BUILD)/event-bridge-test-macos
 	SDL_VIDEODRIVER=dummy $(BUILD)/event-bridge-test-macos tests/event_bridge.lua
+
+# Native file fault tests are standalone and use only temporary fixture paths.
+$(BUILD)/file-write-test: tests/file_write_test.c modules/platform/file.c modules/platform/file.h $(LUA_SRC)
+	$(CC) $(CFLAGS) $(NATIVE_PLATFORM_FLAGS) -Isrc/vendor/lua -o $@ tests/file_write_test.c $(LUA_SRC) -lm
+
+$(BUILD)/file-write-test.exe: tests/file_write_test.c modules/platform/file.c modules/platform/file.h $(LUA_SRC)
+	$(WIN_CC) $(CFLAGS) -Isrc/vendor/lua -o $@ tests/file_write_test.c $(LUA_SRC) -static -lm
 
 # Deliberately no GUI, SDL dummy, rendering or desktop tests in this target.
 test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner

@@ -145,8 +145,9 @@ local commands = {
 
   ["doc:select-lines"] = function()
     local line1, _, line2, _, swap = doc():get_selection(true)
-    append_line_if_last_line(line2)
-    doc():set_selection(line1, 1, line2 + 1, 1, swap)
+    local last = line2 == #doc().lines
+    doc():set_selection(line1, 1, last and line2 or line2 + 1,
+      last and #doc().lines[line2] or 1, swap)
   end,
 
   ["doc:select-word"] = function()
@@ -280,6 +281,7 @@ local commands = {
     end)
   end,
 
+  -- Format is independent of text undo; toggling back restores saved format.
   ["doc:toggle-line-ending"] = function()
     doc().crlf = not doc().crlf
   end,

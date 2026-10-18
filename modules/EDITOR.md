@@ -95,6 +95,30 @@ excluded. Write failures are diagnosed on stderr. Normal confirmed/forced exits
 and fatal recovery remove this session's temporary files. Plugin `core.try`
 errors remain locally recoverable; explicitly broken `--lua-dev` bundles fail.
 
+## Saving and edit state
+
+Text history uses distinct version identities across undo branches. Undo/redo can
+return to a saved version, and saved points form undo merge boundaries. LF/CRLF
+is tracked separately: changing format marks the document dirty, switching back
+to the saved format clears that format difference, and text undo does not toggle
+the format. Select Lines never adds an EOF newline or changes undo history.
+
+Saving writes a same-directory exclusive temporary file, checks write and close,
+and then replaces the target. Failures keep the document unsaved and remove the
+partial temporary file. Existing symlinks continue to address their target;
+hard-linked files are rejected with a Save As diagnostic rather than splitting
+aliases. Existing POSIX owner/mode, extended attributes and ACLs are copied (a
+copy failure aborts); Windows uses ReplaceFile for existing-file metadata.
+New POSIX files are private (0600). The parent directory must permit creating and
+renaming files. This is not a power-loss durability or concurrent-edit conflict
+detection guarantee. Recovery uses an exclusive create/write/close handle per
+backup and retries name collisions, including simultaneous editor instances.
+
+Macros record committed input, omit non-modifier keys consumed by composition,
+and replay with a separate modifier state. Failure also restores the real held
+keys. Playback is ignored while an OS composition is active; it does not replay
+preedit into the OS.
+
 ## Trust and workbench boundaries
 
 **Normal mode executes user and project Lua. Only open trusted projects.**
@@ -126,6 +150,10 @@ make test-renderer-macos test-event-bridge-macos
 python3 tests/editor_integration.py ./cooloo-text
 python3 tests/lifecycle_test.py ./cooloo-text
 python3 tests/adversarial_test.py ./cooloo-text ./build/renderer-test-macos
+python3 tests/round2_test.py ./cooloo-text
+make build/file-write-test
+fixture=$(mktemp)
+build/file-write-test "$fixture"
 make test-workbench-headless
 SDL_VIDEODRIVER=dummy build/renderer-test-macos tests/workbench.lua
 build/lua-runner --lua-run tests/provider.lua
@@ -138,7 +166,7 @@ that build does not validate a Linux desktop backend.
 
 The integration test uses SDL dummy and isolated temporary projects/user modules,
 checks fixed pacing, extension order/error recovery/safe mode, project scan and
-search, pane drop dispatch, macros, reload safety, UTF-8 paths, readonly behavior
+search, pane drop dispatch, macros, reload safety (including undo branches), UTF-8 paths, readonly behavior
 and a real directory child process. It does not synthesize OS drag-and-drop or
 prove desktop IME/clipboard/visual blink behavior. Windows UTF-8 CRT filenames
 use an embedded active-codepage manifest (Windows 10 1903+); older Windows is not

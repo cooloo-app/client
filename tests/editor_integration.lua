@@ -71,7 +71,9 @@ function cooloo.frame(events,dt)
   elseif frame==25 then
     assert(content(file)=='changed\n','autoreload preserves final newline')
     assert(file.crlf)
-    file:text_input('unsaved')
+    file:set_selection(1,1)
+    file:text_input('saved');file:save();file:undo();file:text_input('unsaved')
+    assert(file:is_dirty(),'undo branch must not reuse the saved version')
     write('中文 file.lua','external\n')
   elseif frame==40 then
     assert(content(file):find('unsaved',1,true),'autoreload must not overwrite dirty doc')

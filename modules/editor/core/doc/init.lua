@@ -50,7 +50,9 @@ function Doc:reset()
   self.selection = { a = { line=1, col=1 }, b = { line=1, col=1 } }
   self.undo_stack = { idx = 1 }
   self.redo_stack = { idx = 1 }
-  self.clean_change_id = 1
+  self.change_id = { boundary = true }
+  self.clean_change_id = self.change_id
+  self.crlf, self.clean_crlf = false, false
   self.highlighter = Highlighter(self)
   self:reset_syntax()
 end
@@ -80,20 +82,17 @@ function Doc:load(filename)
     self.lines[#self.lines + 1] = line .. '\n'
   end
   self:reset_syntax()
+  self:clean()
 end
 
 
 function Doc:save(filename)
   assert(not self.virtual, 'virtual documents cannot be saved; export explicitly')
   filename = filename or assert(self.filename, "no filename set to default to")
-  local fp = assert( io.open(filename, "wb") )
-  for i, line in ipairs(self.lines) do
-    -- The last newline is the model sentinel, not part of the file.
-    if i == #self.lines then line = line:sub(1, -2) end
-    if self.crlf then line = line:gsub("\n", "\r\n") end
-    assert(fp:write(line))
-  end
-  assert(fp:close())
+  local target = assert(system.resolve_path(filename))
+  local text = table.concat(self.lines):sub(1, -2)
+  if self.crlf then text = text:gsub("\n", "\r\n") end
+  assert(system.write_file(target, text))
   self.filename = filename or self.filename
   self:reset_syntax()
   self:clean()
@@ -108,16 +107,19 @@ end
 function Doc:is_dirty()
   if self.virtual then return false end
   return self.clean_change_id ~= self:get_change_id()
+    or self.clean_crlf ~= not not self.crlf
 end
 
 
 function Doc:clean()
   self.clean_change_id = self:get_change_id()
+  self.change_id.boundary = true
+  self.clean_crlf = not not self.crlf
 end
 
 
 function Doc:get_change_id()
-  return self.undo_stack.idx
+  return self.change_id
 end
 
 
@@ -245,10 +247,12 @@ local function pop_undo(self, undo_stack, redo_stack)
   if cmd.type == "insert" then
     local line, col, text = table.unpack(cmd)
     self:raw_insert(line, col, text, redo_stack, cmd.time)
+    self.change_id = cmd.change_id
 
   elseif cmd.type == "remove" then
     local line1, col1, line2, col2 = table.unpack(cmd)
     self:raw_remove(line1, col1, line2, col2, redo_stack, cmd.time)
+    self.change_id = cmd.change_id
 
   elseif cmd.type == "selection" then
     self.selection.a.line, self.selection.a.col = cmd[1], cmd[2]
@@ -258,7 +262,8 @@ local function pop_undo(self, undo_stack, redo_stack)
   -- if next undo command is within the merge timeout then treat as a single
   -- command and continue to execute it
   local next = undo_stack[undo_stack.idx - 1]
-  if next and math.abs(cmd.time - next.time) < config.undo_merge_timeout then
+  if next and math.abs(cmd.time - next.time) < config.undo_merge_timeout
+  and (next.type == "selection" or not self.change_id.boundary) then
     return pop_undo(self, undo_stack, redo_stack)
   end
 end
@@ -283,6 +288,8 @@ function Doc:raw_insert(line, col, text, undo_stack, time)
   local line2, col2 = self:position_offset(line, col, #text)
   push_undo(undo_stack, time, "selection", self:get_selection())
   push_undo(undo_stack, time, "remove", line, col, line2, col2)
+  undo_stack[undo_stack.idx - 1].change_id = self.change_id
+  self.change_id = {}
 
   -- update highlighter and assure selection is in bounds
   self.highlighter:invalidate(line)
@@ -296,6 +303,8 @@ function Doc:raw_remove(line1, col1, line2, col2, undo_stack, time)
   local text = self:get_text(line1, col1, line2, col2)
   push_undo(undo_stack, time, "selection", self:get_selection())
   push_undo(undo_stack, time, "insert", line1, col1, text)
+  undo_stack[undo_stack.idx - 1].change_id = self.change_id
+  self.change_id = {}
 
   -- get line content before/after removed text
   local before = self.lines[line1]:sub(1, col1 - 1)
@@ -311,7 +320,7 @@ end
 
 
 function Doc:insert(line, col, text)
-  if self.readonly then return false end
+  if self.readonly or text == "" then return false end
   self.redo_stack = { idx = 1 }
   line, col = self:sanitize_position(line, col)
   self:raw_insert(line, col, text, self.undo_stack, system.get_time())
@@ -320,9 +329,10 @@ end
 
 function Doc:remove(line1, col1, line2, col2)
   if self.readonly then return false end
-  self.redo_stack = { idx = 1 }
   line1, col1 = self:sanitize_position(line1, col1)
   line2, col2 = self:sanitize_position(line2, col2)
+  if line1 == line2 and col1 == col2 then return false end
+  self.redo_stack = { idx = 1 }
   line1, col1, line2, col2 = sort_positions(line1, col1, line2, col2)
   self:raw_remove(line1, col1, line2, col2, self.undo_stack, system.get_time())
 end
@@ -410,6 +420,7 @@ function Doc:set_projection(text, prepend_lines)
     self.lines[#self.lines + 1] = line .. '\n'
   end
   self.undo_stack, self.redo_stack = {idx=1}, {idx=1}
+  self.change_id = {}
   self:clean()
   self.highlighter:reset()
   local delta = prepend_lines or 0

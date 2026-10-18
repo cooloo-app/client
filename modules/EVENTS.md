@@ -26,7 +26,7 @@ Lite's mouse-motion coalescing and split/selection algorithms are unchanged.
 | Motion | `mousemoved(x,y,dx,dy)` | Keep SDL3 floating-point coordinates |
 | Wheel | `mousewheel(y)` | SDL3 `integer_y`; raw sign matches Lite, no extra direction inversion |
 | Resize | `resized(w,h)` | Rebuild software canvas, event triggers core redraw |
-| Expose | `exposed` | Full canvas redraw instead of invalidating a non-existent rencache |
+| Expose | `exposed` | Invalidates the native rencache and requests redraw |
 | Focus gain | Flush queued keydowns (Lite Alt-Tab workaround) | Keyups are never flushed; SDL3 emits releases when keyboard focus is lost |
 | First activation click | Click-through enabled | Same SDL hint as Lite |
 | File drop | `filedropped(path,x,y)` | SDL3 supplies window-local coordinates and owns drop memory |
@@ -51,17 +51,19 @@ make build/event-bridge-test.exe
 # Windows, from client source root with SDL_VIDEODRIVER=dummy:
 build/event-bridge-test.exe tests/event_bridge.lua
 python3 tests/editor_integration.py ./cooloo-text
-build/lua-runner --lua-run tests/workbench.lua
+SDL_VIDEODRIVER=dummy build/renderer-test tests/workbench.lua
+python3 tests/round2_test.py ./cooloo-text-linux
 ```
 
 The test executable alone exposes `SDL_PushEvent`. It links production `gui.c`
-and runs the real Lua facade/core/keymap/DocView, with a deterministic renderer
-and clock. Tests cover tuple arity/values, all four split shortcuts followed by
+and runs the real Lua facade/core/keymap/DocView and native renderer. Tests cover tuple arity/values, all four split shortcuts followed by
 plain/Shift click, modifier releases/AltGr, drag release, focus-gain keydown flush,
 IME-only redraw/clear, UTF-8 selection offsets, event order, commit/undo,
 command-box/view/focus/mouse cancellation, resize and exposure. Existing text
 integration exercises the actual bundled app/canvas and plugin stack; workbench
-integration separately exercises network event delivery.
+integration separately exercises network event delivery. Round-2 regression
+also checks macro replay with held modifiers, exception cleanup, and IME-consumed
+keys in document and command views; replay never drives real OS composition.
 
 SDL dummy is **not** desktop acceptance: real IME composition/candidate placement,
 Alt-Tab delivery, activation click-through, outside-window capture and OS drag

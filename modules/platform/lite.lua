@@ -36,7 +36,7 @@ renderer.font.load = function(filename, size)
 end
 system = {
   platform=api.platform.name,
-  temp_file=api.platform.temp_file,
+  temp_file=api.platform.temp_file, write_file=api.platform.write_file,
   get_time=api.time, get_clipboard=api.clipboard.get, set_clipboard=api.clipboard.set,
   request_quit=api.quit, window_has_focus=api.platform.focus,
   clear_ime=api.clear_ime, set_text_input_rect=api.set_ime_rect,

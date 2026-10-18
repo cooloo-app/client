@@ -10,22 +10,19 @@ local handled_events = {
 
 local state = "stopped"
 local event_buffer = {}
+local ime = require "core.ime"
 local modkeys = {}
 
 local on_event = core.on_event
 
 core.on_event = function(type, ...)
+  local recording = state == "recording"
+  local consumed = ime.editing and (type == "keypressed" or type == "keyreleased")
+    and not keymap.is_modifier((...))
   local res = on_event(type, ...)
-  if state == "recording" and handled_events[type] then
+  if recording and state == "recording" and handled_events[type] and not consumed then
     table.insert(event_buffer, { type, ... })
   end
-  return res
-end
-
-
-local function clone(t)
-  local res = {}
-  for k, v in pairs(t) do res[k] = v end
   return res
 end
 
@@ -40,7 +37,7 @@ command.add(predicate, {
     if state == "stopped" then
       state = "recording"
       event_buffer = {}
-      modkeys = clone(keymap.modkeys)
+      modkeys = keymap.capture_state()
       core.log("Recording macro...")
     else
       state = "stopped"
@@ -49,16 +46,20 @@ command.add(predicate, {
   end,
 
   ["macro:play"] = function()
+    -- Do not replay into an active OS composition or synthesize preedit events.
+    if ime.editing then return end
     state = "playing"
     core.log("Playing macro... (%d events)", #event_buffer)
-    local mk = keymap.modkeys
-    keymap.modkeys = clone(modkeys)
-    for _, ev in ipairs(event_buffer) do
-      on_event(table.unpack(ev))
-      core.root_view:update()
-    end
-    keymap.modkeys = mk
+    local ok, err = xpcall(function()
+      keymap.with_state(modkeys, function()
+        for _, ev in ipairs(event_buffer) do
+          on_event(table.unpack(ev))
+          core.root_view:update()
+        end
+      end)
+    end, debug.traceback)
     state = "stopped"
+    if not ok then error(err, 0) end
   end,
 })
 

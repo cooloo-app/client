@@ -29,6 +29,30 @@ local function update_modkeys()
   if keymap.modkeys.altgr then keymap.modkeys.ctrl = false end
 end
 
+local function clone(t)
+  local res = {}
+  for k, v in pairs(t) do res[k] = v end
+  return res
+end
+
+function keymap.is_modifier(key)
+  return modkey_map[key] ~= nil
+end
+
+function keymap.capture_state()
+  return clone(held)
+end
+
+-- Synthetic input gets its own physical and derived state, even on failure.
+function keymap.with_state(state, fn)
+  local previous_held, previous_modkeys = held, keymap.modkeys
+  held, keymap.modkeys = clone(state), {}
+  update_modkeys()
+  local ok, err = xpcall(fn, debug.traceback)
+  held, keymap.modkeys = previous_held, previous_modkeys
+  if not ok then error(err, 0) end
+end
+
 local function key_to_stroke(k)
   local stroke = ""
   for _, mk in ipairs(modkeys) do

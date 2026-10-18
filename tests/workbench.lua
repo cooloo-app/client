@@ -10,7 +10,7 @@ cooloo={renderer=assert(native_renderer,'run with renderer-test (real font userd
  text_width=function(s)return utf8.len(s)*8 end,line_height=function()return 18 end,
  set_ime_rect=function()end,clipboard={get=function()return '' end,set=function()end},
  quit=function()end,
- platform={fuzzy_match=native_platform.fuzzy_match,exedir='.',exefile='',userdir='.',set_fps=function()end,focus=function()return true end,cursor=function()end,title=function()end,mode=function()end,
+ platform={write_file=native_platform.write_file,resolve_path=native_platform.resolve_path,fuzzy_match=native_platform.fuzzy_match,exedir='.',exefile='',userdir='.',set_fps=function()end,focus=function()return true end,cursor=function()end,title=function()end,mode=function()end,
  confirm=function()return false end,list_dir=function()return {} end,info=function()end,absolute_path=function(s)return s end},
  runtime={start=function()return true end,poll=function()return {} end,send=function()return true end,stop=function()end}}
 require('platform.lite')

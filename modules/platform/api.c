@@ -3,6 +3,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 #include "api.h"
+#include "file.h"
 #include <lauxlib.h>
 #include <SDL3/SDL.h>
 #include <string.h>
@@ -158,12 +159,45 @@ static int absolute(lua_State *L);
 static int resolve_path(lua_State *L) {
     const char *p=luaL_checkstring(L,1);
 #ifdef _WIN32
+    wchar_t *w=wide(L,p);
+    /* Check raw prefixes before _wfullpath can erase an invalid ancestor/.. . */
+    wchar_t *root=w;
+    if(w[0]==L'\\' && w[1]==L'\\') {
+        if(!wcsncmp(w,L"\\\\?\\",4) && wcslen(w)>=7 && w[5]==L':') root=w+7;
+        else {
+            root=!wcsncmp(w,L"\\\\?\\UNC\\",8)?w+8:w+2;
+            /* UNC server and share together form the root, not ancestors. */
+            for(int n=0;n<2 && *root;n++) {
+                while(*root && *root!=L'\\' && *root!=L'/') root++;
+                if(*root)root++;
+            }
+        }
+    }
+    for (wchar_t *end=root; *end; end++) {
+        if ((*end!=L'/' && *end!=L'\\') || end==w || end[-1]==L':') continue;
+        wchar_t separator=*end; *end=0;
+        DWORD attrs=GetFileAttributesW(w);
+        if (attrs!=INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT)) {
+            HANDLE h=CreateFileW(w,0,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+                NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+            if(h==INVALID_HANDLE_VALUE){free(w);lua_pushnil(L);lua_pushliteral(L,"invalid reparse ancestor");return 2;}
+            CloseHandle(h);
+        } else if (attrs!=INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            free(w);lua_pushnil(L);lua_pushliteral(L,"not a directory ancestor");return 2;
+        } else if (attrs==INVALID_FILE_ATTRIBUTES && GetLastError()!=ERROR_FILE_NOT_FOUND
+                   && GetLastError()!=ERROR_PATH_NOT_FOUND) {
+            free(w);lua_pushnil(L);lua_pushliteral(L,"inaccessible ancestor");return 2;
+        }
+        *end=separator;
+    }
+    free(w);
     int results=absolute(L);
     if(!lua_isnil(L,-results))return results;
     DWORD error=(DWORD)lua_tointeger(L,-1);
     if(error!=ERROR_FILE_NOT_FOUND && error!=ERROR_PATH_NOT_FOUND)return results;
     lua_pop(L,results);
-    wchar_t *w=wide(L,p), *full=_wfullpath(NULL,w,0);free(w);
+    w=wide(L,p);
+    wchar_t *full=_wfullpath(NULL,w,0);free(w);
     if(!full)return luaL_error(L,"cannot resolve path: %s",p);
     push_wide(L,full);free(full);
 #else
@@ -192,6 +226,14 @@ static int resolve_path(lua_State *L) {
                     size_t need=strlen(canonical)+strlen(p)+2;
                     if(need>length){char *grown=realloc(out,need);if(!grown){free(canonical);free(out);free(path);return luaL_error(L,"out of memory");}out=grown;length=need;}
                     strcpy(out,canonical);free(canonical);
+                } else {
+                    int error=errno;
+                    struct stat entry;
+                    int present=lstat(out,&entry)==0;
+                    if(error!=ENOENT || (present && S_ISLNK(entry.st_mode))) {
+                        free(out);free(path);lua_pushnil(L);
+                        lua_pushstring(L,error==ENOENT?"dangling symlink ancestor":strerror(error));return 2;
+                    }
                 }
             }
         }
@@ -272,7 +314,7 @@ static int temp_file(lua_State *L) {
 }
 
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"temp_file",temp_file},{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());

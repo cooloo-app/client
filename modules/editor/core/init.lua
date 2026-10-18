@@ -569,11 +569,19 @@ function core.on_error(err)
   for index, doc in ipairs(core.docs or {}) do
     if not doc.virtual and doc:is_dirty() then
       local base = (doc.filename or (EXEDIR .. '/unsaved-' .. index)) .. '~'
-      local path, suffix = base, 0
-      while system.get_file_info(path) do suffix = suffix + 1; path = base .. suffix end
       local text = table.concat(doc.lines):sub(1, -2)
       if doc.crlf then text = text:gsub('\n', '\r\n') end
-      write(path, text)
+      -- The file is created and written under one exclusive native handle.
+      -- A stale existence check must never authorize truncating a backup.
+      for suffix = 0, 9999 do
+        local path = base .. (suffix == 0 and '' or suffix)
+        local called, ok, why, collision = pcall(system.write_file, path, text, true)
+        if called and ok then break end
+        if not called or not collision or suffix == 9999 then
+          io.stderr:write('recovery: ', path, ': ', tostring(called and why or ok), '\n')
+          break
+        end
+      end
     end
   end
   delete_temp_files()
