@@ -1,4 +1,4 @@
-package.path='modules/?.lua;modules/?/init.lua;'..package.path
+package.path='lua/?.lua;lua/?/init.lua;'..package.path
 local project=require('workbench.messages').project
 local p=project({{id='a',ts=0,from='sender',text='中文\nsecond'},
  {id='b',ts=60,from='other',text='hello'}},{source_revision='r'})

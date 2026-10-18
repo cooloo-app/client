@@ -1,2 +1,2 @@
 /* First icon resource is the executable's Explorer/shortcut icon. */
-1 ICON "../assets/cooloo.ico"
+1 ICON "../../cooloo.ico"

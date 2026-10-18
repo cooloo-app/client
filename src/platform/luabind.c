@@ -20,7 +20,7 @@
 #include "record.h"
 #include "noise_xx.h"
 #ifdef COOLOO_WORKBENCH
-#include "../adapters/cooloo/cache.h"
+#include "cache.h"
 #endif
 #endif
 

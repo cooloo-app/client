@@ -21,12 +21,15 @@ int cooloo_gui_run(const char *dev) {
 }
 ''')
     gui = base / 'cooloo-gui-dispatch'
-    sources = ['main.c', 'win_console.c', 'cli.c', 'machine.c', 'net.c',
-               'config.c', 'record.c', 'noise_xx.c', 'vendor/monocypher.c']
+    sources = ['src/cli/main.c', 'src/cli/win_console.c', 'src/cli/cli.c',
+               'src/cli/machine.c', 'src/client/net.c', 'src/client/config.c',
+               'src/client/record.c', 'src/client/noise_xx.c', 'vendor/monocypher.c']
     subprocess.run([*shlex.split(os.environ.get('CC', 'cc')),
                     *shlex.split(os.environ.get('CFLAGS', '-O2 -Wall -Wextra -std=c99')),
-                    '-I', str(client / 'src'), '-o', str(gui), str(stub),
-                    *(str(client / 'src' / src) for src in sources)], check=True)
+                    *(f'-I{client / directory}' for directory in
+                      ('src/client', 'src/cli', 'src/platform', 'vendor')),
+                    '-o', str(gui), str(stub),
+                    *(str(client / src) for src in sources)], check=True)
 
     def run(exe, args, code=0):
         result = subprocess.run([str(exe), *args], env=env, input='',

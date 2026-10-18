@@ -13,7 +13,7 @@ Other seven artifacts retain the `2fc9021` provenance below.
   destroying edits/history, invalid UTF-8 navigation hanging, and focus-loss
   modifiers triggering unwanted shortcuts. Macro recordings also preserve
   focus-loss resets in their isolated playback state. See
-  [editor contracts](../modules/EDITOR.md) and [event contract](../modules/EVENTS.md).
+  [editor contracts](../docs/EDITOR.md) and [event contract](../docs/EVENTS.md).
 - Final isolated m106 build: `/tmp/cooloo-round3-final.rK0wlM/client`, Apple clang
   21.0.0 and MinGW GCC 16.2.0, vendored SDL3/Lua. macOS text and native harnesses
   are validation-only; the installed release refresh is Windows text only.
@@ -51,7 +51,7 @@ Other seven artifacts retain the `2fc9021` provenance below.
 - Fixes eight reviewed root causes: unsafe failed saves, undo-branch dirty state,
   format dirty state, concurrent recovery overwrites, EOF selection mutation,
   macro modifier corruption, IME macro deletion, and invalid-ancestor path bypass.
-  See [editor contracts](../modules/EDITOR.md) for save/format/link policies.
+  See [editor contracts](../docs/EDITOR.md) for save/format/link policies.
 - Isolated m106 build: `/tmp/cooloo-round2.PVxHP4/client`, Apple clang 21.0.0 and
   MinGW GCC 16.2.0. Windows text and native test harnesses; macOS text/harnesses
   built for validation only. Both builds use vendored SDL3/Lua.
@@ -91,7 +91,7 @@ after export). Input archive SHA-256:
   propagation, POSIX executable discovery, portable user-theme precedence, and
   overlapping physical modifiers. Malformed external fonts can still crash the
   inherited stb parser; comprehensive validation is explicitly deferred. Lua
-  recovery does not cover native crashes; see [editor guide](../modules/EDITOR.md).
+  recovery does not cover native crashes; see [editor guide](../docs/EDITOR.md).
 - Isolated m106 build: `/tmp/cooloo-adversarial.hkcxEP/client`; Apple clang 21.0.0,
   MinGW GCC 16.2.0, vendored SDL3/Lua. Built Windows text + renderer/event harnesses,
   native macOS text + harnesses; macOS output is validation-only, not installed.
@@ -201,7 +201,7 @@ The intended replacement is only `cooloo-text-windows-x86_64.exe`.
 - Input now ports Lite's C `system.poll_event` to SDL3, removing the GUI event
   array, modifier snapshots and facade event filtering. Key press/release,
   mouse, resize/expose and focus handling follow Lite. IME is a separate
-  Lite XL-derived increment; see [event contract](../modules/EVENTS.md).
+  Lite XL-derived increment; see [event contract](../docs/EVENTS.md).
 - Passed **macOS and native Windows SDL dummy event-bridge regression**:
   SDL_PushEvent → production C poll → Lua core/keymap/DocView, four split
   shortcuts then plain/Shift click, releases/AltGr, drag release, IME ordering,
@@ -253,7 +253,7 @@ artifacts below retain their earlier provenance and behavior.
   SDL dummy's unsupported-icon warning is expected, not a desktop icon test.
   UTF-8 filename manifest requires Windows 10 1903+.
 - User/project Lua now executes in normal text mode; see
-  [extension/trust guide](../modules/EDITOR.md). `--safe-mode` skips external
+  [extension/trust guide](../docs/EDITOR.md). `--safe-mode` skips external
   extensions, not an OS sandbox. Full workbench still has no automatic discovery.
 - No commit, push, tag, GitHub Release or Python publication performed.
 

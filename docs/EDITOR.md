@@ -167,7 +167,7 @@ python3 tests/adversarial_test.py ./cooloo-text ./build/renderer-test-macos
 python3 tests/round2_test.py ./cooloo-text
 python3 tests/round3_test.py ./cooloo-text
 make build/file-write-test
-fixture=$(mktemp)
+fixture=$(mktemp -d)
 build/file-write-test "$fixture/file.txt"
 make test-workbench-headless
 SDL_VIDEODRIVER=dummy build/renderer-test-macos tests/workbench.lua
@@ -176,7 +176,8 @@ build/lua-runner --lua-run tests/provider.lua
 
 On Linux, use `make test-renderer test-event-bridge`, `build/renderer-test`, and
 `cooloo-text-linux` instead. A Linux machine without desktop development libraries
-can configure SDL with `-DSDL_UNIX_CONSOLE_BUILD=ON` for dummy-only validation;
+can configure SDL with `make SDL_LINUX_EXTRA_FLAGS=-DSDL_UNIX_CONSOLE_BUILD=ON
+cooloo-text-linux` for dummy-only validation;
 that build does not validate a Linux desktop backend.
 
 The integration test uses SDL dummy and isolated temporary projects/user modules,

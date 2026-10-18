@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <math.h>
-#include "vendor/stb_truetype.h"
+#include "stb_truetype.h"
 #include "font.h"
 #include "rencache.h"
 #include <stdlib.h>

@@ -5,31 +5,66 @@ refresh and headless validation. GUI/desktop acceptance remains deferred; see
 `../release/README.md` for the exact scope. `cooloo-text` is a full general-purpose
 editor product, not an offline messaging UI or a text widget.
 
-The Makefile's source sets, not directory names, enforce the link boundary.
-Existing stable client C files remain under `src/` to avoid unnecessary churn.
+The Makefile's source sets enforce the link boundary. Project-owned native code
+lives under `src/`; Lua source lives under `lua/`. Both trees group files by
+responsibility, including product entry points (`apps/`) and adapters.
+
+## Source layout
+
+```text
+src/
+  apps/editor/           # text-editor C entry
+  apps/workbench/        # headless workbench C entry
+  cli/                   # full-client/CLI entry and command dispatch
+  client/                # network, config, records and Noise protocol
+  platform/              # SDL host, rendering and Lua host integration
+    api/                 # Lua-facing platform bindings
+  runtime/               # runner and child-process management
+  adapters/cooloo/       # native messaging/cache bindings
+lua/
+  apps/                  # text, GUI and headless composition
+  editor/                # Lite core, default plugins and sample themes
+  platform/              # Lua platform bridge
+  workbench/             # message projection and console session
+  plugins/               # workspace and console editor plugins
+  adapters/              # local and cooloo providers
+  chat.lua               # shared protocol state model
+vendor/                  # third-party native sources and upstream provenance
+assets/                  # fonts, icons and Windows executable resources
+docs/                    # architecture and editor contracts
+build/generated/         # generated C bundles/fonts/icon; never hand-edit
+```
+
+Lua module names and the portable runtime `data/` layout are unchanged. Bundle
+profiles remain explicit in `tools/embed_workbench.py`; moving a file does not
+make it part of every product. `BUILD=...` also relocates generated files.
+After updating an existing checkout, use a fresh build directory or run
+`make distclean` to remove SDL CMake caches containing the old vendor path.
+
+## Dependency boundaries
 
 | Unit | Implementation | Allowed dependencies |
 |---|---|---|
-| client | `src/net.c`, `config.c`, `record.c`, `noise_xx.c` | OS + vendored crypto |
-| CLI | `src/main.c`, `cli.c`, `machine.c`, `win_console.c` | client |
-| platform | `src/gui.c`, `font.c`, `luabind.c`, `modules/platform/` | SDL3, Lua 5.4, fonts; client binding excluded for editor |
-| editor | `modules/editor/core/` | platform API, no messaging/config API |
-| message model/projection | `modules/workbench/messages.lua` | Lua + injected record decoder; no editor |
-| workspace plugin | `modules/plugins/workspace/` | editor + message projection + injected provider |
-| runtime | `modules/runtime/` | Lua; SDL process API for host, no window/client dependency |
-| console session | `modules/workbench/console.lua` | Lua + injected runtime; no editor |
-| console plugin | `modules/plugins/console/` | editor + console session |
-| local adapter | `adapters/local/` | Lua standard library, explicit fixture file |
-| cooloo adapter | `adapters/cooloo/`, `lua/chat.lua` | client binding, same workspace contract |
-| text composition | `apps/editor/main.lua` | editor/platform only, ordinary documents |
-| full composition | `apps/workbench/gui.lua` | explicitly installs independent workspace/console plugins |
-| headless workbench | `apps/workbench/main.c`, `cli.lua` | model + shared record decoder + Lua runner; no SDL |
+| client | `src/client/net.c`, `config.c`, `record.c`, `noise_xx.c` | OS + vendored crypto |
+| CLI | `src/cli/main.c`, `cli.c`, `machine.c`, `win_console.c` | client |
+| platform | `src/platform/gui.c`, `font.c`, `luabind.c`, `src/platform/api/` | SDL3, Lua 5.4, fonts; client binding excluded for editor |
+| editor | `lua/editor/core/` | platform API, no messaging/config API |
+| message model/projection | `lua/workbench/messages.lua` | Lua + injected record decoder; no editor |
+| workspace plugin | `lua/plugins/workspace/` | editor + message projection + injected provider |
+| runtime | `src/runtime/` | Lua; SDL process API for host, no window/client dependency |
+| console session | `lua/workbench/console.lua` | Lua + injected runtime; no editor |
+| console plugin | `lua/plugins/console/` | editor + console session |
+| local adapter | `lua/adapters/local/` | Lua standard library, explicit fixture file |
+| cooloo adapter | `src/adapters/cooloo/`, `lua/adapters/cooloo/`, `lua/chat.lua` | client binding, same workspace contract |
+| text composition | `lua/apps/editor/main.lua` | editor/platform only, ordinary documents |
+| full composition | `lua/apps/workbench/gui.lua` | explicitly installs independent workspace/console plugins |
+| headless workbench | `src/apps/workbench/main.c`, `lua/apps/workbench/cli.lua` | model + shared record decoder + Lua runner; no SDL |
 
 `COOLOO_EDITOR_ONLY` excludes client includes, symbols, identity/config APIs and
 chat/provider embedded sources. Its source set also excludes the runner/process
 runtime, and its explicit `text` bundle excludes all workbench business modules.
 `COOLOO_RECORD_ONLY` builds only the existing canonical record parser from
-`src/record.c`, without cache/config implementations; the CLI never needs to read
+`src/client/record.c`, without cache/config implementations; the CLI never needs to read
 credentials. `text`, `gui`, and `cli` bundle manifests are tested for isolation. `COOLOO_CLI_ONLY` excludes SDL, editor and runtime.
 `COOLOO_WORKBENCH` adds runner dispatch and explicit script client API to the full
 application, without changing normal CLI arguments or Machine API schema.

@@ -1,5 +1,5 @@
 -- Run by event_bridge_test.c: SDL_PushEvent -> production gui_poll_event -> Lite.
-package.path='modules/editor/?.lua;modules/editor/?/init.lua;modules/?.lua;modules/?/init.lua;'..package.path
+package.path='lua/editor/?.lua;lua/editor/?/init.lua;lua/?.lua;lua/?/init.lua;'..package.path
 local function equal(actual,expected)
   assert(#actual==#expected, 'event arity')
   for i,v in ipairs(expected) do assert(actual[i]==v,tostring(actual[i])..' ~= '..tostring(v)) end

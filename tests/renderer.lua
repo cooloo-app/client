@@ -1,7 +1,7 @@
 local r,p=native_renderer,native_platform
 local font=r.font.load('embedded:monospace',13.5)
 assert(type(font)=='userdata')
-local external=r.font.load('src/vendor/fonts/monospace.ttf',13.5)
+local external=r.font.load('assets/fonts/monospace.ttf',13.5)
 assert(font:get_width('Hello')==external:get_width('Hello'))
 assert(font:get_height()==external:get_height())
 assert(not pcall(r.font.load,'missing-font.ttf',14))

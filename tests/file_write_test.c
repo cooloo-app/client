@@ -45,7 +45,7 @@ static int test_rename(const char *a,const char *b) {
 #define close test_close
 #define rename test_rename
 #endif
-#include "../modules/platform/file.c"
+#include "../src/platform/api/file.c"
 
 int main(int argc,char **argv) {
     assert(argc==2);

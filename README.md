@@ -1,9 +1,20 @@
 # Protocol 2 client — v0.3.0 text workbench
 
 The modular workbench replaces the v0.2 GUI. Protocol 2, Machine API schema 1,
-identity and cache formats remain compatible. See [modules/README.md](modules/README.md)
+identity and cache formats remain compatible. See [docs/README.md](docs/README.md)
 for dependency boundaries and runner API, and [release/README.md](release/README.md)
 for artifact provenance, platform verification and manual acceptance limitations.
+
+## Source layout
+
+Project-owned C sources are in `src/`, Lua sources in `lua/`, with functional
+subdirectories in each. Entry points live in `src/apps/`, `src/cli/` and
+`lua/apps/`; adapters follow the same language split. Third-party native code is
+in `vendor/`, fonts and executable resources in `assets/`, and generated code in
+`build/generated/`. See [source layout and boundaries](docs/README.md).
+
+Existing checkouts need a fresh SDL build directory after this migration
+(`make distclean` removes the old CMake caches and local build products).
 
 ## Workbench development
 
@@ -21,7 +32,7 @@ make test-workbench-macos       # macOS workbench/runtime + SDL dummy + loopback
 `cooloo-text [--safe-mode] [FILE|DIR ...]` is the standalone general-purpose text editor, built on
  the same Lite-derived editor core and SDL3/Chinese-input platform as the full
 product. It supports project scanning, file/directory drops, Lite's 16 default
-plugins and user/project Lua extensions. See [editor guide](modules/EDITOR.md)
+plugins and user/project Lua extensions. See [editor guide](docs/EDITOR.md)
 for directory layout, trust policy and validation. Normal mode executes trusted
 user/project modules; `--safe-mode` skips external extensions. It opens an
 ordinary empty document when no files are supplied. It does
@@ -101,7 +112,7 @@ scripts have been removed; `lua/chat.lua` remains the shared protocol state mode
 ## License
 
 Project-owned client code is licensed under [MIT](LICENSE). Vendored components
-and fonts retain their respective licenses; see their notices under `src/vendor/`.
+and fonts retain their respective licenses; see their notices under `vendor/`.
 
 ## Machine API and Python distribution
 

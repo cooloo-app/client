@@ -1,4 +1,4 @@
-package.path='modules/editor/?.lua;modules/editor/?/init.lua;modules/?.lua;modules/?/init.lua;./?.lua;./?/init.lua;'..package.path
+package.path='lua/editor/?.lua;lua/editor/?/init.lua;lua/?.lua;lua/?/init.lua;./?.lua;./?/init.lua;'..package.path
 local input={}
 local function frame_input(...)
   input={...}
@@ -75,7 +75,7 @@ con:append('\255');assert(utf8.len(con.doc.projection));con:clear()
 con:submit('x=42');con:recall(-1);assert(con.input.lines[1]:find('x=42',1,true))
 con:append(string.rep('a',300000));assert(#con.output<=con.limit);assert(not con.doc:is_dirty())
 -- Exercise actual composition, event dispatch, drawing, editing and split commands.
-dofile('apps/workbench/gui.lua')
+dofile('lua/apps/workbench/gui.lua')
 for i=1,3 do cooloo.frame({},0.016) end
 frame_input({'keypressed','left ctrl'},{'keypressed','n'},{'keyreleased','n'},{'keyreleased','left ctrl'})
 frame_input({'textinput','print("你好")'})

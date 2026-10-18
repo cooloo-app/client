@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     exe = root / 'probe'
     subprocess.run([*shlex.split(os.environ.get('CC', 'cc')),
                     *shlex.split(os.environ.get('CFLAGS', '-O2 -Wall -Wextra -std=c99')),
-                    '-I', str(CLIENT / 'src'), str(src), str(CLIENT / 'src/config.c'),
+                    '-I', str(CLIENT / 'src/client'), str(src), str(CLIENT / 'src/client/config.c'),
                     '-o', str(exe)], check=True)
     cfg = root / 'config-dir'
     cfg.mkdir()

@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vendor/monocypher.h"
+#include "monocypher.h"
 
 /* ---------------------------------------------------------------- */
 /* HMAC / HKDF (Noise §4, on top of Monocypher BLAKE2b)             */

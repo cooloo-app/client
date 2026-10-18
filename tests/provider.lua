@@ -1,5 +1,5 @@
 -- Real adapter/state-machine with deterministic transport/cache boundaries.
-package.path='modules/editor/?.lua;modules/editor/?/init.lua;modules/?.lua;modules/?/init.lua;./?.lua;./?/init.lua;'..package.path
+package.path='lua/editor/?.lua;lua/editor/?/init.lua;lua/?.lua;lua/?/init.lua;./?.lua;./?/init.lua;'..package.path
 global=function()end
 package.preload['client.chat']=function()dofile('lua/chat.lua');return chat end
 local A,B,R=string.rep('a',64),string.rep('b',64),string.rep('c',64)

@@ -26,9 +26,9 @@ github.com is blocked, the mirror URL below is what was actually fetched
 
 ## Licenses
 - SDL3: zlib (vendor/sdl3/LICENSE.txt)
-- Lua: MIT (vendor/lua/readme.html / lua.h header)
+- Lua: MIT (vendor/lua/lua.h header)
 - stb_truetype: public domain / MIT dual (file header)
-- JetBrains Mono: SIL OFL 1.1 (vendor/fonts/OFL.txt)
+- JetBrains Mono: SIL OFL 1.1 (assets/fonts/OFL.txt)
 
 ## Notes
 - SDL3 tree trimmed of test/docs/examples/IDE-project dirs

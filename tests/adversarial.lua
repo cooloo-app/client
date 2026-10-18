@@ -6,12 +6,12 @@ cooloo.safe_mode = os.getenv('BOUNDARY_SAFE') == '1'
 package.preload['user.colors.summer'] = function() return 'EMBEDDED' end
 package.preload['user.colors.fall'] = function() return 'FALLBACK' end
 package.preload['core.command'] = function() return {perform=function() return true end} end
-dofile('modules/platform/lite.lua')
+dofile('lua/platform/lite.lua')
 local expected = cooloo.safe_mode and 'EMBEDDED' or assert(os.getenv('BOUNDARY_THEME'))
 assert(require('user.colors.summer') == expected)
 assert(require('user.colors.fall') == 'FALLBACK')
 system.platform = 'macOS'
-local keys = dofile('modules/editor/core/keymap.lua')
+local keys = dofile('lua/editor/core/keymap.lua')
 for _, pair in ipairs{{'left ctrl','left gui','ctrl'}, {'left ctrl','right ctrl','ctrl'},
                      {'left shift','right shift','shift'}} do
   for order=1,2 do

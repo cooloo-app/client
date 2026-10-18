@@ -20,7 +20,7 @@
 #pragma GCC diagnostic ignored "-Wtype-limits"
 #endif
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "vendor/stb_truetype.h"
+#include "stb_truetype.h"
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif

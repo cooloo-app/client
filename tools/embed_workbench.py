@@ -14,11 +14,11 @@ if profile not in ('text', 'gui', 'cli'):
 modules = {}
 bases = []
 if profile != 'cli':
-    bases += [('modules/editor', ''), ('modules/editor/user', 'user'), ('modules/platform', 'platform')]
+    bases += [('lua/editor', ''), ('lua/editor/user', 'user'), ('lua/platform', 'platform')]
 if profile != 'text':
-    bases += [('modules/workbench', 'workbench')]
+    bases += [('lua/workbench', 'workbench')]
 if profile == 'gui':
-    bases += [('modules/plugins', 'plugins'), ('adapters/local', 'adapters.local')]
+    bases += [('lua/plugins', 'plugins'), ('lua/adapters/local', 'adapters.local')]
 for base, prefix in bases:
     for path in (root / base).rglob('*.lua'):
         name = '.'.join(path.relative_to(root / base).with_suffix('').parts)
@@ -28,17 +28,17 @@ for base, prefix in bases:
             name = name[:-5]
         modules['.'.join(filter(None, [prefix, name]))] = path.read_text()
 if profile == 'gui':
-    modules['adapters.cooloo'] = (root / 'adapters/cooloo/init.lua').read_text()
+    modules['adapters.cooloo'] = (root / 'lua/adapters/cooloo/init.lua').read_text()
     modules['client.chat'] = (root / 'lua/chat.lua').read_text() + '\nreturn chat\n'
 if profile != 'cli':
     modules['user.example'] = 'return [====[' + (root / 'vendor/lite/user-init.lua').read_text() + ']====]\n'
-    plugins = sorted('plugins.' + p.stem for p in (root / 'modules/editor/plugins').glob('*.lua'))
+    plugins = sorted('plugins.' + p.stem for p in (root / 'lua/editor/plugins').glob('*.lua'))
     modules['core.plugin_manifest'] = 'return {' + ','.join(repr(p) for p in plugins) + '}\n'
 loader = []
 for name, source in sorted(modules.items()):
     loader.append('package.preload[%r] = function(...)\n%s\nend\n' % (name, source))
-entry = {'text': 'apps/editor/main.lua', 'gui': 'apps/workbench/gui.lua',
-         'cli': 'apps/workbench/cli.lua'}[profile]
+entry = {'text': 'lua/apps/editor/main.lua', 'gui': 'lua/apps/workbench/gui.lua',
+         'cli': 'lua/apps/workbench/cli.lua'}[profile]
 loader.append((root / entry).read_text())
 source = '\n'.join(loader).encode()
 out.parent.mkdir(parents=True, exist_ok=True)
