@@ -32,7 +32,7 @@ Lite's mouse-motion coalescing and split/selection algorithms are unchanged.
 | File drop | `filedropped(path,x,y)` | SDL3 supplies window-local coordinates and owns drop memory |
 | Quit | `quit` | Existing core quit/dirty-document confirmation |
 | Composition | `textediting(text,start,length)` | [Lite XL increment](../vendor/lite-xl/README.md); all parameters, in poll order |
-| Focus loss | `focuslost` | IME cancellation only; no second keyboard/drag state machine |
+| Focus loss | `focuslost` | Stops IME and clears physical modifier state; SDL may not deliver matching key-up events after focus loss |
 
 IME is display-only. Final commit follows normal Doc text input and undo.
 The active editable view draws composition text, underline, segment and caret;

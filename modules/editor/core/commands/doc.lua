@@ -311,9 +311,14 @@ local commands = {
     end
     core.command_view:set_text(old_filename)
     core.command_view:enter("Rename", function(filename)
+      -- Save resolves aliases and relative paths to the same canonical target.
+      -- Compare that identity before removing the old spelling, otherwise
+      -- `file.txt` -> `./file.txt` can delete the file just written.
+      local old_target = system.resolve_path(old_filename)
+      local new_target = system.resolve_path(filename)
       doc():save(filename)
       core.log("Renamed \"%s\" to \"%s\"", old_filename, filename)
-      if filename ~= old_filename then
+      if old_target ~= new_target then
         os.remove(old_filename)
       end
     end, common.path_suggest)

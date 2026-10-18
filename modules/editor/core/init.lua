@@ -403,6 +403,7 @@ function core.on_event(type, ...)
     require('core.ime').on_text_editing(...)
   elseif type == "focuslost" then
     require('core.ime').stop()
+    require('core.keymap').reset_state()
   elseif type == "keypressed" then
     -- Lite XL suppresses editing shortcuts during composition. Keep modifier
     -- press/release pairs observable even while those shortcuts are suppressed.
@@ -556,16 +557,24 @@ end
 function core.on_error(err)
   -- Recovery must not mutate documents, overwrite originals, or stop after one
   -- unwritable path. Virtual projections contain no unsaved user file data.
-  local function write(path, text)
-    local fp, message = io.open(path, 'wb')
-    if not fp then io.stderr:write('recovery: ', path, ': ', tostring(message), '\n'); return end
-    local ok, why = fp:write(text)
-    local closed, close_error = fp:close()
-    if not ok or not closed then
-      io.stderr:write('recovery: ', path, ': ', tostring(why or close_error), '\n')
+  local diagnostic = 'Error: ' .. tostring(err) .. '\n'
+  local error_base = EXEDIR .. '/error.txt'
+  local error_written = false
+  -- Never truncate a user file or follow a symlink.  Use the conventional
+  -- name only when it can be created exclusively, then retain the error with
+  -- a numbered sibling if that name is occupied.
+  for suffix = 0, 9999 do
+    local path = error_base .. (suffix == 0 and '' or '~' .. suffix)
+    local called, ok, why, collision = pcall(system.write_file, path, diagnostic, true)
+    if called and ok then error_written = true; break end
+    if not called or not collision then
+      io.stderr:write('recovery: ', path, ': ', tostring(called and why or ok), '\n')
+      break
     end
   end
-  write(EXEDIR .. '/error.txt', 'Error: ' .. tostring(err) .. '\n')
+  if not error_written then
+    io.stderr:write('recovery: could not write fatal diagnostic\n')
+  end
   for index, doc in ipairs(core.docs or {}) do
     if not doc.virtual and doc:is_dirty() then
       local base = (doc.filename or (EXEDIR .. '/unsaved-' .. index)) .. '~'

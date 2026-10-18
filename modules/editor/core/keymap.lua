@@ -43,6 +43,11 @@ function keymap.capture_state()
   return clone(held)
 end
 
+function keymap.reset_state()
+  held = {}
+  update_modkeys()
+end
+
 -- Synthetic input gets its own physical and derived state, even on failure.
 function keymap.with_state(state, fn)
   local previous_held, previous_modkeys = held, keymap.modkeys

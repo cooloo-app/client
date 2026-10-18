@@ -70,17 +70,22 @@ end
 
 function Doc:load(filename)
   if self.readonly then return false end
-  local fp = assert( io.open(filename, "rb") )
-  self:reset()
-  self.filename = filename
+  -- Read and validate the complete replacement before touching the current
+  -- document.  Plugins use this API directly, so a read/close failure must
+  -- not discard unsaved text or its undo state.
+  local fp = assert(io.open(filename, "rb"))
   local data = assert(fp:read('*a'))
   assert(fp:close())
-  self.crlf = data:find('\r\n', 1, true) ~= nil
+  local crlf = data:find('\r\n', 1, true) ~= nil
   data = data:gsub('\r\n', '\n')
-  self.lines = {}
+  local lines = {}
   for line in (data .. '\n'):gmatch('(.-)\n') do
-    self.lines[#self.lines + 1] = line .. '\n'
+    lines[#lines + 1] = line .. '\n'
   end
+  self:reset()
+  self.filename = filename
+  self.crlf = crlf
+  self.lines = lines
   self:reset_syntax()
   self:clean()
 end

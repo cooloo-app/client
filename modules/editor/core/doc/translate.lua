@@ -13,18 +13,22 @@ end
 
 
 function translate.previous_char(doc, line, col)
-  repeat
-    line, col = doc:position_offset(line, col, -1)
-  until not common.is_utf8_cont(doc:get_char(line, col))
-  return line, col
+  while true do
+    local next_line, next_col = doc:position_offset(line, col, -1)
+    if next_line == line and next_col == col then return line, col end
+    line, col = next_line, next_col
+    if not common.is_utf8_cont(doc:get_char(line, col)) then return line, col end
+  end
 end
 
 
 function translate.next_char(doc, line, col)
-  repeat
-    line, col = doc:position_offset(line, col, 1)
-  until not common.is_utf8_cont(doc:get_char(line, col))
-  return line, col
+  while true do
+    local next_line, next_col = doc:position_offset(line, col, 1)
+    if next_line == line and next_col == col then return line, col end
+    line, col = next_line, next_col
+    if not common.is_utf8_cont(doc:get_char(line, col)) then return line, col end
+  end
 end
 
 

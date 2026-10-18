@@ -88,7 +88,9 @@ Malformed external fonts can still crash the inherited stb parser; font loading
 is not a validation boundary for untrusted fonts. This native failure is outside
 Lua error recovery; comprehensive font validation is deferred.
 
-Fatal startup/frame/thread/draw errors print a traceback, attempt `error.txt` and
+Fatal startup/frame/thread/draw errors print a traceback, attempt an exclusive
+`error.txt` diagnostic (falling back to numbered siblings without following
+symlinks) and
 non-overwriting recovery copies of dirty ordinary documents, then exit nonzero.
 Untitled dirty documents also receive recovery copies; virtual projections are
 excluded. Write failures are diagnosed on stderr. Normal confirmed/forced exits
