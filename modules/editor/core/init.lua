@@ -147,14 +147,12 @@ function core.init(options)
 end
 
 
-local temp_uid = math.floor(system.get_time() * 1000) % 0xffffffff
-local temp_file_prefix = string.format(".lite_temp_%08x", temp_uid)
-local temp_file_counter = 0
+local temp_files = {}
 
 local function delete_temp_files()
-  for _, filename in ipairs(system.list_dir(EXEDIR) or {}) do
-    if filename:find(temp_file_prefix, 1, true) == 1 then
-      os.remove(EXEDIR .. PATHSEP .. filename)
+  for filename in pairs(temp_files) do
+    if os.remove(filename) or not system.get_file_info(filename) then
+      temp_files[filename] = nil
     end
   end
 end
@@ -162,9 +160,9 @@ end
 core.cleanup = delete_temp_files
 
 function core.temp_filename(ext)
-  temp_file_counter = temp_file_counter + 1
-  return EXEDIR .. PATHSEP .. temp_file_prefix
-      .. string.format("%06x", temp_file_counter) .. (ext or "")
+  local filename = system.temp_file(EXEDIR, ext or "")
+  temp_files[filename] = true
+  return filename
 end
 
 
@@ -302,7 +300,7 @@ end
 function core.open_doc(filename)
   if filename then
     -- try to find existing doc for filename
-    local abs_filename = (system.resolve_path or system.absolute_path)(filename)
+    local abs_filename = assert((system.resolve_path or system.absolute_path)(filename))
     for _, doc in ipairs(core.docs) do
       if doc.filename
       and abs_filename == (system.resolve_path or system.absolute_path)(doc.filename) then
@@ -313,11 +311,23 @@ function core.open_doc(filename)
   -- no existing doc for filename; create new
   local doc = require('core.doc')()
   if filename then
-    local info = system.get_file_info(filename)
+    local info, err, missing = system.get_file_info(filename)
     if info then
       assert(info.type == 'file', 'not a regular file: ' .. filename)
       doc:load(filename)
     else
+      assert(missing, err)
+      local parent = filename
+      while true do
+        parent = parent:match('^(.*)[/\\]') or '.'
+        if parent == '' then parent = PATHSEP end
+        local parent_info, parent_err, parent_missing = system.get_file_info(parent)
+        if parent_info then
+          assert(parent_info.type == 'dir', 'invalid parent directory')
+          break
+        end
+        assert(parent_missing and parent ~= PATHSEP and parent ~= '.', parent_err)
+      end
       doc.filename = filename
       doc:reset_syntax()
     end

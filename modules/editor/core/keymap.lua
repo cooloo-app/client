@@ -20,6 +20,14 @@ if system.platform == "macOS" then
 end
 
 local modkeys = { "ctrl", "alt", "altgr", "shift" }
+local held = {}
+
+local function update_modkeys()
+  for _, mk in ipairs(modkeys) do keymap.modkeys[mk] = false end
+  for key in pairs(held) do keymap.modkeys[modkey_map[key]] = true end
+  -- Windows synthesizes Ctrl with AltGr; suppress it for the entire chord.
+  if keymap.modkeys.altgr then keymap.modkeys.ctrl = false end
+end
 
 local function key_to_stroke(k)
   local stroke = ""
@@ -60,11 +68,8 @@ end
 function keymap.on_key_pressed(k, commands_enabled)
   local mk = modkey_map[k]
   if mk then
-    keymap.modkeys[mk] = true
-    -- work-around for windows where `altgr` is treated as `ctrl+alt`
-    if mk == "altgr" then
-      keymap.modkeys["ctrl"] = false
-    end
+    held[k] = true
+    update_modkeys()
   elseif commands_enabled ~= false then
     local stroke = key_to_stroke(k)
     local commands = keymap.map[stroke]
@@ -83,7 +88,8 @@ end
 function keymap.on_key_released(k)
   local mk = modkey_map[k]
   if mk then
-    keymap.modkeys[mk] = false
+    held[k] = nil
+    update_modkeys()
   end
 end
 

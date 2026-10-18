@@ -10,11 +10,13 @@ if api.text_files and not api.safe_mode then
   table.insert(package.searchers, 1, function(name)
     local relative = name:match('^user%.(.+)$')
     if not relative then return '\n\tnot a user module' end
-    local path = USERDIR .. '/' .. relative:gsub('%.', '/')
-    local filename
-    if api.platform.info(path .. '.lua') then filename = path .. '.lua'
-    elseif api.platform.info(path .. '/init.lua') then filename = path .. '/init.lua' end
-    if filename then return assert(loadfile(filename)), filename end
+    for _, root in ipairs { USERDIR, EXEDIR .. '/data/user' } do
+      local path = root .. '/' .. relative:gsub('%.', '/')
+      local filename
+      if api.platform.info(path .. '.lua') then filename = path .. '.lua'
+      elseif api.platform.info(path .. '/init.lua') then filename = path .. '/init.lua' end
+      if filename then return assert(loadfile(filename)), filename end
+    end
     return '\n\tno user module ' .. name
   end)
 elseif api.safe_mode then
@@ -34,6 +36,7 @@ renderer.font.load = function(filename, size)
 end
 system = {
   platform=api.platform.name,
+  temp_file=api.platform.temp_file,
   get_time=api.time, get_clipboard=api.clipboard.get, set_clipboard=api.clipboard.set,
   request_quit=api.quit, window_has_focus=api.platform.focus,
   clear_ime=api.clear_ime, set_text_input_rect=api.set_ime_rect,

@@ -16,6 +16,11 @@
 #include <direct.h>
 #else
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #endif
 static double fps = 60;
 double platform_frame_period(void) { return 1.0 / fps; }
@@ -126,7 +131,25 @@ static SDL_EnumerationResult entry(void *ctx,const char *dir,const char *name) {
 }
 static int list(lua_State *L) { const char *p=luaL_checkstring(L,1);lua_newtable(L);if (!SDL_EnumerateDirectory(p,entry,L)) { lua_pop(L,1); lua_pushnil(L); lua_pushstring(L,SDL_GetError()); return 2; } return 1; }
 static int info(lua_State *L) {
-    SDL_PathInfo i;if(!SDL_GetPathInfo(luaL_checkstring(L,1),&i)){lua_pushnil(L);lua_pushstring(L,SDL_GetError());return 2;}
+    const char *path=luaL_checkstring(L,1);
+    /* A third result distinguishes missing paths from access/I/O failures. */
+#ifdef _WIN32
+    wchar_t *w=wide(L,path);
+    DWORD attrs=GetFileAttributesW(w), error=GetLastError();free(w);
+    if(attrs==INVALID_FILE_ATTRIBUTES) {
+        lua_pushnil(L);lua_pushfstring(L,"path lookup failed (%d): %s",(int)error,path);
+        lua_pushboolean(L,error==ERROR_FILE_NOT_FOUND || error==ERROR_PATH_NOT_FOUND);return 3;
+    }
+#else
+    struct stat st;
+    if(stat(path,&st)) {
+        int error=errno;
+        struct stat link;
+        int missing=error==ENOENT && lstat(path,&link)!=0 && errno==ENOENT;
+        lua_pushnil(L);lua_pushstring(L,strerror(error));lua_pushboolean(L,missing);return 3;
+    }
+#endif
+    SDL_PathInfo i;if(!SDL_GetPathInfo(path,&i)){lua_pushnil(L);lua_pushstring(L,SDL_GetError());return 2;}
     lua_newtable(L);lua_pushstring(L,i.type==SDL_PATHTYPE_DIRECTORY?"dir":i.type==SDL_PATHTYPE_FILE?"file":NULL);lua_setfield(L,-2,"type");
     lua_pushinteger(L,(lua_Integer)i.size);lua_setfield(L,-2,"size");
     lua_pushnumber(L,(lua_Number)i.modify_time/1e9);lua_setfield(L,-2,"modified");return 1;
@@ -137,6 +160,8 @@ static int resolve_path(lua_State *L) {
 #ifdef _WIN32
     int results=absolute(L);
     if(!lua_isnil(L,-results))return results;
+    DWORD error=(DWORD)lua_tointeger(L,-1);
+    if(error!=ERROR_FILE_NOT_FOUND && error!=ERROR_PATH_NOT_FOUND)return results;
     lua_pop(L,results);
     wchar_t *w=wide(L,p), *full=_wfullpath(NULL,w,0);free(w);
     if(!full)return luaL_error(L,"cannot resolve path: %s",p);
@@ -145,7 +170,7 @@ static int resolve_path(lua_State *L) {
     char *resolved=realpath(p,NULL);
     if(resolved){lua_pushstring(L,resolved);free(resolved);}
     else {
-        if(errno!=ENOENT && errno!=ENOTDIR){lua_pushnil(L);lua_pushstring(L,strerror(errno));return 2;}
+        if(errno!=ENOENT){lua_pushnil(L);lua_pushstring(L,strerror(errno));return 2;}
         char *cwd=SDL_GetCurrentDirectory();
         size_t length=strlen(p)+(cwd?strlen(cwd):0)+2;
         char *path=malloc(length),*out=calloc(length,1);
@@ -180,8 +205,8 @@ static int absolute(lua_State *L) {
 #ifdef _WIN32
     wchar_t *w=wide(L,p);
     HANDLE h=CreateFileW(w,0,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
-    free(w);
-    if(h==INVALID_HANDLE_VALUE){lua_pushnil(L);lua_pushliteral(L,"cannot open path");return 2;}
+    DWORD error=GetLastError();free(w);
+    if(h==INVALID_HANDLE_VALUE){lua_pushnil(L);lua_pushfstring(L,"cannot open path (%d)",(int)error);lua_pushinteger(L,error);return 3;}
     DWORD n=GetFinalPathNameByHandleW(h,NULL,0,FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
     wchar_t *full=malloc(((size_t)n+1)*sizeof *full);
     if(!full){CloseHandle(h);return luaL_error(L,"out of memory");}
@@ -216,8 +241,38 @@ static int fuzzy_match(lua_State *L) {
     if(*ptn)return 0;
     lua_pushinteger(L,score-(int)strlen((const char *)str));return 1;
 }
+/* Reserve the exact name exclusively; Lua records only successfully owned files. */
+static int temp_file(lua_State *L) {
+    const char *dir=luaL_checkstring(L,1), *ext=luaL_optstring(L,2,"");
+    if(strchr(ext,'/') || strchr(ext,'\\'))return luaL_error(L,"invalid temporary extension");
+    static unsigned long counter;
+#ifdef _WIN32
+    unsigned long pid=GetCurrentProcessId();
+#else
+    unsigned long pid=(unsigned long)getpid();
+#endif
+    for(int attempt=0;attempt<10000;attempt++) {
+        lua_pushfstring(L,"%s/.lite_temp_%I_%I%s",dir,(lua_Integer)pid,(lua_Integer)++counter,ext);
+        const char *path=lua_tostring(L,-1);
+#ifdef _WIN32
+        wchar_t *w=wide(L,path);
+        HANDLE h=CreateFileW(w,GENERIC_WRITE,0,NULL,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,NULL);
+        DWORD error=GetLastError();free(w);
+        if(h!=INVALID_HANDLE_VALUE){CloseHandle(h);return 1;}
+        if(error!=ERROR_FILE_EXISTS && error!=ERROR_ALREADY_EXISTS)
+            return luaL_error(L,"cannot reserve temporary file (%d)",(int)error);
+#else
+        int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
+        if(fd>=0){close(fd);return 1;}
+        if(errno!=EEXIST)return luaL_error(L,"cannot reserve temporary file: %s",strerror(errno));
+#endif
+        lua_pop(L,1);
+    }
+    return luaL_error(L,"temporary filename attempts exhausted");
+}
+
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"temp_file",temp_file},{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -239,10 +294,19 @@ void platform_register(lua_State *L) {
     DWORD n=GetModuleFileNameW(NULL,path,32768);
     if(!n || n>=32768)luaL_error(L,"cannot resolve executable path");
     push_wide(L,path);
+#elif defined(__APPLE__)
+    uint32_t size=0;
+    _NSGetExecutablePath(NULL,&size);
+    char *path=malloc(size);
+    if(!path || _NSGetExecutablePath(path,&size)) {free(path);luaL_error(L,"cannot resolve executable path");}
+    char *resolved=realpath(path,NULL);free(path);
+    if(!resolved)luaL_error(L,"cannot resolve executable path");
+    lua_pushstring(L,resolved);free(resolved);
 #else
-    extern const char *cooloo_text_executable;
-    const char *name=strrchr(cooloo_text_executable,'/');
-    lua_pushfstring(L,"%s%s",base?base:"",name?name+1:cooloo_text_executable);
+    char path[4096];
+    ssize_t n=readlink("/proc/self/exe",path,sizeof(path)-1);
+    if(n<0 || n>=(ssize_t)sizeof(path)-1)luaL_error(L,"cannot resolve executable path");
+    path[n]=0;lua_pushstring(L,path);
 #endif
 #else
     lua_pushliteral(L,"");

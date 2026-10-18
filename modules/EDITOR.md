@@ -59,7 +59,7 @@ silently replace core). `user.*` resolves relative to USERDIR, then the portable
 layout. An example user module is in `vendor/lite/user-init.lua`, also embedded as
 the string returned by `require 'user.example'`. Both upstream sample themes,
 `user.colors.fall` and `user.colors.summer`, are embedded; external USERDIR themes
-take precedence in normal text mode.
+then portable themes take precedence over embedded fallback in normal text mode.
 
 `core:open-user-module` opens the selected user init file (or a new named document
 filled with the upstream template; create its parent directory before saving). Lua errors are caught, recorded in
@@ -69,6 +69,12 @@ Lite `core`, `Doc`, `View`, command/keymap/syntax APIs and `core.add_thread`.
 `system.exec(command)` are available. `system.absolute_path` canonicalizes existing
 paths and returns `nil,error` on failure; the separate `system.resolve_path`
 extension resolves new filenames. Directory/stat failures also return `nil,error`.
+`get_file_info` additionally returns a third `true` for missing paths;
+interactive opening rejects access errors, broken links and non-directory parents
+without adding a document. Missing parent directories remain allowed for new
+named documents (create the directories before saving). `core.temp_filename(ext)` exclusively reserves an empty
+file in EXEDIR and tracks that exact path for session cleanup; it may fail if the
+directory is not writable.
 
 The native Lite renderer uses independent, garbage-collected font objects and the
 upstream pixel tab/advance/height rules. `renderer.font.load(path,size)` loads real
@@ -78,6 +84,9 @@ Missing primary glyphs use the existing system CJK fallback chain; unavailable
 fallback glyphs retain blank replacement spacing. Font sizes may be fractional.
 `renderer.show_debug(true)` displays actual dirty regions. Arbitrary native Lite
 C plugins and every third-party Lua plugin are not a compatibility guarantee.
+Malformed external fonts can still crash the inherited stb parser; font loading
+is not a validation boundary for untrusted fonts. This native failure is outside
+Lua error recovery; comprehensive font validation is deferred.
 
 Fatal startup/frame/thread/draw errors print a traceback, attempt `error.txt` and
 non-overwriting recovery copies of dirty ordinary documents, then exit nonzero.
@@ -116,6 +125,7 @@ Build `cooloo-text` (macOS), `cooloo-text.exe` (MinGW), or the development
 make test-renderer-macos test-event-bridge-macos
 python3 tests/editor_integration.py ./cooloo-text
 python3 tests/lifecycle_test.py ./cooloo-text
+python3 tests/adversarial_test.py ./cooloo-text ./build/renderer-test-macos
 make test-workbench-headless
 SDL_VIDEODRIVER=dummy build/renderer-test-macos tests/workbench.lua
 build/lua-runner --lua-run tests/provider.lua
