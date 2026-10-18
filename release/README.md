@@ -1,5 +1,22 @@
 # cooloo client — development artifact refresh (2026-10-18, untagged)
 
+## Latest: dedicated T icon — Windows text only (2026-10-18)
+
+`cooloo-text-windows-x86_64.exe` is rebuilt from committed client source
+`6a7f8dbc7499953e4afd847c523c04da656704ab` to embed and use the dedicated
+orange T icon for cooloo-text. The C icon and full cooloo product are unchanged.
+Input git archive SHA-256:
+`7932b888d54867e7bc47b53d0ea520690cf73c1f37370b8783a37d0db671ec05`.
+
+- Isolated m106 build with Apple clang/MinGW GCC 16.2.0 toolchain and vendored
+  SDL3/Lua; `make -j4 cooloo-text.exe` passed.
+- PE32+ x86_64 GUI subsystem; static inspection passed. Artifact is
+  **4,221,107 bytes**, SHA-256:
+  `8f02183f97a8d0670c7f65a1f2877246880ec4fe45c83f71c84aabc3fd5cfb5d`.
+- m101 desktop icon probe was attempted but could not create a GUI window in the
+  available session; Windows desktop/taskbar visual acceptance remains unverified.
+- Development refresh only; no tag, GitHub Release or Python publication.
+
 ## Latest: round-3 adversarial fixes — Windows text only (2026-10-18)
 
 `cooloo-text-windows-x86_64.exe` is rebuilt from committed client source
@@ -301,7 +318,7 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 | cooloo-darwin-arm64 | 2827080 | 59eb85349b4b87a70ef275d8869cf235dec0fe819280cd91b508032572d3bc16 |
 | cooloo-windows-x86_64.exe | 4401747 | 3f90764aa16b814e0ff57f63c82f666528a986dfef93999623d2ba411bc56e6d |
 | cooloo-text-darwin-arm64 | 2650056 | ddfe93aadf4102b0f12c3797db66905922d0ddf58251c8c23a7eb4aac2aa1351 |
-| cooloo-text-windows-x86_64.exe | 4222131 | 0067db5f3a75b3b6f33d7d7d133dd71351a390e37d3f0285963a1ef7b6581f9d |
+| cooloo-text-windows-x86_64.exe | 4221107 | 8f02183f97a8d0670c7f65a1f2877246880ec4fe45c83f71c84aabc3fd5cfb5d |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
 | cooloo-workbench-windows-x86_64.exe | 645198 | d45e0de2ce1dc74e9f10aa58ce3836ef1a8c312b2b21b28f2c8e65f2a7fae8f7 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
