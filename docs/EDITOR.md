@@ -10,8 +10,10 @@ pane. A dropped directory starts a separate text-editor process, with an argv
 array (no shell interpolation). Safe mode is inherited by directory children;
 a development `--lua-dev` bundle is deliberately not inherited.
 
-Project scanning, Ctrl+P file candidates, treeview and project search use the
-selected directory. The window title includes the project path. The SDL3 host
+With no file arguments, the editor shows an empty welcome view rather than
+creating a document; Ctrl+N creates an unnamed document. Project scanning,
+Ctrl+P file candidates, treeview and project search use the selected directory.
+The window title includes the project path. The SDL3 host
 uses Lite's poll → editor step → coroutine work → sleep-remaining-frame sequence,
 not event-triggered frame scheduling. `config.fps` (1–1000, default 60) controls
 both host pacing and Lite's existing per-frame timers. There is no new dt/deadline

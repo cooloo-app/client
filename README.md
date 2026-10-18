@@ -35,10 +35,10 @@ make test-workbench-macos       # macOS workbench/runtime + SDL dummy + loopback
 product. It supports project scanning, file/directory drops, Lite's 16 default
 plugins and user/project Lua extensions. See [editor guide](docs/EDITOR.md)
 for directory layout, trust policy and validation. Normal mode executes trusted
-user/project modules; `--safe-mode` skips external extensions. It opens an
-ordinary empty document when no files are supplied. It does
-not bundle message/workspace/console plugins, link the execution runtime or client
-network/identity/cache core, or read/write `~/.cooloo`. Existing `editor`,
+user/project modules; `--safe-mode` skips external extensions. With no files
+supplied it shows an empty welcome view; Ctrl+N creates an unnamed document.
+It does not bundle message/workspace/console plugins, link the execution runtime
+or client network/identity/cache core, or read/write `~/.cooloo`. Existing `editor`,
 `editor.exe`, `editor-linux` build names remain aliases with this new pure-editor
 behavior; they no longer start a mock conversation or execute `--lua-run`.
 
