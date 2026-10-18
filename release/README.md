@@ -1,6 +1,46 @@
 # cooloo client — development artifact refresh (2026-10-18, untagged)
 
-## Latest: round-2 adversarial fixes — Windows text only (2026-10-18)
+## Latest: round-3 adversarial fixes — Windows text only (2026-10-18)
+
+`cooloo-text-windows-x86_64.exe` is rebuilt from committed client source
+`89db9d01b0b2f0fd2e2e9e161b9b26e047753dcc` (initial fixes `69d838d`, edge-case
+and regression follow-up `89db9d0`). Input git archive SHA-256:
+`c35d6e2998499f2fcb73431d387abb93501388108fb1ca6b2aea6c30b3c97f43`.
+Other seven artifacts retain the `2fc9021` provenance below.
+
+- Fixes five reviewed root causes: equivalent-path rename deleting saved data,
+  fatal diagnostics overwriting existing files/symlink targets, failed Doc load
+  destroying edits/history, invalid UTF-8 navigation hanging, and focus-loss
+  modifiers triggering unwanted shortcuts. Macro recordings also preserve
+  focus-loss resets in their isolated playback state. See
+  [editor contracts](../modules/EDITOR.md) and [event contract](../modules/EVENTS.md).
+- Final isolated m106 build: `/tmp/cooloo-round3-final.rK0wlM/client`, Apple clang
+  21.0.0 and MinGW GCC 16.2.0, vendored SDL3/Lua. macOS text and native harnesses
+  are validation-only; the installed release refresh is Windows text only.
+- Linux/macOS passed Round 3 and Round 2 acceptance, renderer/cache/event bridge,
+  normal/safe editor integration, lifecycle, prior adversarial tests, native
+  close/replace failure injection, workbench local smoke and headless tests.
+  Five independent Linux negative controls rejected old implementations
+  (four assertion failures, one navigation timeout).
+- Linux/macOS `make test` passed after repairing the existing startup-test stub
+  for `luabind_set_args` and building sibling server gate/daemon. These tests use
+  isolated configuration and loopback only; server source remains
+  `de4f3d21aecaa2190564c329608c02a9decd8010`, unchanged.
+- Native Windows m101 passed Round 3 (including symlink cases), Round 2,
+  renderer/event bridge, file close/replace fault injection, normal/safe editor
+  integration, lifecycle and local workbench smoke. Test tree:
+  `C:\Users\Plato\AppData\Local\Temp\cooloo-round3-final-ql7n577x`.
+- PE32+ x86_64 GUI subsystem, Windows system DLLs only. Build, transfer, Windows
+  execution copy and installed artifact hashes match. **4,222,131 bytes**, SHA-256:
+  `0067db5f3a75b3b6f33d7d7d133dd71351a390e37d3f0285963a1ef7b6581f9d`.
+- **Not verified:** real desktop focus/Alt-Tab and IME candidates, OS clipboard
+  and drop delivery, multi-display DPI/visual acceptance, exhaustive ACL/UNC/
+  reparse/network-filesystem behavior, concurrent external rename races,
+  power-loss durability, native malformed-font safety or full workbench network
+  integration. D04 remains deferred. SDL dummy is not desktop acceptance.
+- Development refresh only; no tag, GitHub Release or Python publication.
+
+## Historical: round-2 adversarial fixes — Windows text only (2026-10-18)
 
 `cooloo-text-windows-x86_64.exe` is rebuilt from committed client source
 `3eb7a2f73aa64eefc445dd9f5bfeb40a8e375f4d` (main changes `15709d5`, macOS ACL
@@ -261,7 +301,7 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 | cooloo-darwin-arm64 | 2827080 | 59eb85349b4b87a70ef275d8869cf235dec0fe819280cd91b508032572d3bc16 |
 | cooloo-windows-x86_64.exe | 4401747 | 3f90764aa16b814e0ff57f63c82f666528a986dfef93999623d2ba411bc56e6d |
 | cooloo-text-darwin-arm64 | 2650056 | ddfe93aadf4102b0f12c3797db66905922d0ddf58251c8c23a7eb4aac2aa1351 |
-| cooloo-text-windows-x86_64.exe | 4220083 | de2a2f921fa3bcde74ef2a3b8521f59b488527765f41310877a46e0733313fa2 |
+| cooloo-text-windows-x86_64.exe | 4222131 | 0067db5f3a75b3b6f33d7d7d133dd71351a390e37d3f0285963a1ef7b6581f9d |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
 | cooloo-workbench-windows-x86_64.exe | 645198 | d45e0de2ce1dc74e9f10aa58ce3836ef1a8c312b2b21b28f2c8e65f2a7fae8f7 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
