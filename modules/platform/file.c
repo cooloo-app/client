@@ -33,10 +33,16 @@ static unsigned long serial;
 static int copy_xattrs(const char *path, int fd) {
 #ifdef __APPLE__
     acl_t acl=acl_get_file(path,ACL_TYPE_EXTENDED);
-    if(!acl)return errno;
-    int acl_error=acl_set_fd_np(fd,acl,ACL_TYPE_EXTENDED)?errno:0;
-    acl_free(acl);
-    if(acl_error)return acl_error;
+    if(!acl) {
+        /* Darwin reports ENOENT for an existing file without an extended ACL. */
+        int error=errno;
+        struct stat st;
+        if(error!=ENOENT || stat(path,&st))return error;
+    } else {
+        int error=acl_set_fd_np(fd,acl,ACL_TYPE_EXTENDED)?errno:0;
+        acl_free(acl);
+        if(error)return error;
+    }
 #endif
 #if defined(__linux__) || defined(__APPLE__)
 #ifdef __APPLE__

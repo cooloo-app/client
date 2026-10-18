@@ -87,6 +87,8 @@ assert(not pcall(d.save,d));assert(d:is_dirty());core.quit(true)
         def paths(c):
             (c/'existing.txt').write_bytes(b'original')
             (c/'existing.txt').chmod(0o640)
+            if sys.platform=='darwin':
+                subprocess.run(['chmod','+a','everyone allow read',str(c/'existing.txt')],check=True)
             if hasattr(os,'setxattr'):
                 key='com.cooloo.test' if sys.platform=='darwin' else 'user.cooloo-test'
                 os.setxattr(c/'existing.txt',key,b'preserved')
@@ -106,6 +108,9 @@ d:text_input('new');d:save('alias');core.quit(true)
         assert (base/'path-open'/'alias').is_symlink()
         assert (base/'path-open'/'existing.txt').read_bytes()==b'neworiginal'
         assert (base/'path-open'/'existing.txt').stat().st_mode & 0o777 == 0o640
+        if sys.platform=='darwin':
+            acl=subprocess.check_output(['ls','-le',str(base/'path-open'/'existing.txt')],text=True)
+            assert 'everyone allow read' in acl,acl
         if hasattr(os,'listxattr'):
             key='com.cooloo.test' if sys.platform=='darwin' else 'user.cooloo-test'
             attrs=os.listxattr(base/'path-open'/'existing.txt')
