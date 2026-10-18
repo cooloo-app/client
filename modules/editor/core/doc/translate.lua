@@ -1,4 +1,3 @@
-local common = require "core.common"
 local config = require "core.config"
 
 -- functions for translating a Doc position to another position these functions
@@ -12,23 +11,35 @@ local function is_non_word(char)
 end
 
 
-function translate.previous_char(doc, line, col)
-  while true do
-    local next_line, next_col = doc:position_offset(line, col, -1)
-    if next_line == line and next_col == col then return line, col end
-    line, col = next_line, next_col
-    if not common.is_utf8_cont(doc:get_char(line, col)) then return line, col end
+-- Invalid UTF-8 is retained byte-for-byte and navigated one byte at a time.
+-- Only a complete, valid Unicode scalar can consume multiple bytes.
+local function char_size(text, col)
+  local byte = text:byte(col) or 0
+  local size = byte >= 0xc2 and byte <= 0xdf and 2
+    or byte >= 0xe0 and byte <= 0xef and 3
+    or byte >= 0xf0 and byte <= 0xf4 and 4 or 1
+  if size > 1 and utf8.len(text:sub(col, col + size - 1)) == 1 then
+    return size
   end
+  return 1
+end
+
+function translate.previous_char(doc, line, col)
+  line, col = doc:sanitize_position(line, col)
+  if col > 1 then
+    local text = doc.lines[line]
+    for start = math.max(1, col - 4), col - 1 do
+      local size = char_size(text, start)
+      if size > 1 and start + size == col then return line, start end
+    end
+  end
+  return doc:position_offset(line, col, -1)
 end
 
 
 function translate.next_char(doc, line, col)
-  while true do
-    local next_line, next_col = doc:position_offset(line, col, 1)
-    if next_line == line and next_col == col then return line, col end
-    line, col = next_line, next_col
-    if not common.is_utf8_cont(doc:get_char(line, col)) then return line, col end
-  end
+  line, col = doc:sanitize_position(line, col)
+  return doc:position_offset(line, col, char_size(doc.lines[line], col))
 end
 
 

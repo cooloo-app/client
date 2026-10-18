@@ -74,8 +74,12 @@ function Doc:load(filename)
   -- document.  Plugins use this API directly, so a read/close failure must
   -- not discard unsaved text or its undo state.
   local fp = assert(io.open(filename, "rb"))
-  local data = assert(fp:read('*a'))
-  assert(fp:close())
+  local read_ok, data, read_error = pcall(fp.read, fp, '*a')
+  local close_ok, closed, close_error = pcall(fp.close, fp)
+  assert(read_ok, data)
+  assert(data, read_error)
+  assert(close_ok, closed)
+  assert(closed, close_error)
   local crlf = data:find('\r\n', 1, true) ~= nil
   data = data:gsub('\r\n', '\n')
   local lines = {}

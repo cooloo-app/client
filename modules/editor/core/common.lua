@@ -3,7 +3,7 @@ local common = {}
 
 function common.is_utf8_cont(char)
   local byte = char:byte()
-  return byte >= 0x80 and byte < 0xc0
+  return byte ~= nil and byte >= 0x80 and byte < 0xc0
 end
 
 

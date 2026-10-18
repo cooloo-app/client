@@ -90,8 +90,7 @@ Lua error recovery; comprehensive font validation is deferred.
 
 Fatal startup/frame/thread/draw errors print a traceback, attempt an exclusive
 `error.txt` diagnostic (falling back to numbered siblings without following
-symlinks) and
-non-overwriting recovery copies of dirty ordinary documents, then exit nonzero.
+symlinks) and non-overwriting recovery copies of dirty ordinary documents, then exit nonzero.
 Untitled dirty documents also receive recovery copies; virtual projections are
 excluded. Write failures are diagnosed on stderr. Normal confirmed/forced exits
 and fatal recovery remove this session's temporary files. Plugin `core.try`
@@ -116,9 +115,22 @@ renaming files. This is not a power-loss durability or concurrent-edit conflict
 detection guarantee. Recovery uses an exclusive create/write/close handle per
 backup and retries name collisions, including simultaneous editor instances.
 
-Macros record committed input, omit non-modifier keys consumed by composition,
-and replay with a separate modifier state. Failure also restores the real held
-keys. Playback is ignored while an OS composition is active; it does not replay
+Rename resolves old/new canonical paths before saving; an equivalent path is a
+true no-op, retaining dirty edits and the current name. A distinct target is
+saved before the old path is removed; deletion failure reports both names and
+retains both copies. Existing hard-linked targets remain rejected by Save.
+This is not a transaction against concurrent external path replacement.
+
+`Doc:load` stages open/read/close and line parsing before replacing current
+state. I/O failure preserves text, filename, selection, history and dirty state;
+the read handle is closed even when reading fails. Invalid UTF-8 bytes are kept
+unchanged: character navigation/deletion treats each invalid byte as one unit
+and only groups complete valid Unicode scalars.
+
+Macros record committed input and focus-loss modifier resets, omit non-modifier
+keys consumed by composition, and replay with a separate modifier state.
+Failure also restores the real held keys. Focus loss clears physical modifiers
+and stops IME; a late key release is harmless. Playback is ignored while an OS composition is active; it does not replay
 preedit into the OS.
 
 ## Trust and workbench boundaries
@@ -153,9 +165,10 @@ python3 tests/editor_integration.py ./cooloo-text
 python3 tests/lifecycle_test.py ./cooloo-text
 python3 tests/adversarial_test.py ./cooloo-text ./build/renderer-test-macos
 python3 tests/round2_test.py ./cooloo-text
+python3 tests/round3_test.py ./cooloo-text
 make build/file-write-test
 fixture=$(mktemp)
-build/file-write-test "$fixture"
+build/file-write-test "$fixture/file.txt"
 make test-workbench-headless
 SDL_VIDEODRIVER=dummy build/renderer-test-macos tests/workbench.lua
 build/lua-runner --lua-run tests/provider.lua

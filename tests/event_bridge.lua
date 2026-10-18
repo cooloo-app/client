@@ -84,6 +84,17 @@ local function click(shift)
   assert(not view.mouse_selecting,'release must finish selection')
   if shift then tick(key('keyreleased','Left Shift')) end
 end
+-- Focus loss travels through native SDL delivery before Lua resets modifiers.
+for _,modifier in ipairs{'Left Ctrl','Right Ctrl','Left Shift','Right Shift','Left Alt','Right Alt','Left GUI'} do
+  tick(key('keypressed',modifier), {'textediting','ni',2,0})
+  assert(ime.editing)
+  tick({'focuslost'})
+  assert(not ime.editing and next(keymap.capture_state())==nil)
+  for _,down in pairs(keymap.modkeys) do assert(not down) end
+  tick({'focusgained'})
+  tick(key('keyreleased',modifier),key('keypressed','S'))
+  assert(not keymap.modkeys.ctrl and not keymap.modkeys.shift)
+end
 -- All four splits: no command.perform shortcut around the actual event bridge.
 for _,k in ipairs{'L','J','I','K'} do
   doc:set_selection(1,1)

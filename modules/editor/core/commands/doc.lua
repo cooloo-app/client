@@ -304,7 +304,8 @@ local commands = {
   end,
 
   ["doc:rename"] = function()
-    local old_filename = doc().filename
+    local renamed_doc = doc()
+    local old_filename = renamed_doc.filename
     if not old_filename then
       core.error("Cannot rename unsaved doc")
       return
@@ -314,13 +315,17 @@ local commands = {
       -- Save resolves aliases and relative paths to the same canonical target.
       -- Compare that identity before removing the old spelling, otherwise
       -- `file.txt` -> `./file.txt` can delete the file just written.
-      local old_target = system.resolve_path(old_filename)
-      local new_target = system.resolve_path(filename)
-      doc():save(filename)
-      core.log("Renamed \"%s\" to \"%s\"", old_filename, filename)
-      if old_target ~= new_target then
-        os.remove(old_filename)
+      local old_target = assert(system.resolve_path(old_filename))
+      local new_target = assert(system.resolve_path(filename))
+      if old_target == new_target then return end
+      renamed_doc:save(filename)
+      local removed, err = os.remove(old_filename)
+      if not removed then
+        core.error("Saved \"%s\", but could not remove \"%s\": %s",
+          filename, old_filename, tostring(err))
+        return
       end
+      core.log("Renamed \"%s\" to \"%s\"", old_filename, filename)
     end, common.path_suggest)
   end,
 }

@@ -6,6 +6,7 @@ local handled_events = {
   ["keypressed"]  = true,
   ["keyreleased"] = true,
   ["textinput"]   = true,
+  ["focuslost"]   = true, -- replay the modifier reset in the synthetic state
 }
 
 local state = "stopped"

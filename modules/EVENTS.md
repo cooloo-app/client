@@ -53,6 +53,7 @@ build/event-bridge-test.exe tests/event_bridge.lua
 python3 tests/editor_integration.py ./cooloo-text
 SDL_VIDEODRIVER=dummy build/renderer-test tests/workbench.lua
 python3 tests/round2_test.py ./cooloo-text-linux
+python3 tests/round3_test.py ./cooloo-text-linux
 ```
 
 The test executable alone exposes `SDL_PushEvent`. It links production `gui.c`

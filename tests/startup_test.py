@@ -13,6 +13,8 @@ with tempfile.TemporaryDirectory(prefix='cooloo-startup-') as tmp:
     env = dict(os.environ, COOLOO_CONFIG=str(config), COOLOO_HOST='127.0.0.1:1')
     stub = base / 'gui_stub.c'
     stub.write_text('''#include <stdio.h>
+#include "luabind.h"
+void luabind_set_args(int argc, char **argv) { (void)argc; (void)argv; }
 int cooloo_gui_run(const char *dev) {
     printf("GUI:%s\\n", dev ? dev : "embedded");
     return 0;
