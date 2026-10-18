@@ -12,7 +12,7 @@ local EmptyView = View:extend()
 local function draw_text(x, y, color)
   local th = style.big_font:get_height()
   local dh = th + style.padding.y * 2
-  x = renderer.draw_text(style.big_font, core.app_name or "cooloo-text", x, y + (dh - th) / 2, color)
+  x = renderer.draw_text(style.big_font, core.app_name or "text", x, y + (dh - th) / 2, color)
   x = x + style.padding.x
   renderer.draw_rect(x, y, math.ceil(1 * SCALE), dh, color)
   local lines = {
