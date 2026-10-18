@@ -18,4 +18,6 @@ artifact is not included.
 
 These are development artifacts, not a tagged GitHub Release or a Python
 publication. Build and acceptance details belong in the release process and
-Git history; update `manifest.json` when the artifact set changes.
+Git history; update `manifest.json` when the artifact set changes. Validate the
+set with `python3 tools/release_manifest.py`; render GitHub Release Markdown
+with `python3 tools/release_manifest.py --release-notes`.
