@@ -1,6 +1,45 @@
 # cooloo client — development artifact refresh (2026-10-18, untagged)
 
-## Latest: adversarial integration fixes — Windows text only (2026-10-18)
+## Latest: round-2 adversarial fixes — Windows text only (2026-10-18)
+
+`cooloo-text-windows-x86_64.exe` is rebuilt from committed client source
+`3eb7a2f73aa64eefc445dd9f5bfeb40a8e375f4d` (main changes `15709d5`, macOS ACL
+follow-up `3eb7a2f`). Input archive SHA-256:
+`ece40e3cec447ad4ebc50fa5a418f97e8fc89f76fbb77df2a652a6a9a0f20ef6`.
+Other seven artifacts retain the `2fc9021` provenance below.
+
+- Fixes eight reviewed root causes: unsafe failed saves, undo-branch dirty state,
+  format dirty state, concurrent recovery overwrites, EOF selection mutation,
+  macro modifier corruption, IME macro deletion, and invalid-ancestor path bypass.
+  See [editor contracts](../modules/EDITOR.md) for save/format/link policies.
+- Isolated m106 build: `/tmp/cooloo-round2.PVxHP4/client`, Apple clang 21.0.0 and
+  MinGW GCC 16.2.0. Windows text and native test harnesses; macOS text/harnesses
+  built for validation only. Both builds use vendored SDL3/Lua.
+- Linux/macOS passed renderer/cache/event, `round2_test.py`, native close/replace
+  fault tests, prior adversarial suite, normal/safe editor integration, lifecycle,
+  local workbench smoke and headless projection/session. POSIX tests exercise
+  real partial-write failure, mode/xattr preservation and symlink targets;
+  macOS additionally verifies extended ACL preservation. The first macOS run
+  exposed the absent-ACL convention; the source follow-up above fixes it, and
+  the complete macOS suite was rerun successfully.
+- Native Windows m101 passed renderer/event, file close/replace fault injection,
+  round-2 regressions (including broken junction entry points and named/untitled
+  concurrent recovery), normal/safe editor integration, lifecycle, safe-mode
+  theme/modifier smoke and local workbench smoke. Isolated execution tree:
+  `C:\Users\Plato\AppData\Local\Temp\cooloo-round2-qj__oupe\client`.
+- PE32+ x86_64 GUI subsystem; only Windows system DLL imports. Build, transfer,
+  Windows execution and installed file hashes match. **4,220,083 bytes**, SHA-256:
+  `de2a2f921fa3bcde74ef2a3b8521f59b488527765f41310877a46e0733313fa2`.
+- **Not verified:** real desktop IME/candidates, OS clipboard/drop delivery,
+  cross-window key release, multi-display DPI/visual acceptance, exhaustive
+  ACL/UNC/reparse/network-filesystem behavior, power-loss durability, native
+  malformed-font safety or full workbench/network regression. D04 remains
+  explicitly deferred. Dummy tests are not desktop acceptance.
+- Sibling server `de4f3d21aecaa2190564c329608c02a9decd8010` exported for layout,
+  not built or run. Text-specific tests were used rather than CLI-oriented
+  Windows startup scripts. Development refresh; no tag, Release or PyPI publish.
+
+## Historical: adversarial integration fixes — Windows text only (2026-10-18)
 
 Only `cooloo-text-windows-x86_64.exe` is refreshed; the other seven artifacts
 retain the `2fc9021` provenance below. Client source:
@@ -222,7 +261,7 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 | cooloo-darwin-arm64 | 2827080 | 59eb85349b4b87a70ef275d8869cf235dec0fe819280cd91b508032572d3bc16 |
 | cooloo-windows-x86_64.exe | 4401747 | 3f90764aa16b814e0ff57f63c82f666528a986dfef93999623d2ba411bc56e6d |
 | cooloo-text-darwin-arm64 | 2650056 | ddfe93aadf4102b0f12c3797db66905922d0ddf58251c8c23a7eb4aac2aa1351 |
-| cooloo-text-windows-x86_64.exe | 4209492 | 0efb18195880706eaf8055901d2ca75cea5bc85925b88562a5f125502c1cc414 |
+| cooloo-text-windows-x86_64.exe | 4220083 | de2a2f921fa3bcde74ef2a3b8521f59b488527765f41310877a46e0733313fa2 |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
 | cooloo-workbench-windows-x86_64.exe | 645198 | d45e0de2ce1dc74e9f10aa58ce3836ef1a8c312b2b21b28f2c8e65f2a7fae8f7 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
