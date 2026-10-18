@@ -10,7 +10,11 @@
 #ifndef COOLOO_EDITOR_ONLY
 #include "config.h"
 #endif
+#ifdef COOLOO_EDITOR_ONLY
+#include "embedded_text_icon.h"
+#else
 #include "embedded_icon.h"
+#endif
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <stdio.h>

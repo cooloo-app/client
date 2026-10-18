@@ -46,7 +46,7 @@ WORKBENCH_LUA := $(shell find lua -name '*.lua')
 CFLAGS += -Isrc/client -Isrc/cli -Isrc/platform -Isrc/platform/api -Isrc/runtime -Isrc/adapters/cooloo -Ivendor -I$(GENERATED)
 ALL_SRC   := $(CORE_SRC) $(GUI_SRC) src/adapters/cooloo/script.c src/adapters/cooloo/cache.c $(LUA_SRC) $(EMBED_SRC)
 HEADERS   := $(shell find src -name '*.h') $(wildcard vendor/lua/*.h) vendor/stb_truetype.h vendor/monocypher.h
-GUI_HEADERS := $(GENERATED)/embedded_icon.h
+GUI_HEADERS := $(GENERATED)/embedded_icon.h $(GENERATED)/embedded_text_icon.h
 
 # SDL3 public headers are self-contained; no generated-config include needed
 SDL_MAC_INC := -Ivendor/sdl3/include -Ivendor/lua
@@ -107,7 +107,7 @@ cooloo-text editor: $(EDITOR_SRC) $(HEADERS) $(GUI_HEADERS) $(SDL_MAC_LIB)
 cooloo-text.exe editor.exe: $(EDITOR_SRC) $(HEADERS) $(GUI_HEADERS) $(SDL_WIN_LIB) $(BUILD)/text-icon.o
 	$(WIN_CC) $(CFLAGS) -DCOOLOO_EDITOR_ONLY -mwindows -Isrc $(SDL_WIN_INC) -o $@ $(EDITOR_SRC) $(BUILD)/text-icon.o $(WIN_LIBS)
 
-$(BUILD)/text-icon.o: assets/apps/editor/windows.rc assets/apps/editor/windows.manifest assets/cooloo.ico
+$(BUILD)/text-icon.o: assets/apps/editor/windows.rc assets/apps/editor/windows.manifest assets/cooloo-text.ico
 	mkdir -p $(BUILD)
 	$(WIN_RC) -Iassets/apps/editor -i assets/apps/editor/windows.rc -o $@
 
@@ -215,7 +215,10 @@ test: cooloo-cli
 	@tmp=$$(mktemp -d); $(BUILD)/cache-test "$$tmp"; rc=$$?; rm -rf "$$tmp"; exit $$rc
 
 $(GENERATED)/embedded_icon.h assets/cooloo.ico assets/cooloo.png: tools/generate_icon.py
-	python3 tools/generate_icon.py --output-dir $(GENERATED)
+	python3 tools/generate_icon.py --output-dir $(GENERATED) --mark C
+
+$(GENERATED)/embedded_text_icon.h assets/cooloo-text.ico assets/cooloo-text.png: tools/generate_icon.py
+	python3 tools/generate_icon.py --output-dir $(GENERATED) --mark T
 
 $(WIN_ICON): assets/apps/cooloo/windows.rc assets/cooloo.ico
 	mkdir -p $(BUILD)
