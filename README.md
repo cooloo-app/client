@@ -3,7 +3,8 @@
 The modular workbench replaces the v0.2 GUI. Protocol 2, Machine API schema 1,
 identity and cache formats remain compatible. See [docs/README.md](docs/README.md)
 for dependency boundaries and runner API, and [release/README.md](release/README.md)
-for artifact provenance, platform verification and manual acceptance limitations.
+for the release overview. Machine-readable artifact provenance is in
+[release/manifest.json](release/manifest.json).
 
 ## Source layout
 
@@ -68,10 +69,10 @@ terminal emulator or interactive line-oriented shell. Scripts are not sandboxed.
 The Lite baseline restoration includes native renderer/font userdata, dirty-region
 caching, the SDL event bridge, IME integration and fatal-recovery lifecycle fixes.
 Development artifacts cover all four products on macOS arm64 and Windows x86_64.
-The release notes distinguish each refresh's source and verification scope;
+The release manifest records each artifact's source and verification scope;
 historical test results are not new artifact acceptance. Real GUI/desktop
-acceptance remains deferred. See
-[release/README.md](release/README.md) for exact provenance, hashes and test scope.
+acceptance remains deferred. See [release/README.md](release/README.md) for the
+overview and [release/manifest.json](release/manifest.json) for exact facts.
 `make release-macos` / `make release-windows` build all four products without
 publishing, tagging or uploading a Release.
 

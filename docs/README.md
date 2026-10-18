@@ -2,7 +2,8 @@
 
 Development implementation: stages 1–4, followed by a macOS/Windows artifact
 refresh and headless validation. GUI/desktop acceptance remains deferred; see
-`../release/README.md` for the exact scope. `cooloo-text` is a full general-purpose
+`../release/README.md` for the overview and `../release/manifest.json` for the
+current artifact facts. `cooloo-text` is a full general-purpose
 editor product, not an offline messaging UI or a text widget.
 
 The Makefile's source sets enforce the link boundary. Project-owned native code
