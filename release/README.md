@@ -1,6 +1,48 @@
 # cooloo client — development artifact refresh (2026-10-18, untagged)
 
-## Latest: Lite native baseline restoration — all products (2026-10-18)
+## Latest: adversarial integration fixes — Windows text only (2026-10-18)
+
+Only `cooloo-text-windows-x86_64.exe` is refreshed; the other seven artifacts
+retain the `2fc9021` provenance below. Client source:
+`7e4ef89d46f93be90ebb0b9df9ad6cdec94ec20b` (committed git archive, no source edits
+after export). Input archive SHA-256:
+`de372ffa2639a49834be1cedd2c2623b4859a1bfbaacc49810d83febe564f785`.
+
+- Fixes exclusive temporary-file reservation/session cleanup, document-open error
+  propagation, POSIX executable discovery, portable user-theme precedence, and
+  overlapping physical modifiers. Malformed external fonts can still crash the
+  inherited stb parser; comprehensive validation is explicitly deferred. Lua
+  recovery does not cover native crashes; see [editor guide](../modules/EDITOR.md).
+- Isolated m106 build: `/tmp/cooloo-adversarial.hkcxEP/client`; Apple clang 21.0.0,
+  MinGW GCC 16.2.0, vendored SDL3/Lua. Built Windows text + renderer/event harnesses,
+  native macOS text + harnesses; macOS output is validation-only, not installed.
+- Passed Linux and macOS renderer/cache/event tests, new `adversarial_test.py`
+  (concurrent normal/fatal cleanup, file failures/aliases, actual directory child
+  launches from absolute/relative/PATH/renamed symlink entries, theme and modifier
+  matrices), normal/safe editor integration, and lifecycle init/frame/thread/draw/
+  quit/cancel. Linux workbench Doc/View/composition smoke also passed.
+- Passed native Windows m101 SDL dummy renderer and event bridge, normal/safe
+  `editor_integration.py` (Unicode paths and actual directory child),
+  `lifecycle_test.py`, and file/package theme + modifier matrices in
+  `tests/adversarial.lua`. Test tree:
+  `C:\Users\Plato\AppData\Local\Temp\cooloo-adversarial-w7xj_dyk\client`.
+  Isolated fixtures only; no network or production configuration used.
+- PE32+ x86_64 GUI subsystem; system DLL imports only. Remote build, local staging,
+  Windows execution copy and installed artifact SHA-256 all matched:
+  `0efb18195880706eaf8055901d2ca75cea5bc85925b88562a5f125502c1cc414`;
+  **4,209,492 bytes**.
+- **Not verified:** real OS IME/candidates, clipboard, drag/drop, cross-window key
+  release, multi-display DPI and visual acceptance; full Windows ACL/junction
+  matrices, malformed-font sanitizer coverage, full workbench/network regression.
+  CLI-oriented `windows-startup.ps1` / `windows-window.ps1` are not text-product
+  tests; the text-specific integrations above were used instead.
+- Existing local exe was locked by a running application; preserved it under
+  planner `temp/adversarial-artifacts/previous-running-cooloo-text.exe` before
+  replacement. The running process was not terminated; restart to use this build.
+- Sibling server `de4f3d21aecaa2190564c329608c02a9decd8010` exported for layout,
+  not built or run. Development refresh only; no tag, GitHub Release or PyPI publish.
+
+## Historical: Lite native baseline restoration — all products (2026-10-18)
 
 All eight product artifacts were rebuilt from committed client source
 `2fc9021f48ab343a8e1c46893eca711d43ab8643` using `git archive` exports.
@@ -180,14 +222,15 @@ Deployment target and import checks do not prove oldest-OS runtime compatibility
 | cooloo-darwin-arm64 | 2827080 | 59eb85349b4b87a70ef275d8869cf235dec0fe819280cd91b508032572d3bc16 |
 | cooloo-windows-x86_64.exe | 4401747 | 3f90764aa16b814e0ff57f63c82f666528a986dfef93999623d2ba411bc56e6d |
 | cooloo-text-darwin-arm64 | 2650056 | ddfe93aadf4102b0f12c3797db66905922d0ddf58251c8c23a7eb4aac2aa1351 |
-| cooloo-text-windows-x86_64.exe | 4207980 | 2fbd527db8c63bcc27a4ef192020d57f4567280ea7606d8fb08edc38f334720e |
+| cooloo-text-windows-x86_64.exe | 4209492 | 0efb18195880706eaf8055901d2ca75cea5bc85925b88562a5f125502c1cc414 |
 | cooloo-workbench-darwin-arm64 | 298784 | d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3 |
 | cooloo-workbench-windows-x86_64.exe | 645198 | d45e0de2ce1dc74e9f10aa58ce3836ef1a8c312b2b21b28f2c8e65f2a7fae8f7 |
 | cooloo-cli-darwin-arm64 | 161592 | 3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8 |
 | cooloo-cli-windows-x86_64.exe | 603010 | ce51f081e29f7c3c80239e13303f281279c19093387cf6f9f0828dfa41b3954f |
 
 SHA-256 values were computed on m106 and rechecked after retrieval to local
-staging and installation. This refresh did not transfer or run artifacts on m101.
+staging and installation. The latest Windows text refresh also verified the m101
+execution copy; other artifacts retain their earlier validation scope.
 
 ## Earlier refresh's validation (not the latest text test scope)
 
