@@ -40,9 +40,9 @@
       "os": "windows",
       "arch": "x86_64",
       "bytes": 4221107,
-      "sha256": "8f02183f97a8d0670c7f65a1f2877246880ec4fe45c83f71c84aabc3fd5cfb5d",
-      "source_commit": "6a7f8dbc7499953e4afd847c523c04da656704ab",
-      "verification": "static; Windows text regression; desktop icon acceptance pending"
+      "sha256": "f86b69cb88c81ccce5bb2906cdb3819b9357c00323e81e59e68e6b627663af19",
+      "source_commit": "8ff738563cb25bc3e96b12354e8b26f57a391d13",
+      "verification": "static build only; tests not run"
     },
     {
       "filename": "cooloo-workbench-darwin-arm64",
