@@ -18,7 +18,16 @@ cooloo={public_id=function()return A end,ensure_identity=function()return true e
  end,poll=function()local r=results;results={};return r end},
  record=function(json)return {ts=1,from=A,to=R,content=json}end}
 local p=require('adapters.cooloo').new()
-local function event(kind,c,line)p:poll{{type=kind,conn=c,line=line,nick='user',reason='test'}}end
+local function event(kind,c,line)
+ p:poll{{type=kind,conn=c,line=line,nick='user',reason='test'}}
+ if chat.identity_pending and chat.identity_pending[c] then
+   p:poll{{type='net_line',conn=c,line='IDENTITY '..A..' '..(chat.requested_effective or chat.effective or A)}}
+ end
+ if kind=='net_ready' and p.sending and p.sending.conn==c and p.sending.phase=='as' then
+   assert(writes[#writes].s=='AS '..chat.identity()..'\n')
+   p:poll{{type='net_line',conn=c,line='OK'}}
+ end
+end
 local function complete(id,records,offset,ok)
  results[#results+1]={id=id,ok=ok~=false,records=records or {},offset=offset or 0}
  p:poll{}
@@ -29,7 +38,7 @@ event('net_line',chat.ctrl,'END')
 assert(chat.rooms[R],'room list loaded')
 assert(p:subscribe(R));local c=chat.rooms[R].conn
 assert(c)
-event('net_ready',c);assert(writes[#writes].s=='METAFILE '..R..'\n')
+event('net_ready',c);assert(p.blocked[c])
 local initial=job_serial;complete(initial,{{offset=100,json='cached'}},100)
 assert(writes[#writes].s=='READ '..R..' 100\n')
 p:poll{{type='net_line',conn=c,line='MSG 200 4'},{type='net_line',conn=c,line='live'},{type='net_line',conn=c,line='END'}}
@@ -73,5 +82,10 @@ p:identity(B);event('net_ready',chat.ctrl);event('net_line',chat.ctrl,'OK')
 event('net_line',chat.ctrl,'ERR forbidden no read grant')
 assert(chat.ctrl_up and chat.read_denied and not chat.auth_failed)
 assert(p:address(R));assert(p:capabilities(R).can_send and not p:capabilities(R).can_read)
+-- Mirror directories remain visible/readable, but cannot be send targets.
+chat.read_denied=false
+chat.metadata('{"id":"'..R..'","type":"user","nickname":"mirror","owner":"'..B..'","slot":1,"mirror":1}')
+assert(p:capabilities(R).can_read and not p:capabilities(R).can_send)
+assert(not p:send(R,'must not send to mirror'))
 p:close();assert(next(conns)==nil)
 print('provider: async checkpoint ordering, subscriptions/overflow, stale identity, send ACK/rejection/uncertainty/capabilities passed')

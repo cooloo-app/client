@@ -42,6 +42,17 @@ static int connect_client(netconn *c,char self[65])
     }
     memset(sk,0,sizeof sk);
     if(rc){if(cooloo_machine)machine_error(rc==NET_TOFU_UNKNOWN?"server-untrusted":rc==NET_ERR_TOFU_DIFF?"server-key-changed":"network-error",rc==NET_TOFU_UNKNOWN?"server fingerprint is not trusted":error);else fprintf(stderr,"cooloo: %s\n",error);return -1;}
+    {
+        char line[256],login[65],selected[65],extra;
+        if(net_send_line(c,"IDENTITY\n") || net_read_line(c,line,sizeof line) ||
+           sscanf(line,"IDENTITY %64[0-9a-f] %64[0-9a-f] %c",login,selected,&extra)!=2 ||
+           strcmp(login,self) || strlen(selected)!=64) {
+            if(cooloo_machine)machine_error("identity-selection-failed","server IDENTITY response required");
+            else fprintf(stderr,"server IDENTITY response required\n");
+            net_close(c);return -1;
+        }
+        strcpy(self,selected);
+    }
     if(effective[0]) {
         char line[256];snprintf(line,sizeof line,"AS %s\n",effective);
         if(net_send_line(c,line)||net_read_line(c,line,sizeof line)||strcmp(line,"OK")) {
@@ -69,7 +80,8 @@ int cooloo_cli_request(int argc,char **argv)
     const char *cmd=argv[1];
     if((!strcmp(cmd,"create")||!strcmp(cmd,"meta"))&&argc!=3)return 2;
     if(!strcmp(cmd,"rename")&&argc!=4)return 2;
-    if(!strcmp(cmd,"avatar")&&argc!=5)return 2;
+    if((!strcmp(cmd,"avatar")||!strcmp(cmd,"mirror"))&&argc!=5)return 2;
+    if(!strcmp(cmd,"detach")&&argc!=3)return 2;
     if(!strcmp(cmd,"join")) {
         char text[100]; char *sendargs[5]; size_t j;
         if(argc!=3 || strlen(argv[2])!=64)return 2;
@@ -87,8 +99,11 @@ int cooloo_cli_request(int argc,char **argv)
         if(argc!=4)return 2;
         cmd="DELEGATE";
     }
+    else if(!strcmp(cmd,"identity")){if(argc!=2)return 2;cmd="IDENTITY";}
     else if(!strcmp(cmd,"create"))cmd="CREATE";
     else if(!strcmp(cmd,"avatar"))cmd="AVATAR";
+    else if(!strcmp(cmd,"mirror"))cmd="MIRROR";
+    else if(!strcmp(cmd,"detach"))cmd="DETACH";
     else if(!strcmp(cmd,"meta"))cmd="META";
     else if(!strcmp(cmd,"rename"))cmd="RENAME";
     else return 2;
@@ -105,8 +120,9 @@ int cooloo_cli_request(int argc,char **argv)
 int cooloo_cli_whoami(int argc,char **argv)
 {
     netconn c;char self[65],line[512];int rc=1;
-    if(cooloo_machine&&effective[0])return 2; /* WHOAMI is always the login identity. */
+    if(effective[0])return 2; /* WHOAMI is always the login identity. */
     if(connect_client(&c,self))return 1;
+    { uint8_t sk[32];if(cfg_identity_load(sk)){net_close(&c);return 1;}public_id(self,sk);memset(sk,0,sizeof sk); }
     if(argc==4&&!strcmp(argv[2],"--register")) {
         if(strlen(argv[3])>64||strpbrk(argv[3],"\r\n")){net_close(&c);return 2;}
         snprintf(line,sizeof line,"HELLO %s\n",argv[3]);

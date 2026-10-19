@@ -76,7 +76,9 @@ end
 function M.use_identity(id)
     if id and (#id ~= 64 or not id:match('^[0-9a-f]+$')) then return false end
     M.close_all()
-    M.effective = id ~= cooloo.public_id() and id or nil
+    M.requested_effective = id ~= cooloo.public_id() and id or nil
+    M.effective = M.requested_effective
+    M.identity_confirmed = false
     M.auth_failed = false
     M.rooms, M.order, M.by_conn = {}, {}, {}
     M.sel, M.rooms_loaded = nil, false
@@ -184,14 +186,21 @@ local function add_msg(r, endoff, ts, nick, text, from)
     if r ~= M.current() then r.unread = r.unread + 1 end
 end
 
+local function query_identity(conn,nick)
+    M.identity_pending=M.identity_pending or {}
+    M.identity_pending[conn]=nick
+    cooloo.net.send(conn,'IDENTITY\n')
+end
+
 function M.on_ready(conn, nick)
-    if M.effective then
+    local selected=M.requested_effective or (conn~=M.ctrl and M.effective)
+    if selected then
         M.as_pending = M.as_pending or {}
         M.as_pending[conn] = nick
-        cooloo.net.send(conn, 'AS ' .. M.effective .. '\n')
+        cooloo.net.send(conn, 'AS ' .. selected .. '\n')
         return
     end
-    M.ready_identity(conn, nick)
+    query_identity(conn,nick)
 end
 
 function M.ready_identity(conn, nick)
@@ -249,6 +258,19 @@ function M.ready_identity(conn, nick)
 end
 
 function M.on_line(conn, line)
+    if M.identity_pending and M.identity_pending[conn] then
+        local nick=M.identity_pending[conn];M.identity_pending[conn]=nil
+        local login,effective=line:match('^IDENTITY ([0-9a-f]+) ([0-9a-f]+)$')
+        if login~=cooloo.public_id() or not effective or #effective~=64 or
+           (M.requested_effective and effective~=M.requested_effective) or
+           ((conn~=M.ctrl or M.identity_confirmed) and effective~=M.identity()) then
+            M.status='identity changed or invalid; reset Workspace: Identity'
+            M.auth_failed=true;M.close_all();return
+        end
+        M.login_id=login;M.effective=effective~=login and effective or nil
+        M.identity_confirmed=true;M.auth_failed=false
+        M.ready_identity(conn,nick);return
+    end
     if M.as_pending and M.as_pending[conn] then
         local nick = M.as_pending[conn]
         M.as_pending[conn] = nil
@@ -259,7 +281,7 @@ function M.on_line(conn, line)
             return
         end
         M.auth_failed = false
-        M.ready_identity(conn, nick)
+        query_identity(conn,nick)
         return
     end
     local s = (M.sent_conns or {})[conn]
@@ -441,6 +463,7 @@ function M.fetch_sent(r)
 end
 
 function M.on_closed(conn, reason)
+    if M.identity_pending then M.identity_pending[conn]=nil end
     if M.as_pending then M.as_pending[conn] = nil end
     if M.sent_conns and M.sent_conns[conn] then
         M.sent_conns[conn] = nil
@@ -510,7 +533,7 @@ end
 
 function M.close_all()
     for conn in pairs(M.sent_conns or {}) do cooloo.net.close(conn) end
-    M.sent_conns, M.as_pending = {}, {}
+    M.sent_conns, M.as_pending, M.identity_pending = {}, {}, {}
     if M.ctrl then cooloo.net.close(M.ctrl); M.ctrl = nil end
     M.ctrl_up = false
     M.registered = false

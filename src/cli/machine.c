@@ -58,7 +58,12 @@ int machine_response(const char *command,const char *line)
         if(errno||end==line+3||*end||off<0)return machine_error("protocol-error","invalid send offset");
         machine_offset("result","end_offset",off);return 0;
     }
-    if((!strcmp(command,"CREATE")||!strcmp(command,"AVATAR")||!strcmp(command,"ROOM")) &&
+    if(!strcmp(command,"IDENTITY") && sscanf(line,"IDENTITY %64[0-9a-f] %64[0-9a-f]%n",id,owner,&pos)==2 &&
+       strlen(id)==64 && strlen(owner)==64 && !line[pos]) {
+        printf("{\"schema\":1,\"type\":\"result\",\"authenticated_id\":");machine_string(id);
+        printf(",\"effective_id\":");machine_string(owner);puts("}");return 0;
+    }
+    if((!strcmp(command,"CREATE")||!strcmp(command,"AVATAR")||!strcmp(command,"MIRROR")||!strcmp(command,"ROOM")) &&
        sscanf(line,"%15s %64s %n",kind,id,&pos)==2 && strlen(id)==64 && pos>0) {
         if(output_limit && output_bytes+strlen(line)+100>output_limit){output_limited=1;return machine_error("output-limit","script result exceeds 1 MiB");}
         output_bytes+=strlen(line)+100;
@@ -80,5 +85,5 @@ int machine_finish(int status)
 }
 void machine_version(void)
 {
-    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.0\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\"]}");
+    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.0\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\",\"mirror\"]}");
 }

@@ -22,9 +22,12 @@ cooloo = {
 dofile('lua/chat.lua')
 chat.ctrl=1
 chat.on_ready(1,'same')
+assert(sent[#sent]=='IDENTITY\n' and not chat.ctrl_up)
+chat.on_line(1,'IDENTITY '..A..' '..A)
 chat.on_line(1,'ROOM '..R..' shared')
 chat.on_line(1,'END')
 chat.on_ready(2,'same')
+chat.on_line(2,'IDENTITY '..A..' '..A)
 assert(sent[#sent]=='READ '..R..' 200\n')
 assert(#chat.rooms[R].buf==1)
 chat.on_line(2,'MSG 400 4')
@@ -38,6 +41,7 @@ assert(chat.rooms[R].buf[2].nick=='same')
 -- A new identity must refresh ROOMS after HELLO (its inbox did not exist yet).
 chat.registered=false
 chat.on_ready(1,'')
+chat.on_line(1,'IDENTITY '..A..' '..A)
 chat.on_line(1,'NICK new-user')
 assert(sent[#sent]=='ROOMS\n')
 -- Explicit window identity handshake precedes ALL reads/sends/cache use.
@@ -46,6 +50,8 @@ assert(chat.use_identity(owner))
 chat.on_ready(2,'same')
 assert(sent[#sent]=='AS '..owner..'\n' and not chat.ctrl_up)
 chat.on_line(2,'OK')
+assert(sent[#sent]=='IDENTITY\n')
+chat.on_line(2,'IDENTITY '..A..' '..owner)
 assert(sent[#sent]=='ROOMS\n' and chat.ctrl_up)
 chat.on_line(2,'ROOM '..R..' delegated-room')
 chat.sel=R
@@ -72,4 +78,11 @@ assert(inbox.newest_end==200 and #cached==old_count)
 assert(#inbox.buf==1 and inbox.buf[1].sent)
 chat.on_line(9,'END 1200')
 assert(chat.sent_conns[9]==nil)
-print('GUI state: delegated window handshake, fail-closed identity, sparse sent view, cache and FOLLOW checkpoints passed')
+-- A mirror discovers its default parent without an explicit /as.
+chat.use_identity(nil);chat.on_ready(chat.ctrl,'mirror')
+chat.on_line(chat.ctrl,'IDENTITY '..A..' '..owner)
+assert(chat.identity()==owner and chat.ctrl_up)
+chat.reconnect();chat.on_ready(chat.ctrl,'mirror')
+chat.on_line(chat.ctrl,'IDENTITY '..A..' '..A)
+assert(chat.auth_failed and not chat.ctrl_up) -- detach cannot reuse old cache/view
+print('GUI state: default mirror discovery, explicit identity, fail-closed change, sparse sent cache and FOLLOW checkpoints passed')

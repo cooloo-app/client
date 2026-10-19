@@ -49,8 +49,8 @@ with tempfile.TemporaryDirectory(prefix='cooloo-client2-') as tmp:
             cli('c', 'whoami')
             text = 'hello\n"世界"\\\t\n'
             cli('b', 'send', a + ':001', input=text)
-            gate(a, f'read {c} 0', ok=False)
-            cli('a', 'read', '--raw', c, '0', ok=False)
+            gate(a, f'read {c} 0')
+            cli('a', 'read', '--raw', c, '0')
             received = cli('c', 'read', '--raw', c, '0')
             assert json.loads(received)['content'] == text
             gate(b, f'send {room}', input='from SSH\n')
@@ -141,70 +141,110 @@ with tempfile.TemporaryDirectory(prefix='cooloo-client2-') as tmp:
             cli('f', 'send', room, 'historical participant')
             gate(f, f'room-mode {room} private')
             cli('f', 'send', room, 'included in snapshot')
-            # Delegation is owner-authorized, read/write independent, and never
-            # inherited from child metadata or slot numbers.
+            # Parent owns access to the child; ordinary children never act as A.
             cli('c', '--as', a, 'read', a, '0', ok=False)
             cli('a', 'delegate', c, 'read')
-            cli('c', '--as', a, 'read', a, '0')
-            cli('c', '--as', a, 'send', b, 'forbidden write', ok=False)
-            cli('c', '--as', a, 'delegate', c, 'read,write', ok=False)
-            cli('c', '--as', a, 'rename', a, 'forbidden admin', ok=False)
+            cli('a', '--as', c, 'read', c, '0')
+            cli('a', '--as', c, 'send', b, 'forbidden write', ok=False)
+            cli('a', '--as', c, 'rename', c, 'forbidden admin', ok=False)
             cli('a', 'delegate', c, 'write')
-            cli('c', '--as', a, 'read', a, '0', ok=False)
-            cli('c', '--as', a, 'send', b, 'owner delegated write')
+            cli('a', 'read', c, '0', ok=False)
+            cli('a', '--as', c, 'read', c, '0', ok=False)
+            cli('a', '--as', c, 'send', b, 'parent as child')
             cli('c', 'send', b, 'child default write')
-            messages = [json.loads(x) for x in cli('b', 'read', '--raw', b, '0').splitlines()]
-            assert messages[-2]['from'] == a and messages[-1]['from'] == c
             gate(a, f'delegate {c} read,write')
-            assert 'owner delegated write' in gate(c, f'--as {a} sent {b} 0')
-            cli('b', 'send', a, 'reply discovers peer')
-            cli('d', 'send', b, 'unrelated secret')
-            filtered = cli('c', '--as', a, 'sent', b, '0')
-            assert 'owner delegated write' in filtered
-            assert 'unrelated secret' not in filtered and 'child default write' not in filtered
-            merged = cli('c', '--as', a, 'history')
-            assert 'owner delegated write' in merged and 'reply discovers peer' in merged
+            assert 'parent as child' in gate(a, f'--as {c} sent {b} 0')
+            # Pure mirror: B is a credential for A, never a second inbox/sender.
+            mirror = cli('mirror', 'keygen').strip()
+            cli('a', '--json', 'mirror', '002', mirror, 'mirror')
+            context=json.loads(cli('mirror','--json','identity'))
+            assert context['authenticated_id']==mirror and context['effective_id']==a
+            assert json.loads(cli('mirror','--json','whoami'))['id']==mirror
+            assert gate(mirror,'whoami').split()[1]==mirror
+            assert gate(mirror,'identity').split()[2]==a
+            cli('mirror','send',b,'mirror native')
+            gate(mirror,f'send {b} mirror SSH')
+            messages=[json.loads(x) for x in cli('b','read','--raw',b,'0').splitlines()]
+            assert all(m['from']==a for m in messages[-2:])
+            for sender in ['a','b','mirror']:
+                cli(sender,'send',mirror,'no mirror inbox',ok=False)
+                cli(sender,'send',a+':002','no mirror alias',ok=False)
+            cli('mirror','--as',mirror,'send',b,'no mirror sender',ok=False)
+            gate(mirror,f'--as {mirror} send {b} no',ok=False)
+            gate(mirror,f'--as {mirror} create no',ok=False)
+            gate(mirror,f'--as {mirror} rename {mirror} no',ok=False)
+            gate(b,f'send {a}:002 no',ok=False)
+            for args in [('delegate',c,'read'),('detach',mirror),('rename',a,'bad'),('create','bad')]:
+                cli('mirror',*args,ok=False)
+            cli('b','send',a,'reply discovers peer')
+            cli('d','send',b,'unrelated secret')
+            filtered=cli('mirror','sent',b,'0')
+            assert 'mirror native' in filtered and 'unrelated secret' not in filtered
+            merged=cli('mirror','history')
+            assert 'mirror native' in merged and 'reply discovers peer' in merged
             assert 'unrelated secret' not in merged
-            cli('a', 'send', f, 'unreplied message remains undiscovered')
-            assert 'unreplied message remains undiscovered' not in cli('c', '--as', a, 'history')
-            assert 'unreplied message remains undiscovered' in cli('c', '--as', a, 'sent', f, '0')
-            peer_end = (data / 'rooms' / b / 'messages.jsonl').stat().st_size
-            assert cli('c', '--as', a, 'sent', b, str(peer_end)) == ''
-            cli('c', '--as', a, 'sent', b, '1', ok=False)
-            cli('c', '--as', a, 'sent', room, '0', ok=False)
-            # A live delegated FOLLOW must stop after owner revocation.
-            ce = dict(os.environ, COOLOO_CONFIG=str(base / 'c'), COOLOO_HOST=f'127.0.0.1:{port}')
-            with open(base / 'delegated-follow.log', 'w+') as follow_log:
-                follower = subprocess.Popen([str(client / 'cooloo-cli'), '-y', '--as', a, 'follow', a],
-                                            env=ce, stdout=follow_log, stderr=follow_log)
+            cli('a','send',f,'unreplied message remains undiscovered')
+            assert 'unreplied message remains undiscovered' not in cli('mirror','history')
+            assert 'unreplied message remains undiscovered' in cli('mirror','sent',f,'0')
+            peer_end=(data/'rooms'/b/'messages.jsonl').stat().st_size
+            assert cli('mirror','sent',b,str(peer_end))==''
+            cli('mirror','sent',b,'1',ok=False)
+            cli('mirror','sent',room,'0',ok=False)
+            # A and B folders exist in A's effective cache partition, not B's.
+            for inbox in [a,mirror]:
+                cli('mirror','read','--raw',inbox,'0')
+                assert list((base/'mirror'/'cache').glob(f'*/{a}/rooms/{inbox}/.meta'))
+            assert not list((base/'mirror'/'cache').glob(f'*/{mirror}/rooms/{a}/messages.jsonl'))
+            # Both direct parent and AS-child FOLLOW stop after revocation.
+            ae=dict(os.environ,COOLOO_CONFIG=str(base/'a'),COOLOO_HOST=f'127.0.0.1:{port}')
+            for flags in [[],['--as',c]]:
+                cli('a','delegate',c,'read,write')
+                with open(base/'parent-follow.log','w+') as follow_log:
+                    follower=subprocess.Popen([str(client/'cooloo-cli'),'-y',*flags,'follow',c],env=ae,stdout=follow_log,stderr=follow_log)
+                    try:
+                        marker='parent-follow-ready-'+str(bool(flags))
+                        cli('b','send',c,marker)
+                        for _ in range(200):
+                            follow_log.seek(0)
+                            if marker in follow_log.read(): break
+                            time.sleep(.02)
+                        else: raise AssertionError('parent follower not ready')
+                        gate(a,f'delegate {c} none')
+                        assert follower.wait(timeout=5)!=0
+                    finally:
+                        if follower.poll() is None: follower.terminate();follower.wait(timeout=5)
+            cli('a','--as',c,'send',b,'revoked',ok=False)
+            cli('c','send',b,'own identity still works')
+            # Untrusted metadata and obsolete authz cannot authorize access.
+            child_meta=data/'rooms'/c/'.meta';saved_meta=child_meta.read_bytes()
+            child_meta.write_bytes(saved_meta.replace(f'"owner":"{a}"'.encode(),f'"owner":"{b}"'.encode()))
+            cli('b','--as',c,'read',c,'0',ok=False)
+            child_meta.write_bytes(saved_meta)
+            legacy=data/'authz'/a/c;legacy.parent.mkdir(parents=True);legacy.write_text('DELEGATE-1 3\n')
+            cli('c','--as',a,'read',a,'0',ok=False)
+            record=data/'relations'/c;saved=record.read_bytes();record.write_text('RELATION-1 invalid\n')
+            cli('a','--as',c,'read',c,'0',ok=False)
+            record.write_bytes(saved)
+            # Detach invalidates existing mirror streams and returns independent IDs.
+            me=dict(os.environ,COOLOO_CONFIG=str(base/'mirror'),COOLOO_HOST=f'127.0.0.1:{port}')
+            with open(base/'mirror-follow.log','w+') as follow_log:
+                follower=subprocess.Popen([str(client/'cooloo-cli'),'-y','--json','follow',a,'0'],env=me,stdout=follow_log,stderr=follow_log)
                 try:
                     for _ in range(200):
                         follow_log.seek(0)
                         if 'reply discovers peer' in follow_log.read(): break
                         time.sleep(.02)
-                    else: raise AssertionError('delegated follower not ready')
-                    cli('a', 'delegate', c, 'none')
-                    assert follower.wait(timeout=5) != 0
+                    else: raise AssertionError('mirror follower not ready')
+                    cli('a','detach',mirror)
+                    assert follower.wait(timeout=5)!=0
                 finally:
-                    if follower.poll() is None: follower.terminate(); follower.wait(timeout=5)
-            cli('c', '--as', a, 'send', b, 'revoked', ok=False)
-            gate(c, f'--as {a} read {a} 0', ok=False)
-            cli('c', 'send', b, 'own identity still works')
-            # Child-controlled properties cannot grant delegation.
-            child_meta = data / 'rooms' / c / '.meta'
-            saved_meta = child_meta.read_bytes()
-            child_meta.write_bytes(saved_meta.replace(f'"owner":"{a}"'.encode(), f'"owner":"{b}"'.encode()))
-            cli('c', '--as', b, 'read', b, '0', ok=False)
-            child_meta.write_bytes(saved_meta)
-            cli('a', 'delegate', c, 'read')
-            grant = data / 'authz' / a / c
-            saved_grant = grant.read_bytes()
-            grant.write_text('DELEGATE-1 999\n')
-            cli('c', '--as', a, 'read', a, '0', ok=False)
-            grant.write_bytes(saved_grant)
-            cli('a', 'delegate', c, 'none')
-            assert list((base / 'c' / 'cache').glob(f'*/{a}/rooms/{a}/messages.jsonl'))
-            print('client2: private rooms, independent delegation bits, filtered/merged history, cross-transport revocation and identity-isolated caches passed')
+                    if follower.poll() is None: follower.terminate();follower.wait(timeout=5)
+            assert json.loads(cli('mirror','--json','identity'))['effective_id']==mirror
+            cli('mirror','--as',a,'read',a,'0',ok=False)
+            cli('mirror','send',b,'independent again')
+            cli('b','send',mirror,'independent inbox')
+            assert 'independent inbox' in cli('mirror','read','--raw',mirror,'0')
+            print('client2: parent permissions, pure mirrors, detach/FOLLOW revocation, transport parity, filtered history and identity-isolated caches passed')
         finally:
             daemon.terminate()
             daemon.wait(timeout=5)

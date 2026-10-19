@@ -130,9 +130,10 @@ Full-client runners expose `cooloo.request(command, ...)` and
 Supported commands: whoami, rooms, meta, send, read, sent. These call the **same
 headless CLI functions inside the isolated runner**, not a Machine API grandchild.
 Stop/restart/GUI exit therefore terminates in-flight managed requests too.
-No raw key/connection/UI objects are passed. Default identity is login, never
-implicitly the GUI identity; delegation must be explicit per call and is reset
-after every request. `whoami` is read-only login inspection (no registration).
+No raw key/connection/UI objects are passed. Default identity is the server default
+(parent for mirror credentials), never implicitly the GUI's selection. An explicit
+request_as selection is reset after every request. IDENTITY is queried before any
+business/cache operation; whoami still reports the actual login credential. `whoami` is read-only login inspection (no registration).
 Send requires explicit text, never stdin. Script result capture is capped at
 1 MiB; large READ/SENT returns an `output-limit` error rather than unbounded RAM
 or temporary-file growth. Request latency is the CLI's blocking latency inside

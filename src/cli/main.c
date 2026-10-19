@@ -45,7 +45,9 @@ static void usage(FILE *out)
             "  cooloo create <nickname>             create public room\n"
             "  cooloo join <room-id>                request membership\n"
             "  cooloo room-mode <room-id> public|private\n"
-            "  cooloo avatar <slot> <public-id> <nickname>\n"
+            "  cooloo avatar|mirror <slot> <public-id> <nickname>\n"
+            "  cooloo detach <child-id>             split into independent accounts\n"
+            "  cooloo identity                      authenticated/effective IDs\n"
             "  cooloo meta <id> | rename <id> <nickname>\n"
             "  cooloo whoami [--register <nick>]    show / register nick\n"
             "  cooloo delegate <child-id> read|write|read,write|none\n"
@@ -56,7 +58,7 @@ static void usage(FILE *out)
             "  cooloo version                     print client version\n"
             "  flags: --json JSONL schema 1; noninteractive, no read/follow cache\n"
             "         --json follow <id> <offset> explicit business cursor\n"
-            "         --as <owner-id> select delegated message identity\n"
+            "         --as <id> select permitted message identity\n"
             "         -y/--tofu auto-trust new server fingerprint\n"
             "  env:   COOLOO_HOST=host[:port] override server\n");
 }
@@ -166,7 +168,8 @@ static int run(int argc, char **argv)
     if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
         !strcmp(argv[1], "meta") || !strcmp(argv[1], "rename") ||
         !strcmp(argv[1], "join") || !strcmp(argv[1], "room-mode") ||
-        !strcmp(argv[1], "delegate"))
+        !strcmp(argv[1], "delegate") || !strcmp(argv[1], "mirror") ||
+        !strcmp(argv[1], "detach") || !strcmp(argv[1], "identity"))
         return cooloo_cli_request(argc, argv);
     if (!strcmp(argv[1], "sent"))return cooloo_cli_sent(argc,argv);
     if (!strcmp(argv[1], "history"))return cooloo_cli_history(argc,argv);

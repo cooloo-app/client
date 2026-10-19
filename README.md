@@ -124,8 +124,9 @@ outcomes retain them, and the client never automatically resends. Delegated
 write capability is marked unverified until an operation establishes its outcome;
 known permission denial disables send until explicit reconnect/identity reset.
 
-The runner's explicit `cooloo.request_as(owner_id, command, ...)` selects delegated
-identity per request; `cooloo.request(...)` always uses login identity. Requests
+The runner's explicit `cooloo.request_as(identity_id, command, ...)` selects an
+authorized message identity per request; `cooloo.request(...)` uses the server
+default (parent for mirror credentials). `whoami` always reports the actual login. Requests
 reuse the CLI core inside the runner, so Stop does not leave request subprocesses.
 
 `--lua-dev DIR` expects a generated `workbench.lua` bundle (use
@@ -228,14 +229,17 @@ cooloo create <nickname>               # create public room, returns its ID
 cooloo join <room-id>                  # sends @<room-id> join-request
 cooloo room-mode <room-id> public|private
 cooloo avatar <001..899> <child-public-id> <nickname>
+cooloo mirror <001..899> <child-public-id> <nickname>
+cooloo detach <child-public-id>      # parent actual credential; preserve account/data
+cooloo identity                      # actual login and effective message identity
 cooloo rooms
 cooloo meta <id-or-alias>
 cooloo rename <id-or-alias> <nickname>
 cooloo send <id-or-alias> [text...]     # stdin preserves exact bytes
 cooloo read [--raw] <id-or-alias> <offset>
 cooloo follow <id-or-alias>            # durable catch-up then live stream
-cooloo delegate <child-id> read|write|read,write|none # replace grant; owner credential
-cooloo --as <owner-id> send <id> [text...] # explicit delegated sender
+cooloo delegate <child-id> read|write|read,write|none # parent's access TO ordinary child
+cooloo --as <child-id> send <id> [text...] # parent sends with child's identity
 cooloo --as <owner-id> read <owner-id> 0
 cooloo sent <peer-id> <scan-offset>    # only your messages in peer's inbox
 cooloo history                       # inbox + discovered peer sent history
@@ -268,16 +272,28 @@ sender IDs. Interactive CLI `chat` is temporarily unavailable; use GUI or
 separate send/follow terminals. FOLLOW resumes on the next invocation; automatic
 retry and idle keepalive are not implemented in this revision.
 
-## Delegated identities and history — v0.2.2
+## Ordinary avatars, pure mirrors and history
 
-Login identity remains the default. `--as <owner-id>` must precede the command;
-owner grants read/write separately to existing avatars, with `none` revoking both.
-Delegates cannot administer grants, avatars, names or room modes as the owner.
-No identity block or slot-based implicit permissions are introduced.
+This source requires the matching pure-mirror server with `IDENTITY` support.
+Ordinary children keep their own message identity; the parent defaults to read/write
+access **to the child**, independently configurable with `delegate`. This command
+no longer grants children access to the parent. `--as <child-id>` must precede the
+command and selects a permitted message identity; it never grants administration.
 
-`Workspace: Identity` selects the window's effective identity (empty restores login).
-Status shows effective/login IDs, and new connections must receive AS
-acknowledgment before sending/reading. Message caches use the effective identity.
+`mirror` creates a credential whose default message identity is its parent. A mirror
+cannot send as itself or receive messages, including through slot aliases. It has
+the parent's message read/write capabilities, but cannot administer as the parent.
+`detach` splits either relationship into independent accounts, preserving data.
+The old child/authz model is reset on the server, not migrated or emulated.
+
+`identity` reports actual login/effective IDs; `whoami` always reports the login.
+CLI and GUI query `IDENTITY` before using caches. `Workspace: Identity` selects an
+explicit identity (empty restores the server default, parent for mirrors). Status
+shows both IDs. Streams verify their selected identity; changes to a default on
+reconnect fail closed until the workspace is explicitly reset. Message caches are
+partitioned by effective identity; each readable child has its own room directory.
+A mirror login syncs A and B directories/metadata through background subscriptions,
+while known mirror targets have sending disabled. No second credential/key is loaded.
 The GUI recovers sent messages from recent incoming peers into its inbox view;
 filtered records do not enter the contiguous room cache. This filtered view is
 in-memory and refreshed on reconnect, not continuously followed or persisted yet.
@@ -287,8 +303,14 @@ snapshot (max 10,000 messages/256 received peers, explicit error on overflow).
 No server-side sent index or duplicate body storage is added. **Peers that never
 replied are not automatically discovered**; their sent history is omitted unless
 queried explicitly. This is not complete multi-device synchronization. New clients
-require server v0.2.2 for delegation and filtered history. Read-only delegation can browse; write-only
-is usable via CLI but cannot populate the GUI's room list.
+require the matching pure-mirror server. Read-only parent access can browse a child;
+write-only parent access is usable via CLI but cannot populate that child's GUI room list.
+
+Validation: server/client `make test`, provider state mocks, and
+`python3 tests/mirror_workbench.py` (after building `cooloo-linux`) verify the new
+model, real runner requests and SDL-dummy mirror A/B directory synchronization.
+Windows/macOS artifacts under `release/` have not been refreshed for this change;
+real desktop validation remains separate.
 
 ## Official server relocation — v0.2.4
 

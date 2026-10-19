@@ -41,7 +41,8 @@ function M.new()
     -- Parse only canonical structural fields, not nickname text or executable Lua.
     local id,kind=meta:match('^%{"id":"([0-9a-f]+)","type":"([a-z]+)"')
     if not id then return end
-    local r=chat.rooms[id];if r then r.kind=kind end
+    local r=chat.rooms[id]
+    if r then r.kind=kind;r.mirror=meta:match(',"mirror":1}')~=nil end
     job('meta',{server_fp=cooloo.net.fp(chat.ctrl),self_id=chat.identity(),name=id},0,meta,function(ok)
       if not ok then chat.status='metadata cache failure' end
     end)
@@ -82,10 +83,10 @@ function M.new()
     local permission=self.permissions[id] or {}
     local online=not self.closed and chat.ctrl_up and chat.registered and not chat.auth_failed
     local readable=r and not r.denied and not chat.read_denied -- ROOMS lists readable rooms / own inbox
-    return {can_read=not not readable,can_send=not not (r and online and not permission.write_denied),
+    return {can_read=not not readable,can_send=not not (r and online and not r.mirror and not permission.write_denied),
       can_history=not not (readable and r.server_fp),
       write_state=permission.write_denied and 'denied' or (chat.effective and not permission.write_verified and 'unverified' or 'allowed'),
-      reason=permission.reason or (not online and 'offline or unregistered' or nil)}
+      reason=(r and r.mirror and 'mirror credential: use parent inbox') or permission.reason or (not online and 'offline or unregistered' or nil)}
   end
   function p:list()
     local rooms={}
@@ -125,6 +126,12 @@ function M.new()
       if not wanted[id] then wanted[id]=true;count=count+1 end
     end
     for id,r in pairs(chat.rooms) do if not wanted[id] then close_room(r) end end
+    for id in pairs(wanted) do
+      local r=chat.rooms[id]
+      if r and not r.metadata_requested and chat.ctrl_up then
+        r.metadata_requested=true;cooloo.net.send(chat.ctrl,'METAFILE '..id..'\n')
+      end
+    end
     chat.subscriptions=wanted;chat.start_follows()
     for id in pairs(wanted) do
       local r=chat.rooms[id];if r and r.conn and not r.lease_started then r.lease_started=now end
@@ -214,8 +221,7 @@ function M.new()
     local s=p.sending
     if s and e.conn==s.conn then
       if e.type=='net_ready' then
-        if chat.effective then s.phase='as';cooloo.net.send(s.conn,'AS '..chat.effective..'\n')
-        else s.phase='ready' end
+        s.phase='as';cooloo.net.send(s.conn,'AS '..chat.identity()..'\n')
       elseif e.type=='net_line' then
         if s.phase=='as' and e.line=='OK' then s.phase='ready'
         elseif s.phase=='sent' and e.line:match('^OK %d+$') then

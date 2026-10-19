@@ -2,7 +2,9 @@
 
 Opt in with `cooloo --json <command>`. Existing human output and `read --raw` remain
 available. This is an output adapter around the existing C Native client, not a new
-server protocol or long-running RPC service. Use server v0.2.2 for delegation/SENT.
+server protocol or long-running RPC service. This source requires the matching
+pure-mirror server with IDENTITY support. Default operations use the parent for
+mirror credentials; WHOAMI remains the actual login identity.
 
 ## Invocation
 
@@ -31,9 +33,10 @@ external termination and broken output pipes may have no error event.
 | version | result: binary_version, schema_versions, capabilities |
 | keygen | result: id |
 | whoami [--register nickname] | result: id, nickname ("-" unregistered) |
-| create nickname / avatar slot child-id nickname | result: id, nickname |
+| create nickname / avatar slot child-id nickname / mirror slot child-id nickname | result: id, nickname |
+| identity | result: authenticated_id, effective_id |
 | meta id | result: id, kind, owner ("-" if none), slot (integer), nickname |
-| rename / room-mode / delegate | result |
+| rename / room-mode / delegate / detach | result |
 | send / join | result: end_offset |
 | rooms | room(id,nickname)* then end |
 | read id offset | message* then end(next_offset) |
@@ -53,6 +56,10 @@ Business callers save offsets only after successful processing; no exactly-once 
 Filtered SENT scan_offset is independent from the last matching message, and sparse data
 must not enter the normal contiguous cache. Finite operations require a terminal event
 AND exit 0; partial output or EOF alone is not success.
+
+`delegate child bits` configures the parent's access **to** an ordinary child.
+It no longer grants the child access to the parent. Mirrors cannot send as themselves
+or receive messages; `detach` removes the relationship without deleting either account.
 
 Server errors preserve their code. Local codes include invalid-argument, identity-missing,
 identity-create-failed, server-untrusted, server-key-changed, network-error, protocol-error,
