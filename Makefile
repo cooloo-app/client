@@ -1,5 +1,5 @@
 # cooloo client - single binary: CLI + v0.3 modular workbench
-# bare `cooloo` -> short help; --gui -> GUI (SDL3+Lua); subcommands -> CLI.
+# bare `cooloo` -> short help (Windows desktop -> GUI); --gui -> GUI; commands -> CLI.
 CC      ?= cc
 CFLAGS  ?= -O2 -Wall -Wextra -std=c99
 PREFIX  ?= /usr/local
@@ -223,6 +223,15 @@ $(GENERATED)/embedded_text_icon.h assets/cooloo-text.ico assets/cooloo-text.png:
 $(WIN_ICON): assets/apps/cooloo/windows.rc assets/cooloo.ico
 	mkdir -p $(BUILD)
 	$(WIN_RC) -Iassets/apps/cooloo -i assets/apps/cooloo/windows.rc -o $@
+
+# Offline Windows startup fixtures; GUI dispatch returns 73 without opening SDL.
+$(BUILD)/startup-dispatch.exe: tests/startup_gui_stub.c $(CORE_SRC) $(HEADERS)
+	mkdir -p $(BUILD)
+	$(WIN_CC) $(CFLAGS) -mwindows -o $@ tests/startup_gui_stub.c $(CORE_SRC) -static -lws2_32 -ladvapi32
+
+$(BUILD)/startup-console-parent.exe: tests/startup_console_parent.c
+	mkdir -p $(BUILD)
+	$(WIN_CC) -O2 -Wall -Wextra -o $@ $< -static
 
 release-windows: cooloo.exe cooloo-text.exe cooloo-workbench.exe cli.exe
 cooloo.exe: $(ALL_SRC) $(HEADERS) $(GUI_HEADERS) $(SDL_WIN_LIB) $(WIN_ICON)

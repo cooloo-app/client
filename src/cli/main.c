@@ -9,7 +9,7 @@
  *   cooloo rooms | whoami [--register <nick>]
  *   cooloo --gui [--debug] [--lua-dev DIR]  GUI
  *   global flag: -y/--tofu              auto-trust unknown server fingerprint
- * Running bare (no args) prints a short help summary without side effects.
+ * Running bare prints short help, except Windows desktop launches open the GUI.
  */
 #include "cli.h"
 #include "gui.h"
@@ -83,7 +83,11 @@ static int run(int argc, char **argv)
     luabind_set_args(argc,argv);
 #endif
 
-    /* Parse startup flags; only --gui selects the GUI. */
+#if defined(_WIN32) && !defined(COOLOO_CLI_ONLY)
+    if (argc == 1)
+        gui = cooloo_console_default_gui();
+#endif
+    /* Explicit startup flags take precedence over automatic desktop dispatch. */
     for (i = 1; i < argc && argv[i][0]=='-'; i++) {
         int remove = 0;
         if (!strcmp(argv[i], "--json")) {

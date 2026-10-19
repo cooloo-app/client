@@ -7,6 +7,27 @@
 #include <fcntl.h>
 #include <stdint.h>
 
+/* Called only for a bare full-client launch, before console initialization.
+ * Pipes/files (including mintty/WSL stdio) mean CLI even without a console.
+ * Do not attach in that case: AttachConsole can replace redirected handles.
+ * A successful attachment is retained for the subsequent CLI initialization.
+ */
+int cooloo_console_default_gui(void)
+{
+    const DWORD ids[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+    DWORD process;
+    int i;
+    for (i = 0; i < 3; ++i) {
+        HANDLE h = GetStdHandle(ids[i]);
+        if (h && h != INVALID_HANDLE_VALUE && GetFileType(h) != FILE_TYPE_UNKNOWN)
+            return 0;
+    }
+    if (GetConsoleProcessList(&process, 1) || AttachConsole(ATTACH_PARENT_PROCESS))
+        return 0;
+    /* No parent console is the desktop case. On other errors prefer CLI. */
+    return GetLastError() == ERROR_INVALID_HANDLE;
+}
+
 void cooloo_console_init(int enabled)
 {
     const DWORD ids[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
@@ -53,5 +74,6 @@ void cooloo_console_init(int enabled)
     setvbuf(stderr, NULL, _IONBF, 0);
 }
 #else
+int cooloo_console_default_gui(void) { return 0; }
 void cooloo_console_init(int enabled) { (void)enabled; }
 #endif

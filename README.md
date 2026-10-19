@@ -45,6 +45,31 @@ behavior; they no longer start a mock conversation or execute `--lua-run`.
 `cooloo --gui` explicitly installs the workspace and console plugins. The local
 mock provider remains a development fixture, not the text-editor product.
 
+On Windows, launching the full `cooloo.exe` with no arguments and no terminal or
+redirected standard handles (for example, double-clicking it in Explorer) opens
+this same GUI without allocating a console. A bare launch from PowerShell, CMD,
+or a Bash terminal prints CLI help; pipes and file redirection also keep CLI
+behavior. Explicit commands and flags retain their existing meanings, including
+`--gui`, `--help`, `--json`, and runner modes. CLI-only builds and non-Windows
+platforms continue to print help on bare launches. Detection uses standard
+handles and parent-console attachment, not parent executable names; a custom
+launcher that supplies neither console nor standard handles behaves like a
+desktop launch.
+
+Offline Windows dispatch regression (GUI is replaced with an exit-code stub):
+
+```sh
+make build/startup-dispatch.exe build/startup-console-parent.exe
+```
+
+```powershell
+powershell -NoProfile -File tests/windows-dispatch.ps1 -Exe build/startup-dispatch.exe -ConsoleParent build/startup-console-parent.exe
+```
+
+This covers desktop-style detached launches, parent-console attachment and
+partial/full stdio redirection without opening a GUI or accessing a server.
+Real Explorer and terminal acceptance additionally requires the full binary.
+
 `cooloo-workbench` is a separate headless binary (C + Lua, no SDL):
 
 ```sh
