@@ -13,6 +13,7 @@ function M.install(provider)
   local files=require('plugins.workspace.files').new(system,provider)
   local chats,file_resources,collapsed={},{},{}
   local browser,last_focus,stamp
+  local notification_count,notification_serial=0,0
   local list,filelist,navigation
   local function node_for(view)
     return core.root_view.root_node:get_node_for_view(view)
@@ -106,7 +107,7 @@ function M.install(provider)
       return
     end
     local key='file:'..path_key
-    local protected=room_file and (name=='.meta' or name=='messages.jsonl' or name=='messages.chat')
+    local protected=room_file and (name=='.meta' or name=='messages.jsonl' or name=='messages.chat' or name=='read-state')
     local resource=file_resources[key]
     if not resource then
       resource={kind='file',key=key,path=path,doc=core.open_doc(path)}
@@ -211,6 +212,13 @@ function M.install(provider)
         if ok then filelist:set_rows(files.rows) else core.error('%s',err or 'Cannot bind directory') end
       end)
     end,
+    ['workspace:toggle-mute']=function()
+      local id=active_room() or browser
+      if id and provider.toggle_mute then
+        local ok,err=provider:toggle_mute(id)
+        if not ok then core.error('%s',err) end
+      end
+    end,
     ['workspace:refresh-files']=function() files:refresh() end,
     ['workspace:mock-load']=function()
       if provider.load then prompt('Mock text file',function(path)
@@ -250,10 +258,18 @@ function M.install(provider)
       local id=active_room()
       if id then workspace:select(id);browse(id) end
     end
+    if provider.reading then provider:reading(active_room(),system.window_has_focus()) end
+    if provider.notifications and system.set_unread then
+      local count,serial=provider:notifications()
+      if count~=notification_count or serial~=notification_serial then
+        system.set_unread(count,count>0 and serial>notification_serial and not system.window_has_focus())
+        notification_count,notification_serial=count,serial
+      end
+    end
     local current=provider:list()
     if not had_rooms and current[1] then had_rooms=true;select_room(current[1].id) end
     local parts={provider.status or '',provider.identity_label or '',browser or ''}
-    for _,r in ipairs(current) do parts[#parts+1]=r.id..':'..(r.name or '')..':'..tostring(r.unread or 0) end
+    for _,r in ipairs(current) do parts[#parts+1]=r.id..':'..(r.name or '')..':'..tostring(r.unread or 0)..':'..tostring(r.muted) end
     local delivery=browser and provider.delivery and provider:delivery(browser)
     parts[#parts+1]=delivery and delivery.state or ''
     local now=table.concat(parts,'\n')

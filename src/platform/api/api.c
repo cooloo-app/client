@@ -13,7 +13,9 @@
 #include <errno.h>
 #include <math.h>
 #ifdef _WIN32
+#define COBJMACROS
 #include <windows.h>
+#include <shobjidl.h>
 #include <direct.h>
 #else
 #include <unistd.h>
@@ -21,6 +23,8 @@
 #include <sys/stat.h>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
+#include <objc/message.h>
+#include <objc/runtime.h>
 #endif
 #endif
 static double fps = 60;
@@ -98,7 +102,58 @@ static SDL_Window *window(void) {
     int count=0;SDL_Window **windows=SDL_GetWindows(&count);
     SDL_Window *first=count?windows[0]:NULL;SDL_free(windows);return first;
 }
-static int focus(lua_State *L) { lua_pushboolean(L,SDL_GetKeyboardFocus()!=NULL); return 1; }
+static int focus(lua_State *L) {
+    SDL_Window *w=window();
+    lua_pushboolean(L,w && (SDL_GetWindowFlags(w)&SDL_WINDOW_INPUT_FOCUS) &&
+        !(SDL_GetWindowFlags(w)&SDL_WINDOW_MINIMIZED));return 1;
+}
+/* Policy is supplied by Lua. Native code only displays its aggregate. */
+static int set_unread(lua_State *L) {
+    int unread=luaL_checkinteger(L,1)>0;
+    SDL_Window *w=window();
+    if(!w)return 0;
+#ifdef _WIN32
+    HWND hwnd=SDL_GetPointerProperty(SDL_GetWindowProperties(w),SDL_PROP_WINDOW_WIN32_HWND_POINTER,NULL);
+    HRESULT initialized=CoInitializeEx(NULL,COINIT_APARTMENTTHREADED);
+    ITaskbarList3 *taskbar=NULL;
+    if(hwnd && SUCCEEDED(CoCreateInstance(&CLSID_TaskbarList,NULL,CLSCTX_INPROC_SERVER,
+            &IID_ITaskbarList3,(void **)&taskbar))) {
+        if(SUCCEEDED(ITaskbarList3_HrInit(taskbar))) {
+            HICON icon=NULL;
+            if(unread) {
+                BITMAPINFO info;memset(&info,0,sizeof info);
+                info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+                info.bmiHeader.biWidth=16;info.bmiHeader.biHeight=-16;
+                info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
+                void *pixels=NULL;
+                HBITMAP color=CreateDIBSection(NULL,&info,DIB_RGB_COLORS,&pixels,NULL,0);
+                BYTE maskbits[32]={0};HBITMAP mask=CreateBitmap(16,16,1,1,maskbits);
+                if(color && mask && pixels) {
+                    Uint32 *p=pixels;
+                    for(int y=0;y<16;y++)for(int x=0;x<16;x++)
+                        p[y*16+x]=((x-8)*(x-8)+(y-8)*(y-8)<=49)?0xfff05a5a:0;
+                    ICONINFO ii={TRUE,0,0,mask,color};icon=CreateIconIndirect(&ii);
+                }
+                if(color)DeleteObject(color);
+                if(mask)DeleteObject(mask);
+            }
+            ITaskbarList3_SetOverlayIcon(taskbar,hwnd,icon,unread?L"Unread messages":L"");
+            if(icon)DestroyIcon(icon);
+        }
+        ITaskbarList3_Release(taskbar);
+    }
+    if(SUCCEEDED(initialized))CoUninitialize();
+#elif defined(__APPLE__)
+    id app=((id(*)(id,SEL))objc_msgSend)((id)objc_getClass("NSApplication"),sel_registerName("sharedApplication"));
+    id dock=((id(*)(id,SEL))objc_msgSend)(app,sel_registerName("dockTile"));
+    id label=unread?((id(*)(id,SEL,const char *))objc_msgSend)((id)objc_getClass("NSString"),
+        sel_registerName("stringWithUTF8String:"),"●"):NULL;
+    ((void(*)(id,SEL,id))objc_msgSend)(dock,sel_registerName("setBadgeLabel:"),label);
+#endif
+    if(!unread)SDL_FlashWindow(w,SDL_FLASH_CANCEL);
+    else if(lua_toboolean(L,2))SDL_FlashWindow(w,SDL_FLASH_BRIEFLY);
+    return 0;
+}
 static int title(lua_State *L) { if(window())SDL_SetWindowTitle(window(),luaL_checkstring(L,1)); return 0; }
 static int mode(lua_State *L) {
     SDL_Window *w = window();
@@ -314,7 +369,7 @@ static int temp_file(lua_State *L) {
 }
 
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());

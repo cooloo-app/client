@@ -54,7 +54,7 @@ SDL_WIN_INC := -Ivendor/sdl3/include -Ivendor/lua
 MAC_LIBS  := $(SDL_MAC_LIB) -framework Cocoa -framework Carbon -framework IOKit \
 	-framework CoreFoundation -framework CoreVideo \
 	-framework UniformTypeIdentifiers -framework Metal -framework QuartzCore \
-	-liconv -lm
+	-liconv -lobjc -lm
 WIN_LIBS  := $(SDL_WIN_LIB) -lwinmm -lole32 -loleaut32 -limm32 -lversion -luuid \
 	-ladvapi32 -lsetupapi -lshell32 -lgdi32 -luser32 -lkernel32 -lws2_32 \
 	-static -static-libgcc -lm
@@ -139,6 +139,8 @@ $(BUILD)/runtime-test.exe: tests/runtime_test.c src/runtime/process.c $(LUA_SRC)
 
 test-workbench-macos: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test-macos $(BUILD)/runtime-test-macos editor cooloo
 	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/workbench.lua
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/notifications.lua
+	$(BUILD)/lua-runner --lua-run tests/readstate.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test-macos $(BUILD)/lua-runner tests/runtime.lua
 	COOLOO_TEST_EDITOR=$(CURDIR)/editor COOLOO_TEST_GUI=$(CURDIR)/cooloo python3 tests/workbench_integration.py
@@ -148,6 +150,8 @@ $(BUILD)/runtime-test: tests/runtime_test.c src/runtime/process.c $(LUA_SRC) $(S
 
 test-workbench: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test $(BUILD)/runtime-test editor-linux cooloo-linux
 	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/workbench.lua
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/notifications.lua
+	$(BUILD)/lua-runner --lua-run tests/readstate.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test $(BUILD)/lua-runner tests/runtime.lua
 	python3 tests/workbench_integration.py
@@ -200,6 +204,7 @@ $(BUILD)/file-write-test.exe: tests/file_write_test.c src/platform/api/file.c sr
 # Deliberately no GUI, SDL dummy, rendering or desktop tests in this target.
 test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner
 	$(BUILD)/lua-runner --lua-run tests/workbench_headless.lua
+	$(BUILD)/lua-runner --lua-run tests/readstate.lua
 	python3 tests/workbench_cli.py ./cooloo-workbench
 
 # loopback integration against the sibling server repo's coolood

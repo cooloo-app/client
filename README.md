@@ -196,6 +196,37 @@ Real desktop layout, focus, Chinese IME, clipboard, split interaction, draft
 recovery and sending await human validation. Use one GUI process per identity
 when editing drafts; this version does not merge concurrent external edits.
 
+## Local unread and desktop attention
+
+The full GUI keeps a local read watermark for each server fingerprint, effective
+message identity and conversation. Opening a chat in the focused, non-minimized
+window marks its synchronized messages read; incoming messages in that active
+chat are also read without requiring a scroll to the bottom. Background tabs,
+ordinary documents, unfocused and minimized windows retain unread messages.
+Own messages and recovered SENT records do not add unread. On first upgrade,
+existing local cache becomes the baseline; subsequent downloads remain unread.
+Restart and reconnect reconstruct counts from the durable cache, paging beyond
+the 2000-message display limit when necessary.
+
+Use **Workspace: Toggle Mute** in the command palette for the active or browsed
+conversation. Unread counts are red normally and gray when muted. Muting keeps
+unread intact and removes that conversation from the desktop aggregate. A local
+`read-state` file beside `messages.jsonl` stores the watermark and mute flag using
+atomic replacement; it is a read-only snapshot in the room file browser. Failed
+writes retain unread and report an error. Corrupt state fails closed instead of
+silently treating history as read. Use one GUI process per local identity; state
+is not merged between simultaneous processes or synchronized between devices.
+
+Windows uses a taskbar overlay dot; macOS uses a Dock badge. Non-muted live
+messages request attention while the window is in the background. Restored
+history sets the persistent badge without requesting attention. The badge clears
+when no non-muted unread remains. Closing a chat releases its foreground stream,
+but listed rooms remain eligible for background sync. Notifications require the
+application to stay running; this does not add system notification banners.
+Native bindings are build/runtime tested on Windows and macOS; actual Explorer
+and Dock appearance still needs desktop visual acceptance. These source changes
+do not refresh the checked-in release binaries.
+
 ## License
 
 Project-owned client code is licensed under [MIT](LICENSE). Vendored components

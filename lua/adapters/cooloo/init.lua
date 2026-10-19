@@ -1,6 +1,7 @@
 -- Composition adapter: protocol offsets and durable cache jobs never escape here.
 global{chat=false}
 local chat=require 'client.chat'
+local ReadState=require 'workbench.readstate'
 local M={}
 function M.new()
   local p={status='connecting',trust={},jobs={},blocked={},deferred={},subscriptions={},epoch=0,
@@ -25,10 +26,51 @@ function M.new()
     if not id then callback(false,{},-1);return false,err end
     p.jobs[id]={epoch=p.epoch,callback=callback};return true
   end
+  local function state_error(err)
+    p.read_error='Read state: '..tostring(err)
+  end
+  chat.message_added=function(r,m)
+    local s=r.read_state
+    if s and s:observe(m.endoff,m.from,chat.identity()) and r.following and not r.loading_state then
+      if not s.muted then p.attention_serial=(p.attention_serial or 0)+1 end
+    end
+    r.unread=s and s.unread or 0
+  end
   chat.load_cache=function(r,done)
     local c=r.conn;p.blocked[c]=true;cooloo.net.pause(c,true)
-    job('read',r,nil,2000,function(ok,records,offset)
+    local function finish(ok,records,offset)
+      if r.conn~=c then return end
+      r.loading_state=false
       done(ok,records,offset);p.blocked[c]=nil;cooloo.net.pause(c,false)
+    end
+    r.loading_state=true
+    job('read',r,nil,2000,function(ok,records,offset)
+      if r.conn~=c then return end
+      if not ok then finish(false,{},-1);return end
+      local root,err=p:directory(r.name)
+      local s=r.read_state
+      if s and (not root or s.path~=root..'/read-state') then s=nil end
+      if not s and root then s,err=ReadState.new(root..'/read-state',system.write_file) end
+      if not s then state_error(err);finish(false,{},-1);return end
+      local saved,message=s:baseline(offset)
+      if not saved then state_error(message);finish(false,{},-1);return end
+      r.read_state=s
+      -- Count all unread cached records, including those beyond the display cap.
+      -- Page backwards on the worker; never scan a JSONL file on the UI thread.
+      local function scan(page)
+        if r.conn~=c then return end
+        for _,v in ipairs(page) do
+          local m=cooloo.record(v.json)
+          if m then s:observe(v.offset,m.from,chat.identity()) end
+        end
+        local first=page[1] and page[1].offset
+        if #page==2000 and first>s.watermark then
+          job('read',r,first,2000,function(success,older)
+            if success then scan(older) else finish(false,{},-1) end
+          end)
+        else r.unread=s.unread;finish(true,records,offset) end
+      end
+      scan(records)
     end)
   end
   chat.persist=function(r,offset,json,done)
@@ -93,9 +135,31 @@ function M.new()
     for _,id in ipairs(chat.order) do
       local r=chat.rooms[id];local caps=self:capabilities(id)
       rooms[#rooms+1]={id=id,name=r.nickname or id,can_send=caps.can_send,can_read=caps.can_read,
-        capabilities=caps,unread=r.unread,subscribed=self.subscriptions[id]~=nil}
+        capabilities=caps,unread=r.unread,muted=r.read_state and r.read_state.muted or false,
+        subscribed=self.subscriptions[id]~=nil}
     end
     return rooms
+  end
+  function p:reading(id,focused)
+    local r=focused and id and chat.rooms[id]
+    if r and r.read_state and not r.loading_state then
+      local ok,err=r.read_state:mark(r.newest_end)
+      if not ok then state_error(err) else r.unread=r.read_state.unread end
+    end
+  end
+  function p:toggle_mute(id)
+    local r=chat.rooms[id];local s=r and r.read_state
+    if not s then return false,'Waiting for synchronized conversation' end
+    local ok,err=s:mute(not s.muted)
+    if not ok then state_error(err) end
+    return ok,err
+  end
+  function p:notifications()
+    local count=0
+    for _,r in pairs(chat.rooms) do
+      if r.read_state and not r.read_state.muted then count=count+r.read_state.unread end
+    end
+    return count,self.attention_serial or 0
   end
   function p:schedule()
     if self.closed or chat.read_denied then
@@ -147,7 +211,9 @@ function M.new()
     self.selected=id;chat.select(id);self:schedule();return true
   end
   function p:unsubscribe(id)
-    self.suppressed=self.suppressed or {};self.suppressed[id]=true
+    -- Closing a view releases its foreground lease, but listed rooms remain
+    -- eligible for background synchronization and unread notifications.
+    self.suppressed=self.suppressed or {};self.suppressed[id]=nil
     self.subscriptions[id]=nil
     if self.selected==id then self.selected=nil end
     local current=self.selected
@@ -273,7 +339,7 @@ function M.new()
     end
     local now=self.clock()
     -- One bounded background subscription per listed conversation, admitted
-    -- incrementally. Explicit unsubscribe suppresses automatic resubscription.
+    -- incrementally, including rooms whose last view was closed.
     if chat.rooms_loaded and not chat.read_denied then
       self.suppressed=self.suppressed or {}
       for _,id in ipairs(chat.order) do
@@ -292,7 +358,7 @@ function M.new()
       if not chat.auth_failed and not chat.ctrl then chat.connect_ctrl() end
       self:schedule()
     end
-    self.status=(self.history_status or '')..' '..chat.status
+    self.status=(self.read_error or self.history_status or '')..' '..chat.status
     if chat.read_denied then self.status=self.status..' | read denied; explicit destination may still allow send' end
     if not chat.registered and chat.ctrl_up then self.status=self.status..' | Workspace: Register' end
     if next(self.trust) then self.status='Trust required: Workspace: Trust Server' end
@@ -317,10 +383,11 @@ function M.new()
   end
   function p:identity(id)
     if id and (#id~=64 or not id:match('^[0-9a-f]+$')) then return false end
-    reset();self.deliveries={};self.subscriptions={};self.suppressed={};self.selected=nil;chat.subscriptions={}
+    reset();self.read_error=nil;self.attention_serial=0
+    self.deliveries={};self.subscriptions={};self.suppressed={};self.selected=nil;chat.subscriptions={}
     return chat.use_identity(id)
   end
-  function p:reconnect() reset();chat.reconnect();self:schedule() end
+  function p:reconnect() reset();self.read_error=nil;chat.reconnect();self:schedule() end
   function p:close()
     reset();chat.close_all();self.closed=true;self.subscriptions={};chat.subscriptions={}
   end

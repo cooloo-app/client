@@ -182,8 +182,8 @@ local function add_msg(r, endoff, ts, nick, text, from)
         if not old.sent then r.ends[old.endoff] = nil end
         r.oldest_end = r.buf[1] and r.buf[1].endoff or nil
     end
-    -- The durable JSONL prefix is the synchronization checkpoint.
-    if r ~= M.current() then r.unread = r.unread + 1 end
+    -- Reading and notification policy belong to the adapter, not selection.
+    if M.message_added then M.message_added(r,m) end
 end
 
 local function query_identity(conn,nick)
@@ -517,7 +517,6 @@ end
 function M.select(name)
     if M.rooms[name] then
         M.sel = name
-        M.rooms[name].unread = 0
     end
 end
 

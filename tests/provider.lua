@@ -4,6 +4,18 @@ global=function()end
 package.preload['client.chat']=function()dofile('lua/chat.lua');return chat end
 local A,B,R=string.rep('a',64),string.rep('b',64),string.rep('c',64)
 local time,serial,job_serial=0,0,0
+local state_files={}
+local original_open=io.open
+io.open=function(path,mode)
+ if path:match('/read%-state$') then
+   local value=state_files[path]
+   if not value then return nil,'missing',2 end
+   return {read=function()return value end,close=function()return true end}
+ end
+ return original_open(path,mode)
+end
+system={write_file=function(path,value)state_files[path]=value;return true end}
+local sender=A
 local conns,writes,jobs,results={},{},{},{}
 cooloo={public_id=function()return A end,ensure_identity=function()return true end,server=function()return 'localhost',4222 end,
  time=function()return time end,config={get=function()end,set=function()return true end},
@@ -16,7 +28,7 @@ cooloo={public_id=function()return A end,ensure_identity=function()return true e
  cache_async={submit=function(kind,server,self,room,a,b)
    job_serial=job_serial+1;jobs[job_serial]={kind=kind,room=room};return job_serial
  end,poll=function()local r=results;results={};return r end},
- record=function(json)return {ts=1,from=A,to=R,content=json}end}
+ record=function(json)return {ts=1,from=sender,to=R,content=json}end}
 local p=require('adapters.cooloo').new()
 local function event(kind,c,line)
  p:poll{{type=kind,conn=c,line=line,nick='user',reason='test'}}
@@ -45,6 +57,35 @@ p:poll{{type='net_line',conn=c,line='MSG 200 4'},{type='net_line',conn=c,line='l
 assert(#chat.rooms[R].buf==1 and p.blocked[c])
 complete(job_serial,{},0)
 assert(#chat.rooms[R].buf==2 and writes[#writes].s=='FOLLOW '..R..' 200\n')
+-- Cache baseline and own sends never add unread. Selection is not reading.
+assert(p:list()[1].unread==0)
+sender=B
+local function incoming(offset)
+ event('net_line',c,'MSG '..offset..' 4');event('net_line',c,'live');complete(job_serial)
+end
+incoming(300);assert(p:list()[1].unread==1)
+chat.select(R);p:reading(R,false);assert(p:list()[1].unread==1)
+assert(p:notifications()==1)
+assert(p:toggle_mute(R));assert(p:list()[1].muted and p:notifications()==0)
+local _,attention=p:notifications()
+incoming(400);assert(p:list()[1].unread==2)
+local _,muted_attention=p:notifications();assert(attention==muted_attention)
+p:reading(nil,true);assert(p:list()[1].unread==2,'ordinary document must not read chat')
+p:reading(R,true);assert(p:list()[1].unread==0)
+assert(chat.rooms[R].read_state.watermark==400)
+assert(p:toggle_mute(R));incoming(500);incoming(500)
+assert(p:list()[1].unread==1,'duplicate endpoint counted twice')
+p:reading(R,true)
+-- Reopening must count beyond the 2000-record display window before READ resumes.
+p:reconnect();event('net_ready',chat.ctrl);assert(p:subscribe(R))
+c=chat.rooms[R].conn;event('net_ready',c)
+local page={};for offset=1000,2999 do page[#page+1]={offset=offset,json='cached'} end
+complete(job_serial,page,2999);assert(p.blocked[c])
+complete(job_serial,{{offset=600,json='cached'},{offset=700,json='cached'}},2999)
+assert(chat.rooms[R].unread==2002 and not p.blocked[c])
+assert(writes[#writes].s=='READ '..R..' 2999\n')
+p:reading(R,true);assert(chat.rooms[R].unread==0)
+event('net_line',c,'END');sender=A
 -- A dedicated send stream cannot consume unrelated ctrl ERR as an ACK.
 assert(p:send(R,'/as '..B));local send=p.sending.conn
 event('net_ready',send)
@@ -88,4 +129,5 @@ chat.metadata('{"id":"'..R..'","type":"user","nickname":"mirror","owner":"'..B..
 assert(p:capabilities(R).can_read and not p:capabilities(R).can_send)
 assert(not p:send(R,'must not send to mirror'))
 p:close();assert(next(conns)==nil)
-print('provider: async checkpoint ordering, subscriptions/overflow, stale identity, send ACK/rejection/uncertainty/capabilities passed')
+io.open=original_open
+print('provider: read/focus/mute/attention, async checkpoint ordering, subscriptions/overflow, stale identity, send ACK/rejection/uncertainty/capabilities passed')

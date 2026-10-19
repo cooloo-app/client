@@ -38,7 +38,7 @@ system = {
   platform=api.platform.name,
   temp_file=api.platform.temp_file, write_file=api.platform.write_file,
   get_time=api.time, get_clipboard=api.clipboard.get, set_clipboard=api.clipboard.set,
-  request_quit=api.quit, window_has_focus=api.platform.focus,
+  request_quit=api.quit, window_has_focus=api.platform.focus, set_unread=api.platform.set_unread,
   clear_ime=api.clear_ime, set_text_input_rect=api.set_ime_rect,
   set_cursor=api.platform.cursor, set_window_title=api.platform.title,
   set_window_mode=api.platform.mode, show_confirm_dialog=api.platform.confirm,

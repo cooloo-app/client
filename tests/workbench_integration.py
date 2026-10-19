@@ -121,6 +121,41 @@ end
 ''')
         p = run([gui_binary,'--gui','--debug','--lua-dev',dev],env)
         assert 'PROVIDER_READY' in p.stdout, p.stderr
+        # Real provider/cache restart checks with deterministic window focus.
+        run([root/'cooloo-cli','send',identity,'unread from another identity'],child_env)
+        for phase in ('background', 'read', 'restart'):
+            read_dev=base/('read-'+phase);read_dev.mkdir()
+            run(['python3',root/'tools/embed_workbench.py',read_dev/'workbench.lua','--lua'],env)
+            with (read_dev/'workbench.lua').open('a') as f:
+                f.write('local phase='+json.dumps(phase)+'\n')
+                f.write('''
+local original=cooloo.frame
+local focused=false
+system.window_has_focus=function()return focused end
+local frames,marked=0,false
+function cooloo.frame(events,dt)
+  local draws=original(events,dt);frames=frames+1
+  local r=chat.current()
+  if r and r.phase=='following' and r.read_state and not r.loading_state then
+    if phase=='background' then
+      assert(r.unread==1,'background message lost or history counted')
+      assert(require('core.command').perform('workspace:toggle-mute'))
+      assert(r.read_state.muted and r.unread==1)
+      print('READ_STATE_OK');cooloo.quit()
+    elseif phase=='read' and not marked then
+      assert(r.unread==1 and r.read_state.muted,'restart lost unread/mute')
+      focused=true;marked=true
+    elseif phase=='restart' or marked then
+      assert(r.unread==0 and r.read_state.muted,'read watermark did not survive')
+      print('READ_STATE_OK');cooloo.quit()
+    end
+  end
+  if frames>300 then error('read state stalled') end
+  return draws
+end
+''')
+            checked=run([gui_binary,'--gui','--debug','--lua-dev',read_dev],env)
+            assert 'READ_STATE_OK' in checked.stdout,checked.stderr
         # A cache held by another process must not stall even one UI poll.
         cache=next((base/'config'/'cache').glob('*/'+identity+'/rooms/'+identity+'/messages.jsonl'))
         locked_dev=base/'locked-dev';locked_dev.mkdir()

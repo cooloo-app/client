@@ -77,6 +77,9 @@ Provider contract:
 - Optional `revision(id)` avoids rebuilding unchanged projections; `delivery(id)`
   returns pending/sent/rejected/unknown plus detail. IDs are provider identities,
   never document lines or protocol offsets. Messages contain `id/from/text/ts`.
+- Optional `reading(id,focused)` marks only an active foreground chat;
+  `toggle_mute(id)` persists local policy; `notifications()` returns the non-muted
+  aggregate and live-message attention serial. `list()` includes `unread/muted`.
 - Workspace keeps submitted drafts until ACK; rejection/unknown retains text.
   ACK clears only an unchanged draft. No resend. A dedicated SEND connection
   prevents metadata/registration errors from being mistaken for SEND replies.
@@ -88,7 +91,8 @@ Provider contract:
 - At most 12 room streams plus control/SEND/SENT within 16 transport slots.
   Subscriptions are admitted incrementally, selected room wins, completed
   background streams rotate on five-second leases, stalled background catch-up
-  yields after 30 seconds. Unsubscribe closes its stream and filtered SENT query.
+  yields after 30 seconds. Unsubscribe closes its foreground stream and filtered
+  SENT query; listed rooms remain eligible for incremental background admission.
   Unread reflects synchronized data, not an instantaneous server-side counter.
 - Connection tokens are never reused with their slot, so queued old-identity
   events cannot attach to a new connection. Cache callbacks carry an epoch.
@@ -195,6 +199,22 @@ visual acceptance remain pending.
 The existing quit hook flushes drafts before console cleanup and asks about
 pending delivery. The ChatView iteration has syntax/build checks only; automated
 and runtime tests were explicitly skipped. Desktop acceptance is pending.
+
+`workbench/readstate.lua` owns the local monotonic read watermark, mute flag and
+pending received endpoints. `adapters.cooloo` loads it from the authenticated room
+directory and reconstructs unread from cache pages (including beyond the display
+cap) before resuming READ/FOLLOW. Selection alone never clears unread. The workspace
+passes actual window focus plus active ChatView resource, then sends one aggregate
+to `system.set_unread(count,attention)`. Native code renders the Windows taskbar
+overlay/macOS Dock badge and uses SDL flash; it owns no messaging state. Cached
+history and own/filtered SENT messages never request attention. The small local
+state file uses the existing synchronous atomic writer, like drafts; JSONL scans
+and appends remain on the cache worker. Files contain exactly `v1`, decimal read
+byte endpoint, and `0`/`1` mute flag, each followed by LF. They are never executed.
+Missing files baseline the existing cache once; malformed/unreadable files stop
+that stream with a visible error. Write failure does not advance the watermark.
+State is local to server/effective identity/room; concurrent GUI state merging and
+cross-device read synchronization are not implemented.
 
 Workspace and console plugins install their own commands and lifecycle handlers;
 the full composition only selects dependencies and schedules them. Virtual/read-only

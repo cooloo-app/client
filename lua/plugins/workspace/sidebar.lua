@@ -69,7 +69,10 @@ function Sidebar:draw()
       end
       local mark=row.branch and (row.expanded and '- ' or '+ ') or '  '
       local unread=row.room and (row.room.unread or 0)>0 and (' ['..row.room.unread..']') or ''
-      renderer.draw_text(style.font,mark..row.label..unread,self.position.x+8*SCALE+row.depth*14*SCALE,y+3*SCALE,style.text)
+      local x=renderer.draw_text(style.font,mark..row.label,self.position.x+8*SCALE+row.depth*14*SCALE,y+3*SCALE,style.text)
+      if unread~='' then
+        renderer.draw_text(style.font,unread,x,y+3*SCALE,row.room.muted and style.dim or {240,90,90,255})
+      end
     end
   end
   core.pop_clip_rect()
