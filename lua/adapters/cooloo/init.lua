@@ -155,7 +155,7 @@ function M.new()
   function p:open(id)
     local r=chat.rooms[id];local messages={}
     for _,m in ipairs(r and r.buf or {}) do
-      messages[#messages+1]={id=(m.to or id)..':'..tostring(m.endoff),from=m.nick,text=m.text,ts=m.ts}
+      messages[#messages+1]={id=(m.to or id)..':'..tostring(m.endoff),from=m.nick,sender_id=m.from,text=m.text,ts=m.ts}
     end
     return messages
   end

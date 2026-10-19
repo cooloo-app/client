@@ -2,19 +2,22 @@
 local M = {}
 function M.project(messages, options)
   options = options or {}
-  local lines, anchors, ranges, line = {}, {}, {}, 1
+  local lines, anchors, ranges, headers, line = {}, {}, {}, {}, 1
   for _, m in ipairs(messages) do
     assert(type(m.id)=='string' and not anchors[m.id], 'missing or duplicate message ID')
     assert(type(m.text)=='string' and utf8.len(m.text), 'invalid UTF-8 message')
     local stamp = assert(os.date(options.local_time and '%H:%M' or '!%H:%M', m.ts or 0))
-    local block = ('%s  %s\n%s\n'):format(stamp, m.from or '?', m.text)
+    local name = (m.from or '?'):gsub('[%c]', ' ')
+    local block = ('%s  %s\n%s\n'):format(stamp, name, m.text)
+    headers[line] = {first= #stamp+3, last= #stamp+3+#name,
+      sender=m.sender_id or m.from or '?'}
     lines[#lines+1] = block
     anchors[m.id] = line
     local _, count = block:gsub('\n', '')
     ranges[#ranges+1] = {id=m.id, first_line=line, last_line=line+count-1}
     line = line + count + 1
   end
-  return {text=table.concat(lines, '\n'), anchors=anchors, ranges=ranges,
+  return {text=table.concat(lines, '\n'), anchors=anchors, ranges=ranges, headers=headers,
     source_revision=options.source_revision}
 end
 -- Decoder is injected so the CLI and native GUI use the same C record parser.

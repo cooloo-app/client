@@ -2,12 +2,13 @@ local Doc = require 'core.doc'
 local project = require('workbench.messages').project
 local M = {}
 local function text(d) return d:get_text(1, 1, #d.lines, #d.lines[#d.lines]) end
-function M.new(provider,storage)
+function M.new(provider,storage,transcripts)
   local self = {provider=provider, documents={}, drafts={}, selected=nil, pending={}, opened={}, view_counts={}}
   function self:reset()
+    if transcripts then transcripts:reset() end
     if storage then storage:reset() end
     for id, d in pairs(self.documents) do
-      d:set_projection(''); d.projection=''; d.anchors={}
+      d:set_projection(''); d.projection=''; d.anchors={}; d.chat_headers=nil
       self.drafts[id]:set_projection('')
       if self.provider.unsubscribe then self.provider:unsubscribe(id) end
     end
@@ -30,6 +31,7 @@ function M.new(provider,storage)
     return self.documents[id], self.drafts[id]
   end
   function self:release(id)
+    if transcripts then transcripts:flush() end
     self.opened[id]=nil
     if self.provider.unsubscribe then self.provider:unsubscribe(id) end
     if self.selected==id then self.selected=nil end
@@ -64,6 +66,20 @@ function M.new(provider,storage)
       if not revision or d.provider_revision~=revision then
         local projection=project(self.provider:open(id), {source_revision=revision})
         d.provider_revision=revision
+        local headers_changed=false
+        local old=d.chat_headers or {}
+        for line,header in pairs(projection.headers) do
+          local before=old[line]
+          if not before or before.sender~=header.sender or before.first~=header.first
+            or before.last~=header.last then headers_changed=true;break end
+        end
+        if not headers_changed then
+          for line in pairs(old) do
+            if not projection.headers[line] then headers_changed=true;break end
+          end
+        end
+        if headers_changed or not d.chat_headers then d.chat_headers=projection.headers end
+        if transcripts then transcripts:queue(id,projection.text) end
         if d.projection~=projection.text then
           local delta=0
           for key, oldline in pairs(d.anchors or {}) do

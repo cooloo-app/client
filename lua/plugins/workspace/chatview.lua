@@ -2,7 +2,7 @@
 -- commands must not treat the currently focused child document as the chat.
 local core=require 'core'
 local DV=require 'core.docview'
-local Wrapped=require 'core.wrappedview'
+local Wrapped=require 'plugins.workspace.historyview'
 local View=require 'core.view'
 local style=require 'core.style'
 local ime=require 'core.ime'

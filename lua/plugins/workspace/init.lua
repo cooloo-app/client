@@ -8,7 +8,8 @@ function M.install(provider)
   local Sidebar=require 'plugins.workspace.sidebar'
   local tree=require 'plugins.workspace.tree'
   local storage=require('plugins.workspace.drafts').new(provider,system,function(message) core.error('%s',message) end)
-  local workspace=require('plugins.workspace.model').new(provider,storage)
+  local transcripts=require('plugins.workspace.transcripts').new(provider,system,function(message) core.error('%s',message) end)
+  local workspace=require('plugins.workspace.model').new(provider,storage,transcripts)
   local files=require('plugins.workspace.files').new(system,provider)
   local chats,file_resources,collapsed={},{},{}
   local browser,last_focus,stamp
@@ -105,7 +106,7 @@ function M.install(provider)
       return
     end
     local key='file:'..path_key
-    local protected=room_file and (name=='.meta' or name=='messages.jsonl')
+    local protected=room_file and (name=='.meta' or name=='messages.jsonl' or name=='messages.chat')
     local resource=file_resources[key]
     if not resource then
       resource={kind='file',key=key,path=path,doc=core.open_doc(path)}
@@ -135,6 +136,7 @@ function M.install(provider)
   local rooms=provider:list()
   if rooms[1] then select_room(rooms[1].id) end
   local function confirm_leave()
+    transcripts:flush()
     if not storage:flush() then
       core.error('Draft save failed; keep the window open and retry after fixing the directory')
       return false
@@ -276,7 +278,7 @@ function M.install(provider)
     sync_ui()
     workspace:refresh()
     local clock=system.get_time()
-    storage:poll(clock);files:poll(clock)
+    storage:poll(clock);transcripts:poll(clock);files:poll(clock)
     if files:step() then core.redraw=true end
   end}
 end

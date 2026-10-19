@@ -169,6 +169,28 @@ filesystem APIs; the model retains subscriptions and ACK/version guards.
 The Lua cooloo adapter supplies `directory(id)` and `prepare_directory(id)`;
 the latter uses an existing async cache read to create a missing room directory.
 No native cache format, protocol, editor, platform or C source changes are needed.
+
+`transcripts.lua` atomically writes the same UTF-8 projection used by ChatView to
+`messages.chat` beside `messages.jsonl`. This is a regenerable snapshot of loaded
+history, not a full-history export or a write-back format. Updates are coalesced
+for 0.5 seconds (without postponing indefinitely under continuous traffic), failed
+writes are reported and retried, and normal close/quit flushes pending snapshots.
+Unavailable directories are retried; local fixtures without a directory stay in
+memory. Identity reset drops pending snapshots before the new identity is used.
+The generated room file opens as a read-only ordinary DocView snapshot in the
+chosen split; other `.chat` files remain normal editable files. Only `draft.txt`
+redirects to ChatView. An already open snapshot is not a live history view.
+
+`historyview.lua` extends WrappedView within Workbench and colors only sender
+names, using structured byte spans from the projection and a deterministic sender
+ID hash into eight colors chosen for the default dark theme. Collisions are
+allowed; names remain the identity label. The adapter retains sender IDs separately
+from display nicknames, so renaming does not change the color. Providers without
+IDs fall back to their display name. Timestamp and body text use theme colors;
+message bodies cannot masquerade as colored headers. No editor syntax registration
+or editor core patch is required. Light/custom-theme palette tuning and desktop
+visual acceptance remain pending.
+
 The existing quit hook flushes drafts before console cleanup and asks about
 pending delivery. The ChatView iteration has syntax/build checks only; automated
 and runtime tests were explicitly skipped. Desktop acceptance is pending.
