@@ -185,13 +185,26 @@ static int confirm(lua_State *L) {
 static SDL_EnumerationResult entry(void *ctx,const char *dir,const char *name) {
     lua_State *L=ctx;(void)dir;lua_pushstring(L,name);lua_rawseti(L,-2,(lua_Integer)lua_rawlen(L,-2)+1);return SDL_ENUM_CONTINUE;
 }
-static int list(lua_State *L) { const char *p=luaL_checkstring(L,1);lua_newtable(L);if (!SDL_EnumerateDirectory(p,entry,L)) { lua_pop(L,1); lua_pushnil(L); lua_pushstring(L,SDL_GetError()); return 2; } return 1; }
+static int list(lua_State *L) {
+    const char *p=luaL_checkstring(L,1);
+#ifdef _WIN32
+    /* SDL's directory APIs convert UTF-8 but do not add long-path prefixes. */
+    if (*p) {
+        wchar_t *w=platform_windows_path(L,p);
+        push_wide(L,w);free(w);p=lua_tostring(L,-1);
+    }
+#endif
+    lua_newtable(L);
+    if (!SDL_EnumerateDirectory(p,entry,L)) { lua_pop(L,1);lua_pushnil(L);lua_pushstring(L,SDL_GetError());return 2; }
+    return 1;
+}
 static int info(lua_State *L) {
     const char *path=luaL_checkstring(L,1);
     /* A third result distinguishes missing paths from access/I/O failures. */
 #ifdef _WIN32
-    wchar_t *w=wide(L,path);
-    DWORD attrs=GetFileAttributesW(w), error=GetLastError();free(w);
+    wchar_t *w=platform_windows_path(L,path);
+    DWORD attrs=GetFileAttributesW(w), error=GetLastError();
+    push_wide(L,w);free(w);path=lua_tostring(L,-1);
     if(attrs==INVALID_FILE_ATTRIBUTES) {
         lua_pushnil(L);lua_pushfstring(L,"path lookup failed (%d): %s",(int)error,path);
         lua_pushboolean(L,error==ERROR_FILE_NOT_FOUND || error==ERROR_PATH_NOT_FOUND);return 3;
@@ -300,7 +313,7 @@ static int resolve_path(lua_State *L) {
 static int absolute(lua_State *L) {
     const char *p=luaL_checkstring(L,1);
 #ifdef _WIN32
-    wchar_t *w=wide(L,p);
+    wchar_t *w=platform_windows_path(L,p);
     HANDLE h=CreateFileW(w,0,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
     DWORD error=GetLastError();free(w);
     if(h==INVALID_HANDLE_VALUE){lua_pushnil(L);lua_pushfstring(L,"cannot open path (%d)",(int)error);lua_pushinteger(L,error);return 3;}
@@ -352,7 +365,7 @@ static int temp_file(lua_State *L) {
         lua_pushfstring(L,"%s/.lite_temp_%I_%I%s",dir,(lua_Integer)pid,(lua_Integer)++counter,ext);
         const char *path=lua_tostring(L,-1);
 #ifdef _WIN32
-        wchar_t *w=wide(L,path);
+        wchar_t *w=platform_windows_path(L,path);
         HANDLE h=CreateFileW(w,GENERIC_WRITE,0,NULL,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,NULL);
         DWORD error=GetLastError();free(w);
         if(h!=INVALID_HANDLE_VALUE){CloseHandle(h);return 1;}
@@ -369,7 +382,7 @@ static int temp_file(lua_State *L) {
 }
 
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());

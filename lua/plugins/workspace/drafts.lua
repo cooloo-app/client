@@ -23,22 +23,19 @@ function M.new(provider,fs,report)
       e.status='Waiting for local conversation directory';return false
     end
     local path=root..'/draft.txt'
-    local f,openerr,code=io.open(path,'rb')
+    local data,readerr,code=fs.read_file(path)
     local saved=''
-    if f then
-      local data,readerr=f:read('*a')
-      local closed,closeerr=f:close()
-      if not data or not closed then return self:fail(e,tostring(readerr or closeerr)) end
+    if data then
       saved=data:gsub('\r\n','\n')
     elseif code~=2 then
-      return self:fail(e,tostring(openerr))
+      return self:fail(e,tostring(readerr))
     end
     e.path=path;e.saved=saved;e.loaded=true
     e.doc:set_projection(saved);e.doc.readonly=false
     e.version=e.doc:get_change_id()
     e.status=nil
     -- Materialize even an empty draft so the room tree describes the chat.
-    if not f then e.saved=nil end
+    if not data then e.saved=nil end
     return true
   end
   function self:save(id)

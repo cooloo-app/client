@@ -82,15 +82,56 @@ static int copy_xattrs(const char *path, int fd) {
 #endif
 
 #ifdef _WIN32
-static wchar_t *file_wide(lua_State *L, const char *s) {
+wchar_t *platform_windows_path(lua_State *L, const char *s) {
     int n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, NULL, 0);
     if (!n) luaL_error(L, "invalid UTF-8 filename");
     wchar_t *w = malloc((size_t)n * sizeof *w);
     if (!w) luaL_error(L, "out of memory");
     MultiByteToWideChar(CP_UTF8, 0, s, -1, w, n);
+    for (wchar_t *p=w; *p; p++) if (*p==L'/') *p=L'\\';
+    if (!wcsncmp(w,L"\\\\?\\",4)) return w;
+    /* Resolve relative paths and dot segments before adding the prefix: Windows
+     * deliberately disables that normalization for extended-length paths. */
+    wchar_t *full=_wfullpath(NULL,w,0);
+    free(w);
+    if (!full) { luaL_error(L,"cannot resolve path: %s",s); return NULL; }
+    int unc=full[0]==L'\\' && full[1]==L'\\';
+    w=malloc((wcslen(full)+9)*sizeof *w);
+    if (!w) { free(full); luaL_error(L,"out of memory"); return NULL; }
+    wcscpy(w,unc?L"\\\\?\\UNC\\":L"\\\\?\\");
+    wcscat(w,full+(unc?2:0));
+    free(full);
     return w;
 }
 #endif
+
+/* UTF-8 filenames, including Windows long paths; missing files retain errno=2
+ * so draft loading can distinguish a new draft from an unreadable one. */
+int platform_read_file(lua_State *L) {
+    const char *path=luaL_checkstring(L,1);
+#ifdef _WIN32
+    wchar_t *w=platform_windows_path(L,path);
+    FILE *f=_wfopen(w,L"rb");
+    int error=errno;
+    free(w);
+#else
+    FILE *f=fopen(path,"rb");
+    int error=errno;
+#endif
+    if (!f) { lua_pushnil(L);lua_pushstring(L,strerror(error));lua_pushinteger(L,error);return 3; }
+    luaL_Buffer buffer;
+    luaL_buffinit(L,&buffer);
+    char chunk[8192];
+    size_t count;
+    while ((count=fread(chunk,1,sizeof chunk,f))>0) luaL_addlstring(&buffer,chunk,count);
+    error=ferror(f)?(errno?errno:EIO):0;
+    if (fclose(f) && !error) error=errno?errno:EIO;
+    luaL_pushresult(&buffer);
+    if (error) {
+        lua_pop(L,1);lua_pushnil(L);lua_pushstring(L,strerror(error));lua_pushinteger(L,error);return 3;
+    }
+    return 1;
+}
 
 /* Returns true, or nil/message/collision. Only a name collision is retryable. */
 int platform_write_file(lua_State *L) {
@@ -101,7 +142,7 @@ int platform_write_file(lua_State *L) {
     luaL_argcheck(L, strlen(path) == path_len, 1, "embedded NUL in filename");
 #ifdef _WIN32
     DWORD error = 0;
-    wchar_t *target = file_wide(L, path), *temp = NULL;
+    wchar_t *target = platform_windows_path(L, path), *temp = NULL;
     HANDLE fp = INVALID_HANDLE_VALUE;
     int exists = 0;
     if (!exclusive) {
