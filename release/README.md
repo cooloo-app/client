@@ -14,14 +14,14 @@ not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 
 | File | Source commit | Build date | Bytes |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 2877656 |
-| `cooloo-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 5125480 |
-| `cooloo-text-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 2651128 |
-| `cooloo-text-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 4827231 |
-| `cooloo-workbench-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 298784 |
-| `cooloo-workbench-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 647246 |
-| `cooloo-cli-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 161672 |
-| `cooloo-cli-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 604821 |
+| `cooloo-darwin-arm64` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 2877848 |
+| `cooloo-windows-x86_64.exe` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 5126121 |
+| `cooloo-text-darwin-arm64` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 2651128 |
+| `cooloo-text-windows-x86_64.exe` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 4827231 |
+| `cooloo-workbench-darwin-arm64` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 298784 |
+| `cooloo-workbench-windows-x86_64.exe` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 647246 |
+| `cooloo-cli-darwin-arm64` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 161848 |
+| `cooloo-cli-windows-x86_64.exe` | `cb21e62baac66cf965f2e2f751377ce49d392661` | 2026-10-19 | 606172 |
 
 All artifacts use the same source revision.
 
