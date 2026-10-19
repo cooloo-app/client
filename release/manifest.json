@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "client_version": "0.3.0",
-  "status": "tagged-artifacts",
+  "status": "development-artifacts",
   "updated": "2026-10-19",
   "artifacts": [
     {
@@ -9,60 +9,200 @@
       "product": "cooloo",
       "os": "darwin",
       "arch": "arm64",
-      "bytes": 2877464,
-      "sha256": "ce0fbe1455456a98b1f1d39172a90f46aad0f2db0fe951261e437eb9685de266",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "bytes": 2877656,
+      "sha256": "cc7393c64cafbb3b5805b544170e332b78a4512b33d7c84ac80c71c7277a43f5",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     },
     {
       "filename": "cooloo-windows-x86_64.exe",
       "product": "cooloo",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 4510652,
-      "sha256": "ceb1109af31fd52e27bdcad4ef2c1f0d029d1dd72637c04eb644c9e7dfde156f",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "bytes": 5125480,
+      "sha256": "49afcfb35f2da6cc2fcc67f03479a4135c3418aee04649aef1004be9941f8607",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build. Additionally, Windows local startup and window/icon/console probes passed; visual UX acceptance pending."
     },
     {
       "filename": "cooloo-text-darwin-arm64",
       "product": "cooloo-text",
       "os": "darwin",
       "arch": "arm64",
-      "bytes": 2650952,
-      "sha256": "fe9f283ec838ea06b760fdf5109e7276042c2e8f7693d6be07a084dad8337978",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "bytes": 2651128,
+      "sha256": "8ab3104c2a22d6f2ce71cc0f07afe10e1500ad3b52806958825451a2ac7f53e1",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     },
     {
       "filename": "cooloo-text-windows-x86_64.exe",
       "product": "cooloo-text",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 4221107,
-      "sha256": "5a75bf82f94cec912f7ae5c23d3a0342ed945b6cf6537069c574bf655e9baf4d",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "bytes": 4827231,
+      "sha256": "02864f04a086a041bcaf330be060442d7e7d19e60d40bb9c363a47c66932c738",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     },
     {
       "filename": "cooloo-workbench-darwin-arm64",
@@ -70,29 +210,99 @@
       "os": "darwin",
       "arch": "arm64",
       "bytes": 298784,
-      "sha256": "47d718f0f8ee7a9c92a0988bd0178b1ddeabd5f5dac9b398f711379d0c7885eb",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "sha256": "25d17c58ad48ee6ace0f1fa57d412108f4d5f6ddfa9d615696816517d17ea348",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     },
     {
       "filename": "cooloo-workbench-windows-x86_64.exe",
       "product": "cooloo-workbench",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 645710,
-      "sha256": "5415b271262be6bb89e138262d5519dcf92447cac2e30da8008f4af3b9b48328",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "bytes": 647246,
+      "sha256": "22d11c953be543e7943f6b241d3e10502490fc775f67e731734374d3364233f7",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     },
     {
       "filename": "cooloo-cli-darwin-arm64",
@@ -100,29 +310,99 @@
       "os": "darwin",
       "arch": "arm64",
       "bytes": 161672,
-      "sha256": "f2639f5352b473d762c1000e8a503c0ff26cf8b0501d7eae2ca7b9fe46a93e57",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "sha256": "4a28dec28b3d636b97f05a3fd3a5cdaff92f987ebdaddf9cc6ba86d3d4e7cfbc",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     },
     {
       "filename": "cooloo-cli-windows-x86_64.exe",
       "product": "cooloo-cli",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 603285,
-      "sha256": "4d4a0a7f567c5d8bf69ca19e88cb4e70d59762c64f37248533c3ac533b974191",
-      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
-      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "bytes": 604821,
+      "sha256": "d1b0b1c9e9dd8ca0645e446979f6d88a62f0cf9fdd9c01a879b5aeb29aea3d6c",
+      "client_version": "0.3.0",
+      "source_commit": "2a2713ec1682addc202e00d1c3b96a2be51c38ee",
       "source_dirty": false,
-      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "source_archive_sha256": "8e535166fdcfcecf36fda8ec31ac2b5ee9f9c04498bea91b78f5daea1cb79254",
+      "test_server_commit": "028913043b1774d84073fbd2caaf6cc618492168",
       "build_date": "2026-10-19",
-      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
-      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
+      "build_platform": "m106 macOS arm64; Apple clang / MinGW-w64",
+      "toolchain": {
+        "clang": {
+          "path": "/usr/bin/clang",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+        },
+        "make": {
+          "path": "/usr/bin/make",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818",
+          "version": "GNU Make 3.81"
+        },
+        "cmake": {
+          "path": "/opt/homebrew/bin/cmake",
+          "sha256": "01bb5214684f5390e96e0d6aef7aafd7415b77ecbcfd59f6b55b018d8de0d9a2",
+          "version": "cmake version 4.4.3"
+        },
+        "python3": {
+          "path": "/opt/homebrew/bin/python3",
+          "sha256": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a",
+          "version": "Python 3.14.8"
+        },
+        "x86_64-w64-mingw32-gcc": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-gcc",
+          "sha256": "012ac93959d40444ddc8c67d23d348c062acbe977e6384ca6fe45c0648e97301",
+          "version": "x86_64-w64-mingw32-gcc (GCC) 16.2.0"
+        },
+        "x86_64-w64-mingw32-windres": {
+          "path": "/opt/homebrew/bin/x86_64-w64-mingw32-windres",
+          "sha256": "8041e3ee74367a73786a5468b397ebc003ddb019ac063a55fc3725958d444777",
+          "version": "GNU windres (GNU Binutils) 2.47.20260726"
+        },
+        "sdk": "25F70",
+        "sdk_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+      },
+      "verification": "Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build."
     }
   ]
 }

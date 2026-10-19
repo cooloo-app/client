@@ -1,42 +1,38 @@
-# cooloo client v0.3.0 artifacts
+# cooloo client 0.3.0 artifacts
 
-This directory contains all eight client artifacts for macOS arm64 and Windows
-x86_64. Exact filenames, sizes, SHA-256 checksums and provenance are maintained
-in [`manifest.json`](manifest.json); [`SHA256SUMS`](SHA256SUMS) is derived from it.
+Generated from `manifest.json`; edit the build inputs/report, not this file.
 
-## Build provenance
+Four products for macOS arm64 and Windows x86_64. Binaries are unsigned,
+not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 
-All products were rebuilt on 2026-10-19 in an isolated m106 directory from
-clean client source commit `017638f5e202c5035ebaf8dec4625fb71640dda8`.
-Apple clang built the native macOS products; MinGW-w64 cross-compiled Windows.
-The release commit contains these artifacts and metadata only; its client tag
-`v0.3.0` retains the same build inputs as that source commit.
-No GitHub Release or Python publication is included in this operation.
+- `cooloo`: communication CLI + GUI workbench.
+- `cooloo-text`: standalone text editor.
+- `cooloo-cli`: headless communication CLI.
+- `cooloo-workbench`: headless projection/validation and Lua runner.
 
-## Products
+## Provenance
 
-- `cooloo`: full communication CLI and GUI workbench (`cooloo --gui`).
-- `cooloo-text`: standalone general-purpose text editor.
-- `cooloo-workbench`: headless message projection/validation and Lua runner.
-- `cooloo-cli`: headless communication CLI without SDL/editor modules; no GUI.
+| File | Source commit | Build date | Bytes |
+|---|---|---|---|
+| `cooloo-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 2877656 |
+| `cooloo-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 5125480 |
+| `cooloo-text-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 2651128 |
+| `cooloo-text-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 4827231 |
+| `cooloo-workbench-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 298784 |
+| `cooloo-workbench-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 647246 |
+| `cooloo-cli-darwin-arm64` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 161672 |
+| `cooloo-cli-windows-x86_64.exe` | `2a2713ec1682addc202e00d1c3b96a2be51c38ee` | 2026-10-19 | 604821 |
 
-All eight binaries are Git LFS tracked, unsigned and not notarized. No Linux
-release artifact is included.
+All artifacts use the same source revision.
+
+SHA-256 values and toolchain details are in `manifest.json`; `SHA256SUMS`
+is derived from it. This development refresh does not create a tag,
+GitHub Release or Python publication.
 
 ## Verification
 
-- `make release-macos` and `make release-windows`: passed for all four products.
-- `make test`: passed config, startup, Protocol 2 loopback integration, Lua
-  protocol state and cache checks. Test server source commit:
-  `de4f3d21aecaa2190564c329608c02a9decd8010`.
-- Static formats: Mach-O arm64 and PE32+ x86_64. Windows GUI products use the GUI
-  subsystem; headless products use the console subsystem. DLL imports are
-  Windows system/UCRT libraries only.
-- Native `cooloo --json version` and `cooloo-cli --json version` report `0.3.0`.
-- Transfers and installed artifact checksums were verified.
-- Per the earlier test boundary, macOS GUI, SDL dummy and Windows runtime/desktop
-  tests were not run; human desktop acceptance remains pending. Build/static
-  checks are not a claim of desktop acceptance.
+- `cooloo-darwin-arm64`, `cooloo-text-darwin-arm64`, `cooloo-text-windows-x86_64.exe`, `cooloo-workbench-darwin-arm64`, `cooloo-workbench-windows-x86_64.exe`, `cooloo-cli-darwin-arm64`, `cooloo-cli-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build.
 
-Validate the set with `python3 tools/release_manifest.py`; render Markdown with
-`python3 tools/release_manifest.py --release-notes`.
+- `cooloo-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build. Additionally, Windows local startup and window/icon/console probes passed; visual UX acceptance pending.
+
+Validate with `python3 tools/release_manifest.py`.

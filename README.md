@@ -224,8 +224,8 @@ when no non-muted unread remains. Closing a chat releases its foreground stream,
 but listed rooms remain eligible for background sync. Notifications require the
 application to stay running; this does not add system notification banners.
 Native bindings are build/runtime tested on Windows and macOS; actual Explorer
-and Dock appearance still needs desktop visual acceptance. These source changes
-do not refresh the checked-in release binaries.
+and Dock appearance still needs desktop visual acceptance. Artifact provenance
+and the verification performed for each binary are recorded in `release/manifest.json`.
 
 ## License
 
@@ -340,7 +340,7 @@ write-only parent access is usable via CLI but cannot populate that child's GUI 
 Validation: server/client `make test`, provider state mocks, and
 `python3 tests/mirror_workbench.py` (after building `cooloo-linux`) verify the new
 model, real runner requests and SDL-dummy mirror A/B directory synchronization.
-Windows/macOS artifacts under `release/` have not been refreshed for this change;
+Platform artifact revisions and verification are recorded in `release/manifest.json`;
 real desktop validation remains separate.
 
 ## Official server relocation — v0.2.4
