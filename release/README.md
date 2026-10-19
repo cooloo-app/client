@@ -6,13 +6,16 @@ The current artifact facts are maintained in
 for filenames, hashes, source commits, and verification scope.
 
 The full Windows `cooloo-windows-x86_64.exe` was refreshed on 2026-10-19
-from base commit `e8a027eb43e405dc36c7ee58a72c567fe742275a` plus uncommitted
-Workbench Lua changes; it is not a clean-commit build. Its size is 4,484,777
-bytes and SHA-256 is
-`006fa790d193c678b82d8d7f5a9497cd934b4112a0e93ff5b4be3818f7f0bf3b`.
-The isolated m106 MinGW build and static PE/DLL checks passed. GUI, SDL dummy,
-and Windows runtime tests were not run; human desktop acceptance is pending.
-Other products and macOS artifacts were not refreshed.
+from base commit `4cfdd17018a823837b169737254e2db075e69a49` plus uncommitted
+unified resource navigation, per-pane Chat views, browser/focus separation,
+view-count lifecycle, and durable draft changes; it is not a clean-commit build.
+Its size is 4,505,257 bytes and SHA-256 is
+`aba78d9f46c5abf0b898260f03bf54b12caf816df7680ec1559adbd420da23a3`.
+Lua syntax compilation, the isolated m106 MinGW build and static PE/DLL checks
+passed. All automated tests, GUI, SDL dummy and runtime smoke tests were skipped
+at the user's request; human desktop acceptance is pending. The standalone text
+bundle is byte-identical to the source baseline. Other products and macOS
+artifacts were not refreshed.
 
 Products:
 

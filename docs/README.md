@@ -141,15 +141,37 @@ outside this API. Inspect JSONL errors and uncertainty; never blindly resend.
 The pure editor has no runner. The standalone workbench runner exposes neither
 communication API; full-client runners retain their existing explicit APIs.
 
-Workspace navigation extensions live entirely in `lua/plugins/workspace/`:
+Workspace navigation extensions live in `lua/plugins/workspace/`:
 `tree.lua` groups nickname paths without replacing provider IDs; `files.lua`
-manages session-only directory bindings and incremental entry processing;
-`sidebar.lua` subclasses View; the workspace model owns open subscriptions,
-per-room drafts and ACK/version tracking. GUI assembly installs the existing
-console before workspace so the workspace's pre-existing quit hook can ask about
-unsent drafts before console cleanup. No editor class/global method is patched
-for navigation, layout, input or file editing. These changes are compiled and
-non-GUI checked; desktop interaction acceptance is pending.
+follows the provider's room directory, with optional session-only overrides;
+`sidebar.lua` subclasses View. `navigation.lua` owns resource/view registration
+and target-pane routing, separate from the browser's room. Chat resources are
+keyed by room ID within a provider identity epoch; files use canonical full paths.
+Both open through the same pane-local lookup. File activation never changes the
+browser room. File rows carry immutable room/path context, and left selection
+and right title are derived from one browser state.
+
+`chatview.lua` is a composite View, deliberately not a DocView. Its focused-child
+`.doc` supports editing/IME but is never the resource identity. `chatcommands.lua`
+registers Chat-local aliases of existing editor operation functions without
+replacing original commands or predicates. Child update/draw scopes focus/IME
+identity and restores it on return or error. Chat split shortcuts create a full
+ChatView. For native `Root: Split` commands, the navigator recognizes newly split
+blank descendants of a Chat leaf and fills them before painting, via the owned
+sidebar's update callback after input events. No editor hooks/classes are patched.
+The navigator reconciles all live Chat views; the model unsubscribes only after
+the last view closes. History/draft Docs and delivery guards remain shared per
+room, while scroll, child focus and divider are per-view. File Docs opened through
+native editor commands/splits are recognized by the same canonical resource key.
+
+`drafts.lua` loads and atomically saves room `draft.txt` files using existing
+filesystem APIs; the model retains subscriptions and ACK/version guards.
+The Lua cooloo adapter supplies `directory(id)` and `prepare_directory(id)`;
+the latter uses an existing async cache read to create a missing room directory.
+No native cache format, protocol, editor, platform or C source changes are needed.
+The existing quit hook flushes drafts before console cleanup and asks about
+pending delivery. The ChatView iteration has syntax/build checks only; automated
+and runtime tests were explicitly skipped. Desktop acceptance is pending.
 
 Workspace and console plugins install their own commands and lifecycle handlers;
 the full composition only selects dependencies and schedules them. Virtual/read-only

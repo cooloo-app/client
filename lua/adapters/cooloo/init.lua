@@ -47,6 +47,36 @@ function M.new()
     end)
   end
   chat.init(cooloo.server());chat.connect_ctrl()
+  -- Match cfg_dir/cache_path without exposing credentials or changing cache formats.
+  function p:directory(id)
+    local r=chat.rooms[id]
+    local server=r and r.server_fp or (chat.ctrl_up and cooloo.net.fp(chat.ctrl))
+    local identity=chat.identity()
+    local function valid(value) return type(value)=='string' and #value==64 and value:match('^[0-9a-f]+$') end
+    if not valid(server) or not valid(identity) or not valid(id) then
+      return nil,'Waiting for authenticated conversation directory'
+    end
+    local base=os.getenv('COOLOO_CONFIG')
+    if not base or base=='' then
+      local home=os.getenv('HOME') or (package.config:sub(1,1)=='\\' and os.getenv('USERPROFILE'))
+      if not home then return nil,'Configuration directory unavailable' end
+      base=home..'/.cooloo'
+    end
+    return base:gsub('[/\\]+$','')..'/cache/'..server..'/'..identity..'/rooms/'..id
+  end
+  function p:prepare_directory(id)
+    local root=self:directory(id)
+    if not root then return end
+    self.directory_jobs=self.directory_jobs or {}
+    if self.directory_jobs[root]==self.epoch then return end
+    local server,identity=root:match('/cache/([0-9a-f]+)/([0-9a-f]+)/rooms/[^/]+$')
+    self.directory_jobs[root]=self.epoch
+    -- The existing cache reader creates missing room directories on its worker.
+    -- This also supports an addressed send-only conversation without METAFILE.
+    job('read',{server_fp=server,self_id=identity,name=id},nil,1,function()
+      self.directory_jobs[root]=nil
+    end)
+  end
   function p:capabilities(id)
     local r=chat.rooms[id]
     local permission=self.permissions[id] or {}

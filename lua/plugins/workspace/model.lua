@@ -2,17 +2,19 @@ local Doc = require 'core.doc'
 local project = require('workbench.messages').project
 local M = {}
 local function text(d) return d:get_text(1, 1, #d.lines, #d.lines[#d.lines]) end
-function M.new(provider)
-  local self = {provider=provider, documents={}, drafts={}, selected=nil, pending={}, opened={}}
+function M.new(provider,storage)
+  local self = {provider=provider, documents={}, drafts={}, selected=nil, pending={}, opened={}, view_counts={}}
   function self:reset()
+    if storage then storage:reset() end
     for id, d in pairs(self.documents) do
       d:set_projection(''); d.projection=''; d.anchors={}
       self.drafts[id]:set_projection('')
       if self.provider.unsubscribe then self.provider:unsubscribe(id) end
     end
-    self.documents={}; self.drafts={}; self.selected=nil; self.pending={}; self.opened={}
+    self.documents={}; self.drafts={}; self.selected=nil; self.pending={}; self.opened={}; self.view_counts={}
   end
   function self:select(id)
+    if storage and self.selected and self.selected~=id then storage:save(self.selected) end
     if not self.opened[id] or self.selected ~= id then
       if self.provider.subscribe then self.provider:subscribe(id) end
     end
@@ -22,6 +24,7 @@ function M.new(provider)
       self.documents[id]=d
       local draft=Doc(); draft.virtual=true; draft.filename='draft: '..id
       self.drafts[id]=draft
+      if storage then storage:attach(id,draft) end
     end
     self:refresh()
     return self.documents[id], self.drafts[id]
@@ -30,6 +33,12 @@ function M.new(provider)
     self.opened[id]=nil
     if self.provider.unsubscribe then self.provider:unsubscribe(id) end
     if self.selected==id then self.selected=nil end
+  end
+  function self:reconcile_views(counts)
+    self.view_counts=counts
+    for id in pairs(self.opened) do
+      if not counts[id] then self:release(id) end
+    end
   end
   function self:has_unsent()
     if next(self.pending) then return true end
@@ -42,7 +51,10 @@ function M.new(provider)
       if delivery and delivery.state~='pending' then
         local draft=self.drafts[id]
         if delivery.state=='sent' and text(draft)==pending.text
-          and draft:get_change_id()==pending.version then draft:set_projection('') end
+          and draft:get_change_id()==pending.version then
+          draft:set_projection('')
+          if storage then storage:save(id) end
+        end
         self.pending[id]=nil
       end
     end
@@ -67,12 +79,17 @@ function M.new(provider)
     id=id or self.selected
     local d=self.drafts[id]
     if not d then return false, 'select a conversation' end
+    if d.readonly then return false, 'draft is waiting for its local directory' end
+    if storage and not storage:save(id) then return false, 'save draft before sending' end
     if self.pending[id] then return false, 'previous send still awaiting acknowledgment' end
     local submitted=text(d)
     local ok, status=self.provider:send(id, submitted)
     if ok then
       if self.provider.delivery then self.pending[id]={text=submitted, version=d:get_change_id()}
-      else d:set_projection('') end
+      else
+        d:set_projection('')
+        if storage then storage:save(id) end
+      end
     end
     return ok, status
   end

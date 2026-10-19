@@ -4,80 +4,118 @@ function M.install(provider)
   local command=require 'core.command'
   local keymap=require 'core.keymap'
   local DV=require 'core.docview'
-  local Wrapped=require 'core.wrappedview'
+  local ChatView=require 'plugins.workspace.chatview'
   local Sidebar=require 'plugins.workspace.sidebar'
   local tree=require 'plugins.workspace.tree'
-  local workspace=require('plugins.workspace.model').new(provider)
-  local files=require('plugins.workspace.files').new(system)
-  local sessions,collapsed,origins={},{},setmetatable({},{__mode='k'})
-  local context,stamp,last_focus
-  local list,filelist
-  local History=Wrapped:extend()
-  local Draft=DV:extend()
-  -- Closing a view keeps the session draft in the model until exit/reset.
-  function Draft:try_close(close) close() end
-  local function find_edit(n)
-    if n.type=='leaf' then return not n.locked and n or nil end
-    return find_edit(n.a) or find_edit(n.b)
-  end
+  local storage=require('plugins.workspace.drafts').new(provider,system,function(message) core.error('%s',message) end)
+  local workspace=require('plugins.workspace.model').new(provider,storage)
+  local files=require('plugins.workspace.files').new(system,provider)
+  local chats,file_resources,collapsed={},{},{}
+  local browser,last_focus,stamp
+  local list,filelist,navigation
   local function node_for(view)
-    return view and core.root_view.root_node:get_node_for_view(view)
-  end
-  local function edit_node()
-    local node=core.root_view:get_active_node()
-    if not node or node.locked then node=find_edit(core.root_view.root_node) end
-    return node
-  end
-  local function set_context(id)
-    context=id;files:select(id);filelist.index=1
-  end
-  local function active_room()
-    local doc=core.active_view and core.active_view.doc
-    for id,s in pairs(sessions) do
-      if doc==s.messages or doc==s.draft then return id,s end
-    end
+    return core.root_view.root_node:get_node_for_view(view)
   end
   local function room_name(id)
     for _,r in ipairs(provider:list()) do if r.id==id then return r.name or id end end
     return id
   end
-  function History:get_name() return 'Chat: '..room_name(self.room) end
-  function Draft:get_name() return 'Draft: '..room_name(self.room) end
-  local function select_room(id)
-    local messages,draft=workspace:select(id)
-    local s=sessions[id] or {messages=messages,draft=draft}
-    sessions[id]=s
-    local mn,dn=node_for(s.history),node_for(s.input)
-    if not mn and not dn then
-      s.history=History(messages);s.history.room=id
-      s.input=Draft(draft);s.input.room=id
-      -- Reuse existing history/draft panes as tab groups where possible.
-      for other_id,other in pairs(sessions) do
-        if other_id~=id then
-          local a,b=node_for(other.history),node_for(other.input)
-          if a and b and a~=b then mn,dn=a,b;break end
-        end
-      end
-      if mn then mn:add_view(s.history);dn:add_view(s.input)
-      else
-        local node=edit_node();node:add_view(s.history)
-        node:split('down',s.input);node.divider=0.72
-      end
-    else
-      if not mn then
-        s.history=History(messages);s.history.room=id
-        dn:split('up',s.history)
-      elseif not dn then
-        s.input=Draft(draft);s.input.room=id
-        mn:split('down',s.input)
-      end
-    end
-    node_for(s.history):set_active_view(s.history)
-    node_for(s.input):set_active_view(s.input)
-    set_context(id)
-  end
   local function refresh_tree()
     list:set_rows(tree.build(provider:list(),collapsed))
+  end
+  local function browse(id)
+    -- Choosing a target file pane must not navigate away from the room being
+    -- browsed. Only explicit Chat navigation/activation calls this function.
+    local changed=browser~=id
+    if changed then
+      browser=id;files:select(id)
+      filelist:set_rows(files.rows);filelist.index=1
+    end
+    list.selected_room=id
+    refresh_tree()
+    if changed then
+      for i,row in ipairs(list.rows) do
+        if row.room and row.room.id==id then list.index=i;break end
+      end
+    end
+    filelist.title=id and ('Files: '..room_name(id)) or 'Room files'
+  end
+  local function chat_resource(id)
+    -- This registry is scoped to the current server/effective-identity epoch.
+    chats[id]=chats[id] or {kind='chat',key='chat:'..id,room=id}
+    return chats[id]
+  end
+  navigation=require('plugins.workspace.navigation').new(function(resource)
+    if resource.kind=='file' then return DV(resource.doc) end
+    local id=resource.room
+    local history,draft=workspace:select(id)
+    return ChatView(history,draft,function() return 'Chat: '..room_name(id) end,function()
+      local entry=storage.entries[id]
+      -- Actual unsubscription is reconciled after removal, when the last view
+      -- is gone. Closing either of two views never closes the room session.
+      return not entry or not entry.loaded or storage:save(id)
+    end)
+  end,function(counts,keys)
+    workspace:reconcile_views(counts)
+    for key in pairs(file_resources) do
+      if not keys[key] then file_resources[key]=nil end
+    end
+  end,function(view)
+    -- Also recognize files opened/split through native editor commands. All
+    -- opening routes use the same canonical identity and shared Doc.
+    if not view:is(DV) or not view.doc.filename then return end
+    local path=system.absolute_path(view.doc.filename)
+    if not path then return end
+    local normalized=path:gsub('\\','/')
+    if package.config:sub(1,1)=='\\' then normalized=normalized:lower() end
+    local key='file:'..normalized
+    file_resources[key]=file_resources[key] or {kind='file',key=key,path=path,doc=view.doc}
+    return file_resources[key]
+  end)
+  local function active_room()
+    local resource=navigation:resource(core.active_view)
+    if resource and resource.kind=='chat' then return resource.room end
+  end
+  local function select_room(id,node)
+    node=node or navigation:target()
+    workspace:select(id)
+    local view=navigation:open(chat_resource(id),node)
+    browse(id)
+    return view
+  end
+  local function canonical(path)
+    local absolute,err=system.absolute_path(path)
+    assert(absolute,err)
+    local key=absolute:gsub('\\','/')
+    if package.config:sub(1,1)=='\\' then key=key:lower() end
+    return absolute,key
+  end
+  local function open_file(row)
+    -- Every published row carries its own room/root. Never reinterpret a row
+    -- using a later global browser context or a basename such as messages.jsonl.
+    local node=navigation:target()
+    local path,path_key=canonical(row.path)
+    local name=path:match('[^/\\]+$')
+    local native=row.room and provider.directory and provider:directory(row.room)
+    local native_key=native and select(2,canonical(native))
+    local _,parent_key=canonical(path:match('^(.*)[/\\]'))
+    local room_file=native_key and native_key==parent_key
+    if room_file and name=='draft.txt' then
+      local view=select_room(row.room,node);view:focus(view.input)
+      return
+    end
+    local key='file:'..path_key
+    local protected=room_file and (name=='.meta' or name=='messages.jsonl')
+    local resource=file_resources[key]
+    if not resource then
+      resource={kind='file',key=key,path=path,doc=core.open_doc(path)}
+      file_resources[key]=resource
+    end
+    if protected then
+      assert(not resource.doc:is_dirty(),'Save or close the edited cache file before viewing its snapshot')
+      resource.doc.virtual=true;resource.doc.readonly=true;resource.protected=true
+    end
+    navigation:open(resource,node)
   end
   list=Sidebar('Conversations',function(row,toggle)
     if row.branch and (toggle or not row.room) then
@@ -86,53 +124,60 @@ function M.install(provider)
   end)
   filelist=Sidebar('Room files',function(row,toggle)
     if row.branch then files:toggle(row)
-    elseif row.file and not toggle then
-      local node=edit_node();node:set_active_view(node.active_view)
-      local ok,doc=core.try(core.open_doc,row.path)
-      if ok then
-        -- Remember the explicit most recent room used to open this file.
-        origins[doc]=context
-        core.root_view:open_doc(doc)
-      end
-    end
+    elseif row.file and not toggle then core.try(open_file,row) end
   end)
+  list.before_interact=function() navigation:observe() end
+  filelist.before_interact=list.before_interact
   local middle=core.root_view:get_active_node():split('left',list,true)
   middle=middle:split('right',filelist,true)
   middle:set_active_view(middle.active_view)
   refresh_tree()
   local rooms=provider:list()
   if rooms[1] then select_room(rooms[1].id) end
-  local function confirm_discard()
-    return not workspace:has_unsent() or system.show_confirm_dialog('Unsent messages',
-      'Discard all session drafts and pending delivery tracking? Messages already sent may still arrive.')
+  local function confirm_leave()
+    if not storage:flush() then
+      core.error('Draft save failed; keep the window open and retry after fixing the directory')
+      return false
+    end
+    if not provider.directory and workspace:has_unsent() then
+      return system.show_confirm_dialog('Unsent messages','Discard in-memory local fixture drafts?')
+    end
+    return not next(workspace.pending) or system.show_confirm_dialog('Pending delivery',
+      'Some sends are awaiting acknowledgment. Saved drafts will be kept; check delivery before resending after restart.')
   end
-  -- Retain the pre-existing workspace lifecycle hook; no editor overrides.
   local request_quit=system.request_quit
   system.request_quit=function()
-    if not confirm_discard() then return end
+    if not confirm_leave() then return end
     workspace:reset()
     if provider.close then provider:close() end
     request_quit()
   end
   local function reset_views()
     workspace:reset()
-    for _,s in pairs(sessions) do
-      s.draft.readonly=true
-      for _,view in ipairs{s.history,s.input} do
-        local node=node_for(view)
-        if node then node:set_active_view(view);node:close_active_view(core.root_view.root_node) end
-      end
+    local closing={}
+    for view,resource in pairs(navigation.views) do
+      if resource.kind=='chat' or resource.protected then closing[#closing+1]=view end
     end
-    sessions={};origins=setmetatable({},{__mode='k'});files:reset();context=nil;last_focus=nil
+    for _,view in ipairs(closing) do
+      local node=node_for(view)
+      if node then node:set_active_view(view);node:close_active_view(core.root_view.root_node) end
+    end
+    chats={};file_resources={};navigation:reset();files:reset()
+    browser=nil;last_focus=nil;stamp=nil;list.selected_room=nil
+    filelist:set_rows(files.rows);filelist.title='Room files'
   end
   local function prompt(title,fn) core.command_view:enter(title,function(text) fn(text) end) end
+  require('plugins.workspace.chatcommands').install(function(direction) navigation:split(direction) end)
   command.add(function()
-    local _,s=active_room()
-    return s and core.active_view.doc==s.draft
+    local id=active_room()
+    return id and core.active_view.doc==workspace.drafts[id]
   end,{
+    ['workspace:save-draft']=function()
+      if storage:save(active_room()) then core.log('Draft saved') end
+    end,
     ['workspace:send']=function()
-      local id=active_room()
-      local ok,status=workspace:send(id);core.log('%s',status or (ok and 'sent' or 'send failed'))
+      local ok,status=workspace:send(active_room())
+      core.log('%s',status or (ok and 'sent' or 'send failed'))
     end,
   })
   command.add(nil,{
@@ -153,15 +198,15 @@ function M.install(provider)
       end) end
     end,
     ['workspace:history']=function()
-      local id=active_room() or context
+      local id=active_room() or browser
       if id then local _,status=provider:earlier(id);workspace:refresh();core.log('%s',status or '') end
     end,
     ['workspace:bind-directory']=function()
-      local id=active_room() or context
+      local id=browser
       if not id then core.error('Select a conversation first');return end
       prompt('Local directory for '..room_name(id)..' (session only)',function(path)
         local ok,err=files:bind(id,path)
-        if ok then set_context(id) else core.error('%s',err or 'Cannot bind directory') end
+        if ok then filelist:set_rows(files.rows) else core.error('%s',err or 'Cannot bind directory') end
       end)
     end,
     ['workspace:refresh-files']=function() files:refresh() end,
@@ -176,7 +221,7 @@ function M.install(provider)
     end,
     ['workspace:identity']=function()
       if provider.identity then prompt('Identity ID (empty = self)',function(id)
-        if not confirm_discard() then return end
+        if not confirm_leave() then return end
         if provider:identity(id~='' and id or nil) then reset_views()
         else core.error('Invalid identity ID') end
       end) end
@@ -189,43 +234,50 @@ function M.install(provider)
     ['workspace:tree-open']=function() core.active_view:choose(false) end,
     ['workspace:tree-toggle']=function() core.active_view:choose(true) end,
   })
-  keymap.add{['ctrl+return']='workspace:send',['up']='workspace:tree-up',
+  keymap.add{['ctrl+return']='workspace:send',['ctrl+s']='workspace:save-draft',['up']='workspace:tree-up',
     ['down']='workspace:tree-down',['return']='workspace:tree-open',['space']='workspace:tree-toggle'}
   local had_rooms=#rooms>0
-  return {poll=function(events)
-    provider:poll(events)
+  local function sync_ui()
+    navigation:sync()
     local focus=core.active_view
     if focus~=last_focus then
+      -- Save on leaving either view of a shared room; the store owns one draft.
+      local previous=navigation:resource(last_focus)
+      if previous and previous.kind=='chat' then storage:save(previous.room) end
       last_focus=focus
-      local id,s=active_room()
-      if id then
-        workspace:select(id);set_context(id)
-        -- Pair activation uses only node-local APIs and leaves keyboard focus intact.
-        local partner=focus.doc==s.draft and s.history or s.input
-        local node=node_for(partner)
-        if node and node~=node_for(focus) then node:set_active_view(partner);core.set_active_view(focus) end
-      elseif focus.doc and origins[focus.doc] then set_context(origins[focus.doc]) end
+      local id=active_room()
+      if id then workspace:select(id);browse(id) end
     end
-    for id,s in pairs(sessions) do
-      if not node_for(s.history) and not node_for(s.input) and workspace.opened[id] then workspace:release(id) end
-    end
-    workspace:refresh()
     local current=provider:list()
     if not had_rooms and current[1] then had_rooms=true;select_room(current[1].id) end
-    local parts={provider.status or '',provider.identity_label or '',context or ''}
+    local parts={provider.status or '',provider.identity_label or '',browser or ''}
     for _,r in ipairs(current) do parts[#parts+1]=r.id..':'..(r.name or '')..':'..tostring(r.unread or 0) end
-    local delivery=context and provider.delivery and provider:delivery(context)
+    local delivery=browser and provider.delivery and provider:delivery(browser)
     parts[#parts+1]=delivery and delivery.state or ''
     local now=table.concat(parts,'\n')
     if now~=stamp then
       stamp=now;refresh_tree()
       list.footer=(provider.status or '')..' '..(delivery and delivery.state or '')
       list.detail=provider.identity_label or '<local>'
-      filelist.title=context and ('Files: '..room_name(context)) or 'Room files'
+      filelist.title=browser and ('Files: '..room_name(browser)) or 'Room files'
     end
+    local footer=storage:status(browser) or files.status
+    if filelist.footer~=footer then core.redraw=true end
+    if filelist.rows~=files.rows then filelist:set_rows(files.rows) end
+    filelist.footer=footer
+    filelist.detail=files.root and 'Workspace: Refresh Files' or (provider.directory and 'Local conversation files' or 'Workspace: Bind Directory')
+  end
+  -- Own sidebar lifecycle, not an editor patch: reconcile after input events
+  -- and before central views update/draw, including native palette splits.
+  list.before_update=sync_ui
+  navigation:sync()
+  return {poll=function(events)
+    provider:poll(events)
+    sync_ui()
+    workspace:refresh()
+    local clock=system.get_time()
+    storage:poll(clock);files:poll(clock)
     if files:step() then core.redraw=true end
-    filelist.rows=files.rows;filelist.footer=files.status
-    filelist.detail=files.root and 'Workspace: Refresh Files' or 'Workspace: Bind Directory'
   end}
 end
 return M

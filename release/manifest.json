@@ -19,14 +19,14 @@
       "product": "cooloo",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 4484777,
-      "sha256": "006fa790d193c678b82d8d7f5a9497cd934b4112a0e93ff5b4be3818f7f0bf3b",
-      "source_commit": "e8a027eb43e405dc36c7ee58a72c567fe742275a",
+      "bytes": 4505257,
+      "sha256": "aba78d9f46c5abf0b898260f03bf54b12caf816df7680ec1559adbd420da23a3",
+      "source_commit": "4cfdd17018a823837b169737254e2db075e69a49",
       "source_dirty": true,
-      "source_archive_sha256": "9744496dcd24ee399fceef6644e268dec8e335d7c92a4f5ecff356899ff9848d",
+      "source_archive_sha256": "a7a41bed77f016df7690bbc866c37422f7c2215f569149ca1bc562f861d3781b",
       "build_date": "2026-10-19",
       "build_platform": "macOS arm64 (m106), MinGW-w64 cross-compilation",
-      "verification": "build and static PE32+ x86_64 / GUI subsystem / system DLL imports only; includes uncommitted Workbench Lua changes on source_commit; GUI, SDL dummy and Windows runtime tests not run; human desktop acceptance pending"
+      "verification": "Lua syntax compilation, isolated build and static PE32+ x86_64 / GUI subsystem / system DLL imports only; includes uncommitted unified resource navigation, per-pane Chat views, browser/focus separation and view-count lifecycle changes on source_commit; all automated tests, GUI, SDL dummy and runtime smoke tests skipped at user request; human desktop acceptance pending"
     },
     {
       "filename": "cooloo-text-darwin-arm64",
