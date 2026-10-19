@@ -5,6 +5,15 @@ The current artifact facts are maintained in
 [`manifest.json`](manifest.json), which is the machine-readable source of truth
 for filenames, hashes, source commits, and verification scope.
 
+The full Windows `cooloo-windows-x86_64.exe` was refreshed on 2026-10-19
+from base commit `e8a027eb43e405dc36c7ee58a72c567fe742275a` plus uncommitted
+Workbench Lua changes; it is not a clean-commit build. Its size is 4,484,777
+bytes and SHA-256 is
+`006fa790d193c678b82d8d7f5a9497cd934b4112a0e93ff5b4be3818f7f0bf3b`.
+The isolated m106 MinGW build and static PE/DLL checks passed. GUI, SDL dummy,
+and Windows runtime tests were not run; human desktop acceptance is pending.
+Other products and macOS artifacts were not refreshed.
+
 Products:
 
 - `cooloo`: full communication CLI and GUI workbench (`cooloo --gui`).

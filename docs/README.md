@@ -141,6 +141,16 @@ outside this API. Inspect JSONL errors and uncertainty; never blindly resend.
 The pure editor has no runner. The standalone workbench runner exposes neither
 communication API; full-client runners retain their existing explicit APIs.
 
+Workspace navigation extensions live entirely in `lua/plugins/workspace/`:
+`tree.lua` groups nickname paths without replacing provider IDs; `files.lua`
+manages session-only directory bindings and incremental entry processing;
+`sidebar.lua` subclasses View; the workspace model owns open subscriptions,
+per-room drafts and ACK/version tracking. GUI assembly installs the existing
+console before workspace so the workspace's pre-existing quit hook can ask about
+unsent drafts before console cleanup. No editor class/global method is patched
+for navigation, layout, input or file editing. These changes are compiled and
+non-GUI checked; desktop interaction acceptance is pending.
+
 Workspace and console plugins install their own commands and lifecycle handlers;
 the full composition only selects dependencies and schedules them. Virtual/read-only
 Doc and wrapped View remain editor mechanisms, not message-specific types.

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "client_version": "0.3.0",
   "status": "development-artifacts",
-  "updated": "2026-10-18",
+  "updated": "2026-10-19",
   "artifacts": [
     {
       "filename": "cooloo-darwin-arm64",
@@ -19,10 +19,14 @@
       "product": "cooloo",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 4401747,
-      "sha256": "3f90764aa16b814e0ff57f63c82f666528a986dfef93999623d2ba411bc56e6d",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "bytes": 4484777,
+      "sha256": "006fa790d193c678b82d8d7f5a9497cd934b4112a0e93ff5b4be3818f7f0bf3b",
+      "source_commit": "e8a027eb43e405dc36c7ee58a72c567fe742275a",
+      "source_dirty": true,
+      "source_archive_sha256": "9744496dcd24ee399fceef6644e268dec8e335d7c92a4f5ecff356899ff9848d",
+      "build_date": "2026-10-19",
+      "build_platform": "macOS arm64 (m106), MinGW-w64 cross-compilation",
+      "verification": "build and static PE32+ x86_64 / GUI subsystem / system DLL imports only; includes uncommitted Workbench Lua changes on source_commit; GUI, SDL dummy and Windows runtime tests not run; human desktop acceptance pending"
     },
     {
       "filename": "cooloo-text-darwin-arm64",

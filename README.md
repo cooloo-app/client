@@ -110,6 +110,43 @@ live documents/connections is intentionally disabled. The old GUI entry/layout/i
 scripts have been removed; `lua/chat.lua` remains the shared protocol state model.
 
 
+## Workbench navigation (development; desktop acceptance pending)
+
+The full GUI now uses a conversation tree on the left, ordinary editor panes in
+ the center, and a room file tree on the right. These are Lua workspace
+extensions; the text-editor core, platform and standalone text bundle are unchanged.
+
+- Nickname `A:B` appears under `A`. Click the `+`/`-` area to expand/collapse,
+  and click a real conversation name to open it. Duplicate names retain separate
+  ID-labelled entries. Up/Down, Enter and Space navigate a focused sidebar.
+- Each room has a read-only history view and a separate editable draft view.
+  Multiple rooms use paired history/draft tabs; selecting either activates its
+  counterpart. Existing editor split commands remain available. Reopening the
+  same room reuses its session and draft, rather than creating another sender.
+- Ctrl+Enter sends only the focused room draft. A pending send cannot be repeated;
+  ACK clears only the unchanged submitted document version. Rejected or unknown
+  delivery retains the draft. Closing its views retains the draft in memory;
+  reopen through the conversation tree. Drafts are not persisted across restarts.
+- `Workspace: Bind Directory` binds an existing local directory to the current
+  room for this session. `Workspace: Refresh Files` rescans after external changes.
+  Bindings do not use message-cache directories automatically, change CWD, load
+  project scripts, or execute Lua files. Clicking a file uses ordinary DocView
+  and its existing save commands. Explicitly opening a shared file from another
+  room updates that document's workspace association.
+- File scanning is on demand, processes 32 entries per frame, and displays at
+  most 2000 entries with 24 nested levels. Canonical directory aliases are not
+  traversed. The existing filesystem API enumerates each directory synchronously;
+  a very large or slow directory can still pause its initial enumeration/sort.
+- Identity changes clear old chat views and directory bindings; discarding
+  session drafts or pending tracking asks for confirmation. Exit has the same
+  draft warning. Existing Console functionality remains available.
+
+Build with `make cooloo-linux` for Linux development, then run
+`./cooloo-linux --gui`. This iteration was compiled and checked with non-GUI
+model/provider/headless tests only. Real desktop layout, focus, Chinese IME,
+clipboard, split interaction, and Windows/macOS behavior await human validation.
+No SDL dummy or GUI functional test was run for this iteration.
+
 ## License
 
 Project-owned client code is licensed under [MIT](LICENSE). Vendored components
