@@ -56,14 +56,31 @@ handles and parent-console attachment, not parent executable names; a custom
 launcher that supplies neither console nor standard handles behaves like a
 desktop launch.
 
+For terminal commands on Windows, use the Python package's `cooloo` console
+entry point (or `python -m cooloo` to bypass a stale native exe on PATH). It waits
+for the same bundled GUI executable; a separate CLI artifact is not needed.
+A GUI-subsystem exe cannot make an interactive PowerShell/CMD session wait merely
+by attaching to its console. Direct native launches therefore refuse terminal
+input for trust prompts and stdin `send`, with a launcher diagnostic. Redirected
+pipes/files remain usable. Desktop shortcuts may target the native exe with
+`--gui`. The SDK sets `COOLOO_LAUNCHER_WAIT=1` in its child environment while waiting;
+this is an internal launch contract, not a user setting or a trust decision.
+
+Trust prompts only read a terminal and accept a complete `y`, `Y`, `yes` or `YES`
+line. EOF, other answers and redirected input never pin an unknown server.
+For automation, verify the fingerprint and opt in with `-y/--tofu`; this never
+accepts a changed pin. This also prevents piped message content from becoming
+consent. Release binaries are unchanged until an explicit artifact refresh.
+
 Offline Windows dispatch regression (GUI is replaced with an exit-code stub):
 
 ```sh
-make build/startup-dispatch.exe build/startup-console-parent.exe
+make build/startup-dispatch.exe build/startup-console-parent.exe build/console-input-probe.exe
 ```
 
 ```powershell
 powershell -NoProfile -File tests/windows-dispatch.ps1 -Exe build/startup-dispatch.exe -ConsoleParent build/startup-console-parent.exe
+python tests/windows_input_test.py build/console-input-probe.exe
 ```
 
 This covers desktop-style detached launches, parent-console attachment and

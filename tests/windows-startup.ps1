@@ -67,8 +67,8 @@ $r = Run-Test '--lua-dev'
 if ($r.Code -ne 2 -or $r.Err -notmatch 'requires a directory') { throw 'argument error failed' }
 if ($env:COOLOO_TEST_HOST) {
     $r = Run-Test 'rooms' "y`n"
-    if ($r.Code -ne 1 -or $r.Out -notmatch 'not-registered' -or $r.Err -notmatch 'Trust server') { throw 'piped TOFU input failed' }
-    $r = Run-Test 'whoami --register ui-test'
+    if ($r.Code -ne 1 -or $r.Err -match '\[y/N\]' -or $r.Err -notmatch 'untrusted') { throw 'redirected input must not consent to TOFU' }
+    $r = Run-Test '-y whoami --register ui-test'
     if ($r.Code -ne 0 -or $r.Out -notmatch 'ui-test') { throw 'register failed' }
     $r = Run-Test 'create ui-test-room'
     if ($r.Code -ne 0 -or $r.Out -notmatch '^ROOM ([0-9a-f]{64})') { throw 'create failed' }
@@ -77,7 +77,7 @@ if ($env:COOLOO_TEST_HOST) {
     if ($r.Code -ne 0 -or $r.Out -notmatch '^OK ') { throw 'piped send failed' }
     $r = Run-Test "read --raw $room 0"
     if ($r.Code -ne 0 -or $r.Out -notmatch 'transparent C pipe test' -or $r.Out -notmatch 'second line') { throw 'readback failed' }
-    Write-Output 'PASS: Windows piped TOFU, registration, multiline stdin send and readback'
+    Write-Output 'PASS: Windows noninteractive TOFU rejection, explicit trust, registration, multiline stdin send and readback'
 }
 Remove-Item -Recurse -Force $cfg
 Write-Output 'PASS: Windows bare/full help, stderr, exit code, keygen and explicit/debug GUI'

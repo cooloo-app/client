@@ -74,9 +74,10 @@ fi
 cp "$TMP/ks.bak" "$TMP/cfg1/known_servers"
 rm -f "$TMP/cfg1/known_servers"
 printf 'y\n' | "$CLI" rooms >"$TMP/t3" 2>&1
-check "interactive TOFU prompt" "$TMP/t3" 'trust and pin it'
-grep -q "127.0.0.1:$PORT" "$TMP/cfg1/known_servers" \
-    && ok "prompt pinned server" || bad "prompt pinned server"
+check "redirected input cannot consent" "$TMP/t3" 'untrusted'
+[ ! -f "$TMP/cfg1/known_servers" ] \
+    && ok "redirected input did not pin server" || bad "redirected input pinned server"
+"$CLI" -y rooms >"$TMP/t3" 2>&1
 
 echo "== register"
 "$CLI" whoami >"$TMP/r1" 2>&1

@@ -1,8 +1,10 @@
 /* Windows single-exe GUI/CLI console setup. Never overwrite redirected pipes. */
 #include "win_console.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #ifdef _WIN32
 #include <windows.h>
-#include <stdio.h>
 #include <io.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -73,7 +75,31 @@ void cooloo_console_init(int enabled)
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 }
+int cooloo_console_input_is_terminal(void)
+{
+    DWORD mode;
+    return GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode) != 0;
+}
+
+int cooloo_console_can_read(void)
+{
+    if (!cooloo_console_input_is_terminal()) return 0;
+#ifndef COOLOO_CLI_ONLY
+    /* AttachConsole cannot make an interactive shell wait for a GUI image.
+     * The SDK console entry point opts in only while it waits for this child. */
+    const char *waiting = getenv("COOLOO_LAUNCHER_WAIT");
+    if (!waiting || strcmp(waiting, "1")) {
+        fprintf(stderr, "cooloo: interactive input requires the Python launcher; use python -m cooloo (the native GUI exe does not make PowerShell/CMD wait).\n");
+        return 0;
+    }
+#endif
+    return 1;
+}
+
 #else
+#include <unistd.h>
+int cooloo_console_input_is_terminal(void) { return isatty(STDIN_FILENO); }
+int cooloo_console_can_read(void) { return cooloo_console_input_is_terminal(); }
 int cooloo_console_default_gui(void) { return 0; }
 void cooloo_console_init(int enabled) { (void)enabled; }
 #endif

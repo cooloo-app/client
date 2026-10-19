@@ -213,6 +213,7 @@ test: cooloo-cli
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python3 tests/config_test.py
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python3 tests/startup_test.py
 	python3 tests/protocol2_test.py
+	python3 tests/trust_test.py
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -DLUA_USE_POSIX -I vendor/lua tests/lua_test.c $(LUA_SRC) -lm -o $(BUILD)/lua-test
 	$(BUILD)/lua-test tests/chat_protocol2.lua
@@ -233,6 +234,10 @@ $(WIN_ICON): assets/apps/cooloo/windows.rc assets/cooloo.ico
 $(BUILD)/startup-dispatch.exe: tests/startup_gui_stub.c $(CORE_SRC) $(HEADERS)
 	mkdir -p $(BUILD)
 	$(WIN_CC) $(CFLAGS) -mwindows -o $@ tests/startup_gui_stub.c $(CORE_SRC) -static -lws2_32 -ladvapi32
+
+$(BUILD)/console-input-probe.exe: tests/console_input_probe.c src/cli/win_console.c src/cli/win_console.h
+	mkdir -p $(BUILD)
+	$(WIN_CC) $(CFLAGS) -mwindows -o $@ tests/console_input_probe.c src/cli/win_console.c -static
 
 $(BUILD)/startup-console-parent.exe: tests/startup_console_parent.c
 	mkdir -p $(BUILD)

@@ -7,6 +7,7 @@
 #include "config.h"
 #include "record.h"
 #include "machine.h"
+#include "win_console.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,8 +38,17 @@ static int connect_client(netconn *c,char self[65])
     public_id(self,sk);cfg_server(host,sizeof host,&port);
     rc=net_connect(c,host,port,sk,tofu,error,sizeof error);
     if(rc==NET_TOFU_UNKNOWN && !cooloo_machine) {
-        char answer[16];fprintf(stderr,"Trust server %s:%d (%s)? [y/N] ",host,port,c->server_fp);
-        if(fgets(answer,sizeof answer,stdin)&&(answer[0]=='y'||answer[0]=='Y'))rc=net_connect_trust(c,host,port,sk,error,sizeof error);
+        if (cooloo_console_can_read()) {
+            char answer[16];
+            fprintf(stderr,"Trust server %s:%d (%s)? [y/N] ",host,port,c->server_fp);
+            fflush(stderr);
+            if(fgets(answer,sizeof answer,stdin) &&
+               (!strcmp(answer,"y\n") || !strcmp(answer,"Y\n") ||
+                !strcmp(answer,"yes\n") || !strcmp(answer,"YES\n")))
+                rc=net_connect_trust(c,host,port,sk,error,sizeof error);
+        } else {
+            fprintf(stderr,"Server %s:%d (%s) is untrusted. Verify the fingerprint, then use -y/--tofu to pin it.\n",host,port,c->server_fp);
+        }
     }
     memset(sk,0,sizeof sk);
     if(rc){if(cooloo_machine)machine_error(rc==NET_TOFU_UNKNOWN?"server-untrusted":rc==NET_ERR_TOFU_DIFF?"server-key-changed":"network-error",rc==NET_TOFU_UNKNOWN?"server fingerprint is not trusted":error);else fprintf(stderr,"cooloo: %s\n",error);return -1;}
@@ -152,7 +162,10 @@ int cooloo_cli_send(int argc,char **argv)
 {
     netconn c;char self[65],text[4097],line[512];size_t n=0;int i,rc=1;
     if(argc<3||strlen(argv[2])>68||strpbrk(argv[2]," \r\n"))return 2;
-    if(argc==3){n=fread(text,1,sizeof text,stdin);if(ferror(stdin))return 1;}
+    if(argc==3){
+        if(cooloo_console_input_is_terminal() && !cooloo_console_can_read())return 1;
+        n=fread(text,1,sizeof text,stdin);if(ferror(stdin))return 1;
+    }
     else for(i=3;i<argc;i++) {
         size_t k=strlen(argv[i]);if(n+k+(i>3)>4096)return 2;
         if(i>3)text[n++]=' ';
