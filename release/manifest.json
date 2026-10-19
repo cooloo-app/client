@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "client_version": "0.3.0",
-  "status": "development-artifacts",
+  "status": "tagged-artifacts",
   "updated": "2026-10-19",
   "artifacts": [
     {
@@ -9,34 +9,45 @@
       "product": "cooloo",
       "os": "darwin",
       "arch": "arm64",
-      "bytes": 2827080,
-      "sha256": "59eb85349b4b87a70ef275d8869cf235dec0fe819280cd91b508032572d3bc16",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "bytes": 2877464,
+      "sha256": "ce0fbe1455456a98b1f1d39172a90f46aad0f2db0fe951261e437eb9685de266",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-windows-x86_64.exe",
       "product": "cooloo",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 4505257,
-      "sha256": "aba78d9f46c5abf0b898260f03bf54b12caf816df7680ec1559adbd420da23a3",
-      "source_commit": "4cfdd17018a823837b169737254e2db075e69a49",
-      "source_dirty": true,
-      "source_archive_sha256": "a7a41bed77f016df7690bbc866c37422f7c2215f569149ca1bc562f861d3781b",
+      "bytes": 4510652,
+      "sha256": "ceb1109af31fd52e27bdcad4ef2c1f0d029d1dd72637c04eb644c9e7dfde156f",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
       "build_date": "2026-10-19",
-      "build_platform": "macOS arm64 (m106), MinGW-w64 cross-compilation",
-      "verification": "Lua syntax compilation, isolated build and static PE32+ x86_64 / GUI subsystem / system DLL imports only; includes uncommitted unified resource navigation, per-pane Chat views, browser/focus separation and view-count lifecycle changes on source_commit; all automated tests, GUI, SDL dummy and runtime smoke tests skipped at user request; human desktop acceptance pending"
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-text-darwin-arm64",
       "product": "cooloo-text",
       "os": "darwin",
       "arch": "arm64",
-      "bytes": 2650056,
-      "sha256": "ddfe93aadf4102b0f12c3797db66905922d0ddf58251c8c23a7eb4aac2aa1351",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "bytes": 2650952,
+      "sha256": "fe9f283ec838ea06b760fdf5109e7276042c2e8f7693d6be07a084dad8337978",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-text-windows-x86_64.exe",
@@ -44,9 +55,14 @@
       "os": "windows",
       "arch": "x86_64",
       "bytes": 4221107,
-      "sha256": "f86b69cb88c81ccce5bb2906cdb3819b9357c00323e81e59e68e6b627663af19",
-      "source_commit": "8ff738563cb25bc3e96b12354e8b26f57a391d13",
-      "verification": "static build only; tests not run"
+      "sha256": "5a75bf82f94cec912f7ae5c23d3a0342ed945b6cf6537069c574bf655e9baf4d",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-workbench-darwin-arm64",
@@ -54,39 +70,59 @@
       "os": "darwin",
       "arch": "arm64",
       "bytes": 298784,
-      "sha256": "d7e5ae2a99febbf4e6f5152c3e86cdfe076e480ae0e948628d2d9fc299bdc9c3",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "sha256": "47d718f0f8ee7a9c92a0988bd0178b1ddeabd5f5dac9b398f711379d0c7885eb",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-workbench-windows-x86_64.exe",
       "product": "cooloo-workbench",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 645198,
-      "sha256": "d45e0de2ce1dc74e9f10aa58ce3836ef1a8c312b2b21b28f2c8e65f2a7fae8f7",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "bytes": 645710,
+      "sha256": "5415b271262be6bb89e138262d5519dcf92447cac2e30da8008f4af3b9b48328",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-cli-darwin-arm64",
       "product": "cooloo-cli",
       "os": "darwin",
       "arch": "arm64",
-      "bytes": 161592,
-      "sha256": "3d516b005635da5d54d7a2c921f01cec4411081f2e8cf41c3160e0660f359bc8",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "bytes": 161672,
+      "sha256": "f2639f5352b473d762c1000e8a503c0ff26cf8b0501d7eae2ca7b9fe46a93e57",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     },
     {
       "filename": "cooloo-cli-windows-x86_64.exe",
       "product": "cooloo-cli",
       "os": "windows",
       "arch": "x86_64",
-      "bytes": 603010,
-      "sha256": "ce51f081e29f7c3c80239e13303f281279c19093387cf6f9f0828dfa41b3954f",
-      "source_commit": "2fc9021f48ab343a8e1c46893eca711d43ab8643",
-      "verification": "static; baseline refresh"
+      "bytes": 603285,
+      "sha256": "4d4a0a7f567c5d8bf69ca19e88cb4e70d59762c64f37248533c3ac533b974191",
+      "source_commit": "017638f5e202c5035ebaf8dec4625fb71640dda8",
+      "verification": "isolated release-macos / release-windows builds; make test passed (config, startup, protocol2 loopback integration, Lua protocol state, cache); static architecture and Windows system DLL imports checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run; human desktop acceptance pending",
+      "source_dirty": false,
+      "source_archive_sha256": "ae9b9bbc8f190211c4f5a8d1f975c045fc383df1821d5d6170dda443971b0227",
+      "build_date": "2026-10-19",
+      "build_platform": "m106 macOS arm64; Apple clang native / MinGW-w64 Windows cross-compilation",
+      "test_server_commit": "de4f3d21aecaa2190564c329608c02a9decd8010"
     }
   ]
 }
