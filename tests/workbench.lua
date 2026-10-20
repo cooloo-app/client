@@ -77,9 +77,56 @@ con:append(string.rep('a',300000));assert(#con.output<=con.limit);assert(not con
 -- Exercise actual composition, event dispatch, drawing, editing and split commands.
 dofile('lua/apps/workbench/gui.lua')
 for i=1,3 do cooloo.frame({},0.016) end
+-- Use the real key + text event sequence: text-only injection misses swallowed
+-- input when a globally registered shortcut is invalid in the focused view.
+local core=require 'core'
+local command=require 'core.command'
+local keymap=require 'core.keymap'
+local function space()
+  frame_input({'keypressed','space'},{'textinput',' '},{'keyreleased','space'})
+end
+local chat=core.active_view
+assert(chat:is(require 'plugins.workspace.chatview'))
+chat:focus(chat.input)
+local draft_before=table.concat(chat.doc.lines)
+space()
+assert(table.concat(chat.doc.lines)==' '..draft_before,'chat draft must accept Space')
 frame_input({'keypressed','left ctrl'},{'keypressed','n'},{'keyreleased','n'},{'keyreleased','left ctrl'})
 frame_input({'textinput','print("你好")'})
-local core=require 'core';assert(core.active_view.doc.lines[1]:find('你好',1,true))
+assert(core.active_view.doc.lines[1]:find('你好',1,true))
+local edit=core.active_view
+local before_space=table.concat(edit.doc.lines)
+assert(not command.perform('workspace:tree-toggle'))
+assert(not keymap.on_key_pressed('space'),'inapplicable binding must not consume input')
+space()
+assert(table.concat(edit.doc.lines)==before_space:gsub('\n$',' \n'))
+-- Shared bindings still fall through to document commands.
+frame_input({'keypressed','return'},{'keyreleased','return'})
+assert(#edit.doc.lines==2,'Return must fall through to doc:newline')
+frame_input({'keypressed','up'},{'keyreleased','up'})
+assert(select(1,edit.doc:get_selection())==1)
+frame_input({'keypressed','down'},{'keyreleased','down'})
+assert(select(1,edit.doc:get_selection())==2)
+assert(command.perform('console:open'))
+local console_doc=core.active_view.doc
+space()
+assert(console_doc.lines[1]==' \n','console input must accept Space')
+-- Both installed sidebars must still consume Space and invoke tree-toggle.
+local Sidebar=require 'plugins.workspace.sidebar'
+local sidebars=0
+for _,view in ipairs(core.root_view.root_node:get_children()) do
+  if view:is(Sidebar) then
+    sidebars=sidebars+1
+    local choose=view.choose
+    local toggled=false
+    view.choose=function(_,toggle) toggled=toggle end
+    core.set_active_view(view)
+    assert(keymap.on_key_pressed('space') and toggled)
+    view.choose=choose
+  end
+end
+assert(sidebars==2)
+core.set_active_view(edit)
 require('core.command').perform('root:split-right')
 cooloo.frame({},0.016)
 local tmp=os.tmpname()

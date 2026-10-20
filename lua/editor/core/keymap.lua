@@ -105,9 +105,10 @@ function keymap.on_key_pressed(k, commands_enabled)
     if commands then
       for _, cmd in ipairs(commands) do
         local performed = command.perform(cmd)
-        if performed then break end
+        if performed then return true end
       end
-      return true
+      -- A binding alone does not consume input: all command predicates may
+      -- reject it in this view. Let the following textinput reach the document.
     end
   end
   return false
