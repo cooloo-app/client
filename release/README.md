@@ -15,15 +15,15 @@ not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 | File | Source commit | Build date | Bytes |
 |---|---|---|---|
 | `cooloo-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 2877912 |
-| `cooloo-windows-x86_64.exe` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 5127609 |
+| `cooloo-windows-x86_64.exe` | `d0728d519abb2d4b15281e8d27be6ea03c9e0565` | 2026-10-20 | 5127609 |
 | `cooloo-text-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 2667720 |
-| `cooloo-text-windows-x86_64.exe` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 4829231 |
+| `cooloo-text-windows-x86_64.exe` | `d0728d519abb2d4b15281e8d27be6ea03c9e0565` | 2026-10-20 | 4829743 |
 | `cooloo-workbench-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 298784 |
-| `cooloo-workbench-windows-x86_64.exe` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 647246 |
+| `cooloo-workbench-windows-x86_64.exe` | `d0728d519abb2d4b15281e8d27be6ea03c9e0565` | 2026-10-20 | 647246 |
 | `cooloo-cli-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 161848 |
-| `cooloo-cli-windows-x86_64.exe` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 606172 |
+| `cooloo-cli-windows-x86_64.exe` | `d0728d519abb2d4b15281e8d27be6ea03c9e0565` | 2026-10-20 | 606172 |
 
-All artifacts use the same source revision.
+Mixed source revisions: each artifact retains its own provenance.
 
 SHA-256 values and toolchain details are in `manifest.json`; `SHA256SUMS`
 is derived from it. This development refresh does not create a tag,
