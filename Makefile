@@ -155,6 +155,7 @@ test-workbench: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test $(BUILD)/r
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test $(BUILD)/lua-runner tests/runtime.lua
 	python3 tests/workbench_integration.py
+	python3 tests/refresh_integration.py
 
 RENDERER_TEST_SRC := tests/renderer_test.c $(filter-out src/apps/editor/main.c,$(EDITOR_SRC))
 $(BUILD)/renderer-test: $(RENDERER_TEST_SRC) $(HEADERS) $(GUI_HEADERS) $(SDL_LINUX)/libSDL3.a

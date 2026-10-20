@@ -130,6 +130,12 @@ commands below are available only in the full workbench, not `cooloo-text`:
   `Restart`, `Clear` are available in the command palette.
 - `Workspace: Switch`, `Address`, `History`, `Trust Server`, `Register`, `Identity`,
   `Reconnect`: provider operations. Trust requires explicit fingerprint approval.
+- `Workspace: Refresh Rooms` requests a fresh room snapshot; automatic refresh is
+  every five seconds, independently of the 30-second control/FOLLOW heartbeat.
+  `Workspace: Sync Status` logs phase and receive/persist/model/list timestamps,
+  without message bodies or credentials. Footer reports catch-up/following and
+  pending durable writes. Missing heartbeat replies trigger reconnect after 60
+  seconds, excluding time blocked behind cache processing.
 
 Messages/output are read-only virtual documents with UTF-8 soft wrap, selection,
 copy and find. Lua files use the upstream unwrapped code view. History loads
@@ -344,7 +350,8 @@ A mirror login syncs A and B directories/metadata through background subscriptio
 while known mirror targets have sending disabled. No second credential/key is loaded.
 The GUI recovers sent messages from recent incoming peers into its inbox view;
 filtered records do not enter the contiguous room cache. This filtered view is
-in-memory and refreshed on reconnect, not continuously followed or persisted yet.
+in-memory and incrementally refreshed every five seconds for discovered peers,
+using SENT scan cursors; it is not a persistent sent index or a live subscription.
 
 `sent` prints filtered JSONL and a scan cursor on stderr. `history` prints a merged
 snapshot (max 10,000 messages/256 received peers, explicit error on overflow).

@@ -128,6 +128,35 @@ chat.read_denied=false
 chat.metadata('{"id":"'..R..'","type":"user","nickname":"mirror","owner":"'..B..'","slot":1,"mirror":1}')
 assert(p:capabilities(R).can_read and not p:capabilities(R).can_send)
 assert(not p:send(R,'must not send to mirror'))
+-- Periodic discovery, coalescing and permission reconciliation.
+p:identity(A);event('net_ready',chat.ctrl)
+local ctrl=chat.ctrl
+local function requests(text)
+ local n=0;for _,w in ipairs(writes)do if w.s==text then n=n+1 end end;return n
+end
+local count=requests('ROOMS\n')
+assert(not p:refresh_rooms(),'overlapping ROOMS request')
+event('net_line',ctrl,'ROOM '..R..' original');event('net_line',ctrl,'END')
+time=time+5;p:poll{};assert(requests('ROOMS\n')==count+1)
+local fresh=string.rep('d',64)
+event('net_line',ctrl,'ROOM '..fresh..' new room');event('net_line',ctrl,'END')
+assert(chat.rooms[fresh] and chat.rooms[R].denied)
+assert(p:refresh_rooms());event('net_line',ctrl,'ROOM '..R..' renamed');event('net_line',ctrl,'END')
+assert(not chat.rooms[R].denied and chat.rooms[R].nickname=='renamed')
+-- Keep control and a synchronized room alive for over ten minutes.
+assert(p:subscribe(R));c=chat.rooms[R].conn;event('net_ready',c);complete(job_serial,{},0)
+event('net_line',c,'END')
+for tick=1,22 do
+ time=time+30;p:poll{}
+ event('net_line',ctrl,'PONG');event('net_line',c,'PONG')
+ event('net_line',ctrl,'ROOM '..R..' renamed');event('net_line',ctrl,'END')
+ assert(chat.ctrl==ctrl and chat.rooms[R].conn==c)
+end
+assert(requests('PING\n')>=44)
+assert(p:diagnostics().last_receive==time)
+-- A missed heartbeat closes the stream instead of silently waiting forever.
+time=time+30;p:poll{};event('net_line',ctrl,'ROOM '..R..' renamed');event('net_line',ctrl,'END')
+time=time+60;p:poll{};assert(not conns[c])
 p:close();assert(next(conns)==nil)
 io.open=original_open
 print('provider: read/focus/mute/attention, async checkpoint ordering, subscriptions/overflow, stale identity, send ACK/rejection/uncertainty/capabilities passed')

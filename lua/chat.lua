@@ -82,7 +82,7 @@ function M.use_identity(id)
     M.auth_failed = false
     M.rooms, M.order, M.by_conn = {}, {}, {}
     M.sel, M.rooms_loaded = nil, false
-    M.sent_conns, M.sent_seen = {}, {}
+    M.sent_conns, M.sent_seen, M.sent_offsets = {}, {}, {}
     M.names, M.registered, M.nick, M.want_register = {}, false, '', false
     M.read_denied=false
     M.want_reconnect = false
@@ -102,6 +102,14 @@ function M.ensure_room(name)
         M.order[#M.order + 1] = name
     end
     return r
+end
+
+function M.refresh_rooms()
+    if not M.ctrl_up or not M.registered or M.rooms_pending then return false end
+    M.rooms_pending = {}
+    M.rooms_requested_at = cooloo.time()
+    cooloo.net.send(M.ctrl, 'ROOMS\n')
+    return true
 end
 
 function M.connect_ctrl()
@@ -206,7 +214,7 @@ end
 function M.ready_identity(conn, nick)
     local s = (M.sent_conns or {})[conn]
     if s then
-        cooloo.net.send(conn, 'SENT ' .. s.peer .. ' 0\n')
+        cooloo.net.send(conn, 'SENT ' .. s.peer .. ' ' .. tostring((M.sent_offsets or {})[s.peer] or 0) .. '\n')
         return
     end
     if conn == M.ctrl then
@@ -218,7 +226,7 @@ function M.ready_identity(conn, nick)
             M.nick = nick
             M.registered = true
         end
-        if M.registered then cooloo.net.send(conn, "ROOMS\n") end
+        if M.registered then M.refresh_rooms() end
         return
     end
     local r = M.by_conn[conn]
@@ -313,6 +321,8 @@ function M.on_line(conn, line)
         local off, len = line:match('^MSG (%d+) (%d+)$')
         if off then s.pending = {endoff=tonumber(off),len=tonumber(len)}; return end
         if line:match('^END %d+$') or line:sub(1,4) == 'ERR ' then
+            local offset=tonumber(line:match('^END (%d+)$'))
+            if offset then M.sent_offsets=M.sent_offsets or {};M.sent_offsets[s.peer]=offset end
             if line:sub(1,4) == 'ERR ' then M.status = line end
             M.sent_conns[conn] = nil
             cooloo.net.close(conn)
@@ -323,7 +333,9 @@ function M.on_line(conn, line)
     if conn == M.ctrl then
         local room, nickname = line:match("^ROOM (%x+) (.+)$")
         if room then
-            M.ensure_room(room).nickname = nickname
+            local r = M.ensure_room(room)
+            r.nickname = nickname
+            if M.rooms_pending then M.rooms_pending[room] = true end
             if not M.subscriptions then cooloo.net.send(conn, "METAFILE " .. room .. "\n") end
             return
         end
@@ -346,6 +358,14 @@ function M.on_line(conn, line)
             return
         end
         if line == "END" then
+            if M.rooms_pending then
+                for id,r in pairs(M.rooms) do
+                    if r.listed and not M.rooms_pending[id] then r.denied=true end
+                    if M.rooms_pending[id] then r.listed=true;r.denied=nil end
+                end
+                M.rooms_pending=nil
+                M.rooms_refreshed_at=cooloo.time()
+            end
             -- every ROOMS response (initial or periodic refresh) is a
             -- chance to pick up rooms created after connect
             if not M.rooms_loaded and not M.sel then
@@ -363,12 +383,13 @@ function M.on_line(conn, line)
             M.status = ""   -- clear a stale "registering as ..." text
             cfgset("nick", nick)
             -- Registration creates the inbox; refresh the visible address list.
-            cooloo.net.send(conn, "ROOMS\n")
+            M.refresh_rooms()
             if M.rooms_loaded then M.start_follows() end
             return
         end
         if line:sub(1, 4) == "ERR " then
             M.status = line
+            M.rooms_pending=nil
             if M.effective and line:match('^ERR forbidden') then
                 -- AS already succeeded. A read-only command denial must not
                 -- revoke an independent write grant for this identity.
@@ -473,6 +494,7 @@ function M.on_closed(conn, reason)
     if conn == M.ctrl then
         M.ctrl = nil
         M.ctrl_up = false
+        M.rooms_pending=nil
         M.status = "disconnected: " .. reason
         M.want_reconnect = true
         return
@@ -535,6 +557,7 @@ function M.close_all()
     M.sent_conns, M.as_pending, M.identity_pending = {}, {}, {}
     if M.ctrl then cooloo.net.close(M.ctrl); M.ctrl = nil end
     M.ctrl_up = false
+    M.rooms_pending=nil
     M.registered = false
     for conn, r in pairs(M.by_conn) do
         cooloo.net.close(conn)

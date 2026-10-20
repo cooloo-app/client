@@ -5,7 +5,7 @@ local ReadState=require 'workbench.readstate'
 local M={}
 function M.new()
   local p={status='connecting',trust={},jobs={},blocked={},deferred={},subscriptions={},epoch=0,
-    deliveries={},permissions={},closed=false,clock=cooloo.time}
+    deliveries={},permissions={},health={},closed=false,clock=cooloo.time}
   assert(cooloo.ensure_identity())
   -- Bound streams independently of the number of listed conversations. Only
   -- explicit subscribers consume sockets; selected conversation has priority.
@@ -18,7 +18,7 @@ function M.new()
       local c=r.conn;cooloo.net.close(c);chat.by_conn[c]=nil
       chat.on_closed(c,'unsubscribed')
       r.conn=nil;r.pending=nil;r.following=false;r.phase='idle';r.lease_started=nil
-      p.blocked[c]=nil;p.deferred[c]=nil;p.trust[c]=nil
+      p.blocked[c]=nil;p.deferred[c]=nil;p.trust[c]=nil;p.health[c]=nil
     end
   end
   local function job(kind,r,a,b,callback)
@@ -30,6 +30,7 @@ function M.new()
     p.read_error='Read state: '..tostring(err)
   end
   chat.message_added=function(r,m)
+    r.model_at=p.clock()
     local s=r.read_state
     if s and s:observe(m.endoff,m.from,chat.identity()) and r.following and not r.loading_state then
       if not s.muted then p.attention_serial=(p.attention_serial or 0)+1 end
@@ -76,6 +77,7 @@ function M.new()
   chat.persist=function(r,offset,json,done)
     local c=r.conn;p.blocked[c]=true;cooloo.net.pause(c,true)
     job('append',r,offset,json,function(ok)
+      if ok then r.persisted_at=p.clock() end
       done(ok);p.blocked[c]=nil;cooloo.net.pause(c,false)
     end)
   end
@@ -130,6 +132,15 @@ function M.new()
       write_state=permission.write_denied and 'denied' or (chat.effective and not permission.write_verified and 'unverified' or 'allowed'),
       reason=(r and r.mirror and 'mirror credential: use parent inbox') or permission.reason or (not online and 'offline or unregistered' or nil)}
   end
+  function p:refresh_rooms() return chat.refresh_rooms() end
+  function p:diagnostics()
+    local r=self.selected and chat.rooms[self.selected]
+    local h=r and r.conn and self.health[r.conn]
+    return {rooms_refreshed_at=chat.rooms_refreshed_at,
+      phase=r and (r.denied and 'read denied' or r.phase) or 'no selection',
+      last_receive=h and h.received,last_persist=r and r.persisted_at,
+      last_model=r and r.model_at,cache_pending=r and r.conn and self.blocked[r.conn] or false}
+  end
   function p:list()
     local rooms={}
     for _,id in ipairs(chat.order) do
@@ -168,7 +179,7 @@ function M.new()
     end
     local wanted={};local count=0
     local now=self.clock()
-    if self.selected and self.subscriptions[self.selected] then wanted[self.selected]=true;count=1 end
+    if self.selected and self.subscriptions[self.selected] and not chat.rooms[self.selected].denied then wanted[self.selected]=true;count=1 end
     for id,r in pairs(chat.rooms) do
       if id~=self.selected and r.conn and r.lease_started and now-r.lease_started>=30 then
         self.subscriptions[id]=now;close_room(r)
@@ -182,14 +193,16 @@ function M.new()
           now-(r.lease_started or now)<30 then wanted[id]=true;count=count+1 end
     end
     -- FIFO subscriptions; overflow rotates after a completed five-second lease.
-    local ids={};for id,stamp in pairs(self.subscriptions) do ids[#ids+1]={id=id,stamp=stamp} end
+    local ids={};for id,stamp in pairs(self.subscriptions) do
+      if chat.rooms[id] and not chat.rooms[id].denied then ids[#ids+1]={id=id,stamp=stamp} end
+    end
     table.sort(ids,function(a,b)return a.stamp==b.stamp and a.id<b.id or a.stamp<b.stamp end)
     for _,entry in ipairs(ids) do
       if count>=12 then break end
       local id=entry.id
       if not wanted[id] then wanted[id]=true;count=count+1 end
     end
-    for id,r in pairs(chat.rooms) do if not wanted[id] then close_room(r) end end
+    for id,r in pairs(chat.rooms) do if not wanted[id] or r.denied then close_room(r) end end
     for id in pairs(wanted) do
       local r=chat.rooms[id]
       if r and not r.metadata_requested and chat.ctrl_up then
@@ -284,6 +297,12 @@ function M.new()
     return {},'loading earlier cached messages'
   end
   local function process(e)
+    if e.type=='net_closed' then p.health[e.conn]=nil end
+    if e.type=='net_ready' then p.health[e.conn]={received=p.clock(),ping_at=p.clock()} end
+    if e.type=='net_line' and p.health[e.conn] then
+      local h=p.health[e.conn];h.received=p.clock()
+      if e.line=='PONG' then h.waiting=nil;return end
+    end
     local s=p.sending
     if s and e.conn==s.conn then
       if e.type=='net_ready' then
@@ -338,6 +357,34 @@ function M.new()
       finish(self.sending.phase=='sent' and 'unknown' or 'rejected','request timed out; no automatic resend')
     end
     local now=self.clock()
+    if chat.ctrl_up and chat.registered and not chat.read_denied and
+        now-(chat.rooms_requested_at or -5)>=5 then chat.refresh_rooms() end
+    if chat.rooms_pending and now-(chat.rooms_requested_at or now)>30 then
+      local c=chat.ctrl;cooloo.net.close(c);process{type='net_closed',conn=c,reason='room refresh timed out'}
+    end
+    -- PONG is a protocol line, never inserted inside a MSG record. Cache
+    -- backpressure delays processing it, so do not time out a paused stream.
+    for c,h in pairs(self.health) do
+      local r=chat.by_conn[c]
+      local ready=(c==chat.ctrl and chat.ctrl_up) or (r and r.following)
+      if (chat.sent_conns or {})[c] and now-h.received>=60 then
+        cooloo.net.close(c);process{type='net_closed',conn=c,reason='sent history timed out'}
+      elseif ready and (self.blocked[c] or self.deferred[c]) then
+        if h.waiting then h.waiting=now end
+      elseif ready then
+        if h.waiting and now-h.waiting>=60 then
+          cooloo.net.close(c);process{type='net_closed',conn=c,reason='heartbeat timed out'}
+        elseif not h.waiting and now-h.ping_at>=30 then
+          cooloo.net.send(c,'PING\n');h.ping_at=now;h.waiting=now
+        end
+      end
+    end
+    if now>=(self.sent_refresh_at or 0) and not next(chat.sent_conns or {}) then
+      self.sent_refresh_at=now+5
+      chat.sent_seen={}
+      local inbox=chat.rooms[chat.identity()]
+      if inbox and inbox.following then chat.fetch_sent(inbox) end
+    end
     -- One bounded background subscription per listed conversation, admitted
     -- incrementally, including rooms whose last view was closed.
     if chat.rooms_loaded and not chat.read_denied then
@@ -358,7 +405,9 @@ function M.new()
       if not chat.auth_failed and not chat.ctrl then chat.connect_ctrl() end
       self:schedule()
     end
-    self.status=(self.read_error or self.history_status or '')..' '..chat.status
+    local d=self:diagnostics()
+    self.status=(self.read_error or self.history_status or '')..' '..chat.status..
+      ' | '..d.phase..(d.cache_pending and ' (persisting)' or '')
     if chat.read_denied then self.status=self.status..' | read denied; explicit destination may still allow send' end
     if not chat.registered and chat.ctrl_up then self.status=self.status..' | Workspace: Register' end
     if next(self.trust) then self.status='Trust required: Workspace: Trust Server' end
@@ -378,7 +427,8 @@ function M.new()
   end
   local function reset()
     if p.sending then finish(p.sending.phase=='sent' and 'unknown' or 'rejected','connection reset') end
-    p.epoch=p.epoch+1;p.jobs={};p.blocked={};p.deferred={};p.trust={};p.permissions={};p.history_status=nil
+    p.epoch=p.epoch+1;p.jobs={};p.blocked={};p.deferred={};p.trust={};p.health={};p.permissions={};p.history_status=nil
+    p.sent_refresh_at=nil
     for _,r in pairs(chat.rooms) do r.history_pending=false;r.metadata_requested=false;r.lease_started=nil end
   end
   function p:identity(id)

@@ -220,6 +220,14 @@ function M.install(provider)
       end
     end,
     ['workspace:refresh-files']=function() files:refresh() end,
+    ['workspace:refresh-rooms']=function() if provider.refresh_rooms then provider:refresh_rooms() end end,
+    ['workspace:sync-status']=function()
+      if provider.diagnostics then
+        local d=provider:diagnostics()
+        core.log('Sync: %s; rooms=%s receive=%s persist=%s model=%s',d.phase,
+          tostring(d.rooms_refreshed_at),tostring(d.last_receive),tostring(d.last_persist),tostring(d.last_model))
+      end
+    end,
     ['workspace:mock-load']=function()
       if provider.load then prompt('Mock text file',function(path)
         local ok,err=provider:load(path);if not ok then core.error('%s',err) end

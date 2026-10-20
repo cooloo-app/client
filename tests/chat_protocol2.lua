@@ -2,6 +2,7 @@
 local sent, cached = {}, {}
 local A, R = string.rep('a',64), string.rep('b',64)
 cooloo = {
+    time = function() return 0 end,
     config={get=function()end,set=function()return true end},
     public_id=function()return A end,
     net={fp=function()return string.rep('c',64)end,
