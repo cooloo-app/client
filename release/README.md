@@ -14,16 +14,16 @@ not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 
 | File | Source commit | Build date | Bytes |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 2877912 |
-| `cooloo-windows-x86_64.exe` | `14d6c89e20d81c0b6e24a750a4859d1326d6450a` | 2026-10-20 | 5128633 |
-| `cooloo-text-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 2667720 |
-| `cooloo-text-windows-x86_64.exe` | `14d6c89e20d81c0b6e24a750a4859d1326d6450a` | 2026-10-20 | 4830255 |
-| `cooloo-workbench-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 298784 |
-| `cooloo-workbench-windows-x86_64.exe` | `14d6c89e20d81c0b6e24a750a4859d1326d6450a` | 2026-10-20 | 647246 |
-| `cooloo-cli-darwin-arm64` | `ad67e65351a47d632d1fe4d7f20d22b4830adc6b` | 2026-10-19 | 161848 |
-| `cooloo-cli-windows-x86_64.exe` | `14d6c89e20d81c0b6e24a750a4859d1326d6450a` | 2026-10-20 | 606172 |
+| `cooloo-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 2894424 |
+| `cooloo-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 5128633 |
+| `cooloo-text-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 2667720 |
+| `cooloo-text-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 4830255 |
+| `cooloo-workbench-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 298784 |
+| `cooloo-workbench-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 647246 |
+| `cooloo-cli-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 161848 |
+| `cooloo-cli-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 606172 |
 
-Mixed source revisions: each artifact retains its own provenance.
+All artifacts use the same source revision.
 
 SHA-256 values and toolchain details are in `manifest.json`; `SHA256SUMS`
 is derived from it. This development refresh does not create a tag,
@@ -31,8 +31,6 @@ GitHub Release or Python publication.
 
 ## Verification
 
-- `cooloo-darwin-arm64`, `cooloo-text-darwin-arm64`, `cooloo-text-windows-x86_64.exe`, `cooloo-workbench-darwin-arm64`, `cooloo-workbench-windows-x86_64.exe`, `cooloo-cli-darwin-arm64`, `cooloo-cli-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build.
-
-- `cooloo-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build. Additionally, Windows local startup and window/icon/console probes passed; visual UX acceptance pending.
+- `cooloo-darwin-arm64`, `cooloo-windows-x86_64.exe`, `cooloo-text-darwin-arm64`, `cooloo-text-windows-x86_64.exe`, `cooloo-workbench-darwin-arm64`, `cooloo-workbench-windows-x86_64.exe`, `cooloo-cli-darwin-arm64`, `cooloo-cli-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build.
 
 Validate with `python3 tools/release_manifest.py`.
