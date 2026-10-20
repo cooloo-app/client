@@ -100,6 +100,13 @@ assert(not command.perform('workspace:tree-toggle'))
 assert(not keymap.on_key_pressed('space'),'inapplicable binding must not consume input')
 space()
 assert(table.concat(edit.doc.lines)==before_space:gsub('\n$',' \n'))
+-- A consumed shortcut must not suppress an unrelated character delivered in
+-- the same poll batch (the event queue may contain Left followed by `a`).
+edit.doc:set_selection(1,1)
+frame_input({'keypressed','left'},{'keyreleased','left'},
+  {'keypressed','a'},{'textinput','a'},{'keyreleased','a'})
+assert(table.concat(edit.doc.lines):find('a',1,true),
+  'a after a consumed navigation key must not be swallowed')
 -- Shared bindings still fall through to document commands.
 frame_input({'keypressed','return'},{'keyreleased','return'})
 assert(#edit.doc.lines==2,'Return must fall through to doc:newline')
