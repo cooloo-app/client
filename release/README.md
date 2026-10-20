@@ -1,4 +1,4 @@
-# cooloo client 0.3.0 artifacts
+# cooloo client 0.3.2 artifacts
 
 Generated from `manifest.json`; edit the build inputs/report, not this file.
 
@@ -14,14 +14,14 @@ not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 
 | File | Source commit | Build date | Bytes |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 2894424 |
-| `cooloo-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 5128633 |
-| `cooloo-text-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 2667720 |
-| `cooloo-text-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 4830255 |
-| `cooloo-workbench-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 298784 |
-| `cooloo-workbench-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 647246 |
-| `cooloo-cli-darwin-arm64` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 161848 |
-| `cooloo-cli-windows-x86_64.exe` | `8c6c06d8d4ed941273b5f3bbddad0511acef9112` | 2026-10-20 | 606172 |
+| `cooloo-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 2894424 |
+| `cooloo-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 5128633 |
+| `cooloo-text-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 2667720 |
+| `cooloo-text-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 4830255 |
+| `cooloo-workbench-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 298784 |
+| `cooloo-workbench-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 647246 |
+| `cooloo-cli-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 161848 |
+| `cooloo-cli-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 606172 |
 
 All artifacts use the same source revision.
 
