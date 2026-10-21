@@ -3,6 +3,7 @@ global{chat=false}
 local chat=require 'client.chat'
 local ReadState=require 'workbench.readstate'
 local FileSync=require 'workbench.filesync'
+local FolderSession=require 'workbench.folder_session'
 local M={}
 function M.new()
   local p={status='connecting',trust={},jobs={},blocked={},deferred={},subscriptions={},epoch=0,
@@ -38,7 +39,7 @@ function M.new()
     end
     r.unread=s and s.unread or 0
   end
-  chat.load_cache=function(r,done)
+  local function load_cache(r,done)
     local c=r.conn;p.blocked[c]=true;cooloo.net.pause(c,true)
     local function finish(ok,records,offset)
       if r.conn~=c then return end
@@ -54,6 +55,10 @@ function M.new()
       if s and (not root or s.path~=root..'/read-state.json') then s=nil end
       if not s and root then s,err=ReadState.new(root..'/read-state.json',system.write_file) end
       if not s then state_error(err);finish(false,{},-1);return end
+      if r.generation then
+        local bound,message=s:bind(r.generation)
+        if not bound then state_error(message);finish(false,{},-1);return end
+      end
       local saved,message=s:baseline(offset)
       if not saved then state_error(message);finish(false,{},-1);return end
       r.read_state=s
@@ -74,6 +79,10 @@ function M.new()
       end
       scan(records)
     end)
+  end
+  chat.load_cache=function(r,done)
+    r.generation_wait={done=done,deadline=p.clock()+20}
+    cooloo.net.send(r.conn,'STREAM '..r.name..'\n')
   end
   chat.persist=function(r,offset,json,done)
     local c=r.conn;p.blocked[c]=true;cooloo.net.pause(c,true)
@@ -319,11 +328,19 @@ function M.new()
     elseif e.type=='net_closed' then sync_close(e.reason)
     elseif e.type=='net_line' then
       local line=e.line
+      if s.folder then s.deadline=p.clock()+30;s.folder:line(line);return true end
       if s.phase=='as' then
-        if line=='OK' then request('FGET') elseif line:match('^ERR ') then sync_close(line) end
+        if line=='OK' then
+          if s.folders then
+            s.folder=FolderSession.new(system,p:directory(s.room.name),s.room.name,
+              function(bytes) s.deadline=p.clock()+30;return cooloo.net.send(s.conn,bytes) end,
+              function(err) sync_close(err) end)
+            s.folder:start()
+          else request('FGET') end
+        elseif line:match('^ERR ') then sync_close(line) end
       elseif line:match('^ERR ') then
         if s.phase=='FGET' and line:match('^ERR not%-found ') then
-          request('FPUT',0,ReadState.encode(s.state.watermark))
+          request('FPUT',0,ReadState.encode(s.state.watermark,s.state.generation))
         else
           if line:match('^ERR unknown%-command ') or (s.phase=='FGET' and line:match('^ERR bad%-request ')) then
             p.sync_disabled=true -- pre-file servers resolve "self" as a message ID
@@ -334,12 +351,17 @@ function M.new()
         local result=s.result
         if not result or result.path~=s.path then sync_close('invalid file response');return true end
         if s.phase=='FGET' then
-          local remote=ReadState.decode(result.data)
+          local remote,generation=ReadState.decode(result.data)
+          if remote and generation~=s.state.generation then
+            if s.state.generation then request('FPUT',result.revision,ReadState.encode(s.state.watermark,s.state.generation))
+            else sync_close('read-state generation requires upgraded server') end
+            return true
+          end
           if not remote then sync_close('invalid remote read-state (not overwritten)');return true end
           local ok,err=s.state:mark(remote)
           if not ok then state_error(err);sync_close(err);return true end
           s.room.unread=s.state.unread
-          if s.state.watermark>remote then request('FPUT',result.revision,ReadState.encode(s.state.watermark))
+          if s.state.watermark>remote then request('FPUT',result.revision,ReadState.encode(s.state.watermark,s.state.generation))
           else sync_close();p.sync_status=nil end
         else sync_close();p.sync_status=nil end
       else s.result=FileSync.parse(line) end
@@ -361,7 +383,9 @@ function M.new()
     p.sync_last=id
     local r=chat.rooms[id];local c=cooloo.net.connect(chat.host,chat.port)
     if not c then return end
-    p.file_sync={conn=c,room=r,state=r.read_state,path='rooms/'..id..'/read-state.json',
+    r.sync_turn=not r.sync_turn
+    p.file_sync={conn=c,room=r,state=r.read_state,folders=r.sync_turn and system.make_dir~=nil,
+      path=r.generation and ('read/'..r.generation..'/read-state.json') or ('rooms/'..id..'/read-state.json'),
       identity=chat.identity(),server=cooloo.net.fp(chat.ctrl),deadline=now+20,phase='connecting'}
   end
   local function process(e)
@@ -370,6 +394,23 @@ function M.new()
     if e.type=='net_line' and p.health[e.conn] then
       local h=p.health[e.conn];h.received=p.clock()
       if e.line=='PONG' then h.waiting=nil;return end
+    end
+    local room=chat.by_conn[e.conn]
+    if room and room.generation_wait and e.type=='net_line' then
+      local wait=room.generation_wait
+      local id,generation=e.line:match('^STREAM ([0-9a-f]+) ([0-9a-f]+)$')
+      if id==room.name and generation and #generation==64 then
+        room.generation_wait=nil;room.generation=generation
+        job('generation',room,0,generation,function(ok,_,changed)
+          if room.conn~=e.conn then return end
+          if not ok then wait.done(false,{},-1);return end
+          if changed==1 then room.buf={};room.ends={};room.newest_end=0;room.read_state=nil;room.revision=(room.revision or 0)+1 end
+          load_cache(room,wait.done)
+        end)
+      elseif e.line:match('^ERR unknown%-command ') then
+        room.generation_wait=nil;load_cache(room,wait.done)
+      elseif e.line:match('^ERR ') then room.generation_wait=nil;wait.done(false,{},-1) end
+      return
     end
     if sync_event(e) then return end
     local s=p.sending
@@ -426,6 +467,11 @@ function M.new()
       finish(self.sending.phase=='sent' and 'unknown' or 'rejected','request timed out; no automatic resend')
     end
     local now=self.clock()
+    for _,room in pairs(chat.rooms) do
+      if room.generation_wait and now>room.generation_wait.deadline then
+        local wait=room.generation_wait;room.generation_wait=nil;wait.done(false,{},-1)
+      end
+    end
     sync_tick(now)
     if chat.ctrl_up and chat.registered and not chat.read_denied and
         now-(chat.rooms_requested_at or -5)>=5 then chat.refresh_rooms() end

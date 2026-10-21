@@ -47,6 +47,7 @@ static int worker(void *unused) {
         j->state=2;SDL_UnlockMutex(mutex);
         if(j->kind==0)j->ok=cache_read_controlled(j->server,j->self,j->room,visit,j,cancelled,NULL)==0;
         else if(j->kind==1)j->ok=cache_append_controlled(j->server,j->self,j->room,j->offset,j->json,cancelled,NULL)==0;
+        else if(j->kind==3){int result=cache_generation(j->server,j->self,j->room,j->json);j->ok=result>=0;j->offset=result;}
         else j->ok=cache_meta(j->server,j->self,j->json)==0;
         SDL_LockMutex(mutex);j->state=3;
     }
@@ -67,8 +68,8 @@ static int submit(lua_State *L) {
         value.items=calloc((size_t)value.limit,sizeof(item));if(!value.items)return luaL_error(L,"out of memory");
     } else {
         const char *json;
-        luaL_argcheck(L,!strcmp(kind,"append")||!strcmp(kind,"meta"),1,"invalid cache operation");
-        value.kind=!strcmp(kind,"append")?1:2;
+        luaL_argcheck(L,!strcmp(kind,"append")||!strcmp(kind,"meta")||!strcmp(kind,"generation"),1,"invalid cache operation");
+        value.kind=!strcmp(kind,"append")?1:!strcmp(kind,"generation")?3:2;
         value.offset=luaL_checkinteger(L,5);json=luaL_checkstring(L,6);
         luaL_argcheck(L,strlen(json)<RECORD_MAX,6,"record too large");
         value.json=SDL_strdup(json);if(!value.json)return luaL_error(L,"out of memory");

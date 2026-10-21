@@ -5,6 +5,7 @@
 struct record { long long ts; char from[65], to[65], content[4097]; };
 int record_parse(const char *json, struct record *r);
 /* Contiguous server byte prefix, segregated by server and local public ID. */
+int cache_generation(const char *server,const char *self,const char *room,const char *generation);
 long long cache_offset(const char *server, const char *self, const char *room);
 int cache_append(const char *server, const char *self, const char *room,
                  long long end, const char *json);

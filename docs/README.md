@@ -218,10 +218,21 @@ The adapter uses a dedicated Native file connection, round-robin GET/merge/CAS,
 and client-side max; conflicts and uncertain writes retry by GET. Shared watermarks
 never advance download cursors. Unknown-command servers retain local-only behavior
 until reconnect. See server `SYNC_FILES.md` for the opaque file wire contract.
-Scope is server/effective identity/room, not room-member sharing. Automatic generic
-folder watching, stream replacement/backup rollback and concurrent processes using
-the same cache directory remain unsupported. Client release binaries must be rebuilt
-before this source feature is available on installed desktops.
+Private `scripts/` and singular `config/` folders now sync in the same effective
+identity, never across room members. Folder sessions use complete LIST + exact-byte
+persistent baselines (`.cooloo-sync/`), chunked transfers up to 1 MiB, CAS and durable
+tombstones. Conflicting local edits are retained under `.cooloo-conflicts/`; incoming
+scripts/config are not executed or activated. `configs/` is not automatically migrated.
+Filesystem reconciliation is synchronous with depth/entry/file-size caps; larger
+workspace responsiveness still needs desktop benchmarking. Future room-owner
+`server-config/server-scripts` deployment/runtime is deliberately separate and absent.
+New clients query STREAM before loading history. Epoch changes archive/reset message
+cache on the worker and reset the read watermark, while shared JSON v2 is namespaced
+by generation (`self/read/<generation>/read-state.json`). First upgrade binds existing
+local state; legacy servers retain old behavior. After restoring history, operators
+must rotate epochs offline before clients reconnect; arbitrary live history edits
+are unsupported. Concurrent processes using the same cache directory are unsupported.
+Client release binaries must be rebuilt before these source features reach desktops.
 
 Workspace and console plugins install their own commands and lifecycle handlers;
 the full composition only selects dependencies and schedules them. Virtual/read-only

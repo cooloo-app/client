@@ -157,6 +157,40 @@ static FILE *open_cache(const char *server,const char *self,const char *room,can
     if(cache_path(p,sizeof p,server,self,room))return NULL;
     f=fopen(p,"a+b");if(f&&lock(f,cancel,ctx)){fclose(f);return NULL;}return f;
 }
+int cache_generation(const char *server,const char *self,const char *room,const char *generation)
+{
+    char p[1400],marker[1400],temporary[1450],old[66]={0};FILE *f,*g;int changed=0,rc=-1;
+    if(!id(generation)||cache_path(p,sizeof p,server,self,room))return -1;
+    strcpy(marker,p);strcpy(strrchr(marker,'/')+1,".stream-generation");
+    f=open_cache(server,self,room,NULL,NULL);if(!f)return -1;
+    g=fopen(marker,"rb");if(g){size_t n=fread(old,1,65,g);fclose(g);if(n!=64||!id(old))goto done;}
+    else if(errno!=ENOENT)goto done;
+    changed=old[0]&&strcmp(old,generation);
+    if(changed){
+        char archive[1500];char bytes[8192];size_t n;
+        snprintf(archive,sizeof archive,"%s.%s",p,old);
+        g=fopen(archive,"rb");
+        if(g)fclose(g); /* Preserve the first archive on retry after interrupted reset. */
+        else {
+            if(errno!=ENOENT)goto done;
+            g=fopen(archive,"wb");if(!g)goto done;
+            rewind(f);while((n=fread(bytes,1,sizeof bytes,f))>0)if(fwrite(bytes,1,n,g)!=n){fclose(g);goto done;}
+            if(ferror(f)){fclose(g);goto done;}if(fclose(g))goto done;
+        }
+        if(truncate_file(f,0))goto done;
+    }
+    snprintf(temporary,sizeof temporary,"%s.tmp",marker);
+    g=fopen(temporary,"wb");if(!g)goto done;
+    if(fwrite(generation,1,64,g)!=64){fclose(g);goto done;}
+    if(fclose(g))goto done;
+#ifdef _WIN32
+    if(win_cache_move(temporary,marker))goto done;
+#else
+    if(rename(temporary,marker))goto done;
+#endif
+    rc=changed;
+ done:fclose(f);return rc;
+}
 long long cache_offset(const char *server,const char *self,const char *room)
 {FILE *f=open_cache(server,self,room,NULL,NULL);long long n;if(!f)return -1;n=scan(f,NULL,NULL);fclose(f);return n;}
 int cache_read(const char *server,const char *self,const char *room,cache_visit visit,void *ctx)

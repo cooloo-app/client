@@ -24,6 +24,13 @@ int main(int argc,char **argv)
     f=fopen(p,"ab");assert(f);fputs("bad record\n",f);assert(!fclose(f));
     assert(cache_offset(a,b,c)<0); /* complete corruption fails closed */
     assert(cache_offset(a,c,c)==0); /* identities segregated */
+    assert(cache_generation(a,b,c,a)==0); /* migration keeps existing history */
+    assert(cache_generation(a,b,c,a)==0);
+    assert(cache_generation(a,b,c,b)==1); /* new epoch archives and resets */
+    assert(cache_offset(a,b,c)==0);
+    assert(cache_generation(a,b,c,b)==0);
+    snprintf(p,sizeof p,"%s/cache/%s/%s/rooms/%s/messages.jsonl.%s",argv[1],a,b,c,a);
+    f=fopen(p,"rb");assert(f);assert(fgetc(f)!=EOF);fclose(f);
     puts("cache: gaps, duplicates, conflicts, crash tail and identity isolation passed");
     return 0;
 }

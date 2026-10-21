@@ -35,6 +35,10 @@ local function event(kind,c,line)
  if chat.identity_pending and chat.identity_pending[c] then
    p:poll{{type='net_line',conn=c,line='IDENTITY '..A..' '..(chat.requested_effective or chat.effective or A)}}
  end
+ local room=chat.by_conn[c]
+ if room and room.generation_wait then
+   p:poll{{type='net_line',conn=c,line='ERR unknown-command STREAM'}}
+ end
  if kind=='net_ready' and p.sending and p.sending.conn==c and p.sending.phase=='as' then
    assert(writes[#writes].s=='AS '..chat.identity()..'\n')
    p:poll{{type='net_line',conn=c,line='OK'}}

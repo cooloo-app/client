@@ -223,6 +223,16 @@ static int info(lua_State *L) {
     lua_pushinteger(L,(lua_Integer)i.size);lua_setfield(L,-2,"size");
     lua_pushnumber(L,(lua_Number)i.modify_time/1e9);lua_setfield(L,-2,"modified");return 1;
 }
+static int make_dir(lua_State *L) {
+    const char *p=luaL_checkstring(L,1);
+    if(SDL_CreateDirectory(p)){lua_pushboolean(L,1);return 1;}
+    lua_pushnil(L);lua_pushstring(L,SDL_GetError());return 2;
+}
+static int remove_file(lua_State *L) {
+    const char *p=luaL_checkstring(L,1);
+    if(SDL_RemovePath(p)){lua_pushboolean(L,1);return 1;}
+    lua_pushnil(L);lua_pushstring(L,SDL_GetError());return 2;
+}
 static int absolute(lua_State *L);
 static int resolve_path(lua_State *L) {
     const char *p=luaL_checkstring(L,1);
@@ -382,7 +392,7 @@ static int temp_file(lua_State *L) {
 }
 
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"make_dir",make_dir},{"remove_file",remove_file},{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
