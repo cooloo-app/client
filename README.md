@@ -1,4 +1,4 @@
-# Protocol 2 client — v0.3.2 text workbench
+# Protocol 2 client — v0.3.4 text workbench
 
 The modular workbench replaces the v0.2 GUI. Protocol 2, Machine API schema 1,
 identity and cache formats remain compatible. See [docs/README.md](docs/README.md)

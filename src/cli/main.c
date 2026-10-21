@@ -162,7 +162,7 @@ static int run(int argc, char **argv)
     }
 
     if (!strcmp(argv[1], "version") && argc==2) {
-        if(cooloo_machine)machine_version();else puts("cooloo 0.3.2");return 0;
+        if(cooloo_machine)machine_version();else puts("cooloo 0.3.4");return 0;
     }
     if(cooloo_machine&&(!strcmp(argv[1],"history")||!strcmp(argv[1],"chat")||!strcmp(argv[1],"help")||!strcmp(argv[1],"--help")))return 2;
     if (!strcmp(argv[1], "create") || !strcmp(argv[1], "avatar") ||
