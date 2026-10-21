@@ -27,18 +27,28 @@ local other=path..'-identity';local isolated=assert(State.new(other,write))
 assert(isolated:baseline(0));assert(not isolated.muted and isolated.watermark==0)
 write(path,'return os.execute("never execute config")')
 assert(not State.new(path,write),'corrupt state must not silently mark history read')
--- Legacy migration preserves the old file and keeps device mute off the wire.
+-- Old text files are ignored, never migrated; text at the JSON path is invalid.
 local legacy=path..'-legacy';write(legacy,'v1\n42\n1\n')
-local migrated=assert(State.new(legacy..'.json',write))
-assert(migrated.watermark==42 and migrated.muted)
-local f=assert(io.open(legacy..'.json','rb'));local json=f:read('*a');f:close()
-assert(State.decode(json)==42 and not json:find('mute'))
+local json_path=legacy..'.json'
+local fresh=assert(State.new(json_path,write))
+assert(not fresh.initialized and fresh.watermark==0 and not fresh.muted)
+local function absent(p)
+ local f=io.open(p,'rb');if f then f:close();error('Unexpected file: '..p) end
+end
+absent(json_path);absent(json_path..'.local')
+write(json_path,'v1\n42\n1\n')
+assert(not State.new(json_path,write),'text state at the JSON path must be rejected')
+-- JSON and device-local mute remain supported; JSON wins over an old sibling.
+write(json_path,State.encode(42));write(json_path..'.local','1\n')
+local current=assert(State.new(json_path,write))
+assert(current.watermark==42 and current.muted)
+assert(not State.encode(current.watermark):find('mute'))
 assert(not State.decode('{"version":2,"read_offset":42}'))
 assert(not State.decode('{"version":1,"read_offset":-1}'))
-assert(migrated:mark(100));assert(migrated:mark(60));assert(migrated.watermark==100)
-assert(migrated:bind(string.rep('a',64)));assert(migrated.watermark==100)
-assert(migrated:bind(string.rep('b',64)));assert(migrated.watermark==0)
-assert(migrated:mark(12));local restarted=assert(State.new(legacy..'.json',write))
+assert(current:mark(100));assert(current:mark(60));assert(current.watermark==100)
+assert(current:bind(string.rep('a',64)));assert(current.watermark==100)
+assert(current:bind(string.rep('b',64)));assert(current.watermark==0)
+assert(current:mark(12));local restarted=assert(State.new(json_path,write))
 assert(restarted.watermark==12 and restarted.generation==string.rep('b',64))
 for _,p in ipairs{path,other,legacy,legacy..'.json',legacy..'.json.local',path..'.local',other..'.local'} do os.remove(p) end
-print('readstate: upgrade, restart, mute, dedupe, own messages, failure, monotonicity, 5000 unread, identity isolation passed')
+print('readstate: JSON-only state, restart, mute, dedupe, own messages, failure, monotonicity, 5000 unread, identity isolation passed')

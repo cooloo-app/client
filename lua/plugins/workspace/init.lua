@@ -107,7 +107,7 @@ function M.install(provider)
       return
     end
     local key='file:'..path_key
-    local protected=room_file and (name=='.meta' or name=='messages.jsonl' or name=='messages.chat' or name=='read-state' or name=='read-state.json' or name=='read-state.json.local')
+    local protected=room_file and (name=='.meta' or name=='messages.jsonl' or name=='messages.chat' or name=='read-state.json' or name=='read-state.json.local')
     local resource=file_resources[key]
     if not resource then
       resource={kind='file',key=key,path=path,doc=core.open_doc(path)}

@@ -211,7 +211,8 @@ history and own/filtered SENT messages never request attention. The small local
 state file uses the existing synchronous atomic writer, like drafts; JSONL scans
 and appends remain on the cache worker. `read-state.json` contains canonical
 `{"version":1,"read_offset":N}`; mute lives in `read-state.json.local` and is not
-uploaded. Legacy three-line `read-state` is migrated atomically and retained.
+uploaded. Only JSON read-state is supported; old three-line `read-state` files
+are ignored and are not migrated. Text content at the JSON path is rejected.
 Missing files baseline the existing cache once; malformed/unreadable files stop
 that stream with a visible error. Write failure does not advance the watermark.
 The adapter uses a dedicated Native file connection, round-robin GET/merge/CAS,

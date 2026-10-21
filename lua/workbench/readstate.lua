@@ -21,30 +21,15 @@ end
 function M.new(path,write)
   local s={path=path,write=write,watermark=0,muted=false,pending={},unread=0}
   local f,err,code=io.open(path,'rb')
-  local legacy=false
-  if not f and code==2 and path:match('%.json$') then
-    f,err,code=io.open(path:gsub('%.json$',''),'rb');legacy=f~=nil
-  end
   if f then
     local data=f:read(1024);local ok=f:close()
-    local offset,mute
-    if data then
-      offset,mute=data:match('^v1\n(%d+)\n([01])\n$')
-      if offset then legacy=true;offset=math.tointeger(tonumber(offset))
-      else offset,s.generation=M.decode(data) end
-    end
+    local offset
+    offset,s.generation=M.decode(data)
     if not ok or not offset or offset<0 then return nil,'Invalid local read state: '..path end
-    s.watermark=offset;s.muted=mute=='1';s.initialized=true
+    s.watermark=offset;s.initialized=true
   elseif code~=2 then return nil,err end
-  if not legacy then
-    local pref=io.open(path..'.local','rb')
-    if pref then local value=pref:read(8);pref:close();s.muted=value=='1\n' end
-  else
-    local ok,message=write(path..'.local',s.muted and '1\n' or '0\n')
-    if not ok then return nil,message end
-    ok,message=write(path,M.encode(s.watermark))
-    if not ok then return nil,message end
-  end
+  local pref=io.open(path..'.local','rb')
+  if pref then local value=pref:read(8);pref:close();s.muted=value=='1\n' end
   function s:save(offset,muted)
     local ok,message=self.write(self.path,M.encode(offset,self.generation))
     if not ok then return false,message end
