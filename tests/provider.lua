@@ -7,7 +7,7 @@ local time,serial,job_serial=0,0,0
 local state_files={}
 local original_open=io.open
 io.open=function(path,mode)
- if path:match('/read%-state$') then
+ if path:match('/read%-state') then
    local value=state_files[path]
    if not value then return nil,'missing',2 end
    return {read=function()return value end,close=function()return true end}
@@ -76,6 +76,27 @@ assert(chat.rooms[R].read_state.watermark==400)
 assert(p:toggle_mute(R));incoming(500);incoming(500)
 assert(p:list()[1].unread==1,'duplicate endpoint counted twice')
 p:reading(R,true)
+-- Shared files merge in the client; CAS conflicts refetch, mute stays local.
+time=2;p:poll{};local fs=assert(p.file_sync);local fc=fs.conn
+local FileSync=require 'workbench.filesync'
+local State=require 'workbench.readstate'
+event('net_ready',fc);event('net_line',fc,'OK')
+assert(writes[#writes].s=='FGET self '..fs.path..'\n')
+local remote=State.encode(700)
+event('net_line',fc,'FILE '..fs.path..' 1 '..#remote..' '..FileSync.hex(remote))
+event('net_line',fc,'END')
+assert(not p.file_sync and chat.rooms[R].read_state.watermark==700)
+assert(chat.rooms[R].read_state.muted==false)
+assert(chat.rooms[R].newest_end==500,'shared read must not advance download cursor')
+time=4;p:poll{};fs=assert(p.file_sync);fc=fs.conn
+event('net_ready',fc);event('net_line',fc,'OK')
+remote=State.encode(600)
+event('net_line',fc,'FILE '..fs.path..' 2 '..#remote..' '..FileSync.hex(remote))
+event('net_line',fc,'END')
+assert(writes[#writes].s:match('^FPUT self .+ 2 '))
+event('net_line',fc,'ERR conflict stale');assert(not p.file_sync)
+-- Reset watermark for the independent pagination fixture below.
+assert(chat.rooms[R].read_state:save(500,false))
 -- Reopening must count beyond the 2000-record display window before READ resumes.
 p:reconnect();event('net_ready',chat.ctrl);assert(p:subscribe(R))
 c=chat.rooms[R].conn;event('net_ready',c)
@@ -99,7 +120,7 @@ assert(p:send(R,'denied'));send=p.sending.conn;event('net_ready',send);event('ne
 assert(not p:capabilities(R).can_send and not p:send(R,'again'))
 p:reconnect();assert(p:capabilities(R).write_state=='allowed')
 event('net_ready',chat.ctrl)
-assert(p:send(R,'timeout'));time=21;p:poll{};assert(p:delivery(R).state=='rejected')
+assert(p:send(R,'timeout'));time=time+21;p:poll{};assert(p:delivery(R).state=='rejected')
 -- Async completion from an old identity must not leak into the new workspace.
 assert(p:subscribe(R));c=chat.rooms[R].conn;event('net_ready',c);local stale=job_serial
 assert(p:identity(B));complete(stale,{{offset=100,json='old identity'}},100)

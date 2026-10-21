@@ -209,12 +209,19 @@ to `system.set_unread(count,attention)`. Native code renders the Windows taskbar
 overlay/macOS Dock badge and uses SDL flash; it owns no messaging state. Cached
 history and own/filtered SENT messages never request attention. The small local
 state file uses the existing synchronous atomic writer, like drafts; JSONL scans
-and appends remain on the cache worker. Files contain exactly `v1`, decimal read
-byte endpoint, and `0`/`1` mute flag, each followed by LF. They are never executed.
+and appends remain on the cache worker. `read-state.json` contains canonical
+`{"version":1,"read_offset":N}`; mute lives in `read-state.json.local` and is not
+uploaded. Legacy three-line `read-state` is migrated atomically and retained.
 Missing files baseline the existing cache once; malformed/unreadable files stop
 that stream with a visible error. Write failure does not advance the watermark.
-State is local to server/effective identity/room; concurrent GUI state merging and
-cross-device read synchronization are not implemented.
+The adapter uses a dedicated Native file connection, round-robin GET/merge/CAS,
+and client-side max; conflicts and uncertain writes retry by GET. Shared watermarks
+never advance download cursors. Unknown-command servers retain local-only behavior
+until reconnect. See server `SYNC_FILES.md` for the opaque file wire contract.
+Scope is server/effective identity/room, not room-member sharing. Automatic generic
+folder watching, stream replacement/backup rollback and concurrent processes using
+the same cache directory remain unsupported. Client release binaries must be rebuilt
+before this source feature is available on installed desktops.
 
 Workspace and console plugins install their own commands and lifecycle handlers;
 the full composition only selects dependencies and schedules them. Virtual/read-only

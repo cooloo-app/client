@@ -2,6 +2,7 @@
 global{chat=false}
 local chat=require 'client.chat'
 local ReadState=require 'workbench.readstate'
+local FileSync=require 'workbench.filesync'
 local M={}
 function M.new()
   local p={status='connecting',trust={},jobs={},blocked={},deferred={},subscriptions={},epoch=0,
@@ -50,8 +51,8 @@ function M.new()
       if not ok then finish(false,{},-1);return end
       local root,err=p:directory(r.name)
       local s=r.read_state
-      if s and (not root or s.path~=root..'/read-state') then s=nil end
-      if not s and root then s,err=ReadState.new(root..'/read-state',system.write_file) end
+      if s and (not root or s.path~=root..'/read-state.json') then s=nil end
+      if not s and root then s,err=ReadState.new(root..'/read-state.json',system.write_file) end
       if not s then state_error(err);finish(false,{},-1);return end
       local saved,message=s:baseline(offset)
       if not saved then state_error(message);finish(false,{},-1);return end
@@ -296,6 +297,73 @@ function M.new()
     end)
     return {},'loading earlier cached messages'
   end
+  -- Dedicated short-lived file connection: no interleaving with MSG/metadata.
+  -- GET each room in round-robin order, merge locally, CAS, retry next cycle.
+  local function sync_close(message)
+    local s=p.file_sync
+    if s then cooloo.net.close(s.conn);p.trust[s.conn]=nil;p.health[s.conn]=nil end
+    p.file_sync=nil
+    if message then p.sync_status=message end
+  end
+  local function sync_event(e)
+    local s=p.file_sync
+    if not s or e.conn~=s.conn then return false end
+    local function request(op,revision,data)
+      s.phase=op;s.result=nil;s.error=nil
+      if not FileSync.request(cooloo.net,s.conn,op,s.path,revision,data) then sync_close('file write queue unavailable') end
+    end
+    if e.type=='net_ready' then
+      if cooloo.net.fp(s.conn)~=s.server then sync_close('file server identity mismatch');return true end
+      s.phase='as';cooloo.net.send(s.conn,'AS '..s.identity..'\n')
+    elseif e.type=='net_tofu' then p.trust[s.conn]=e.fp
+    elseif e.type=='net_closed' then sync_close(e.reason)
+    elseif e.type=='net_line' then
+      local line=e.line
+      if s.phase=='as' then
+        if line=='OK' then request('FGET') elseif line:match('^ERR ') then sync_close(line) end
+      elseif line:match('^ERR ') then
+        if s.phase=='FGET' and line:match('^ERR not%-found ') then
+          request('FPUT',0,ReadState.encode(s.state.watermark))
+        else
+          if line:match('^ERR unknown%-command ') or (s.phase=='FGET' and line:match('^ERR bad%-request ')) then
+            p.sync_disabled=true -- pre-file servers resolve "self" as a message ID
+          end
+          sync_close(line)
+        end
+      elseif line=='END' then
+        local result=s.result
+        if not result or result.path~=s.path then sync_close('invalid file response');return true end
+        if s.phase=='FGET' then
+          local remote=ReadState.decode(result.data)
+          if not remote then sync_close('invalid remote read-state (not overwritten)');return true end
+          local ok,err=s.state:mark(remote)
+          if not ok then state_error(err);sync_close(err);return true end
+          s.room.unread=s.state.unread
+          if s.state.watermark>remote then request('FPUT',result.revision,ReadState.encode(s.state.watermark))
+          else sync_close();p.sync_status=nil end
+        else sync_close();p.sync_status=nil end
+      else s.result=FileSync.parse(line) end
+    end
+    return true
+  end
+  local function sync_tick(now)
+    if p.file_sync then
+      if now>p.file_sync.deadline then sync_close('file sync timeout; retry by GET') end
+      return
+    end
+    if p.sync_disabled or not chat.ctrl_up or not chat.registered or chat.auth_failed or now<(p.sync_at or 0) then return end
+    p.sync_at=now+1
+    local ids={}
+    for id,r in pairs(chat.rooms) do if r.read_state and not r.loading_state and not r.denied then ids[#ids+1]=id end end
+    table.sort(ids);if #ids==0 then return end
+    local id=ids[1]
+    for _,v in ipairs(ids) do if v>(p.sync_last or '') then id=v;break end end
+    p.sync_last=id
+    local r=chat.rooms[id];local c=cooloo.net.connect(chat.host,chat.port)
+    if not c then return end
+    p.file_sync={conn=c,room=r,state=r.read_state,path='rooms/'..id..'/read-state.json',
+      identity=chat.identity(),server=cooloo.net.fp(chat.ctrl),deadline=now+20,phase='connecting'}
+  end
   local function process(e)
     if e.type=='net_closed' then p.health[e.conn]=nil end
     if e.type=='net_ready' then p.health[e.conn]={received=p.clock(),ping_at=p.clock()} end
@@ -303,6 +371,7 @@ function M.new()
       local h=p.health[e.conn];h.received=p.clock()
       if e.line=='PONG' then h.waiting=nil;return end
     end
+    if sync_event(e) then return end
     local s=p.sending
     if s and e.conn==s.conn then
       if e.type=='net_ready' then
@@ -357,6 +426,7 @@ function M.new()
       finish(self.sending.phase=='sent' and 'unknown' or 'rejected','request timed out; no automatic resend')
     end
     local now=self.clock()
+    sync_tick(now)
     if chat.ctrl_up and chat.registered and not chat.read_denied and
         now-(chat.rooms_requested_at or -5)>=5 then chat.refresh_rooms() end
     if chat.rooms_pending and now-(chat.rooms_requested_at or now)>30 then
@@ -406,7 +476,7 @@ function M.new()
       self:schedule()
     end
     local d=self:diagnostics()
-    self.status=(self.read_error or self.history_status or '')..' '..chat.status..
+    self.status=(self.read_error or self.sync_status or self.history_status or '')..' '..chat.status..
       ' | '..d.phase..(d.cache_pending and ' (persisting)' or '')
     if chat.read_denied then self.status=self.status..' | read denied; explicit destination may still allow send' end
     if not chat.registered and chat.ctrl_up then self.status=self.status..' | Workspace: Register' end
@@ -426,6 +496,7 @@ function M.new()
     chat.register(nick);return true
   end
   local function reset()
+    sync_close();p.sync_disabled=nil;p.sync_at=nil;p.sync_last=nil;p.sync_status=nil
     if p.sending then finish(p.sending.phase=='sent' and 'unknown' or 'rejected','connection reset') end
     p.epoch=p.epoch+1;p.jobs={};p.blocked={};p.deferred={};p.trust={};p.health={};p.permissions={};p.history_status=nil
     p.sent_refresh_at=nil
