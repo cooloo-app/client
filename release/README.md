@@ -1,4 +1,4 @@
-# cooloo client 0.3.2 artifacts
+# cooloo client 0.3.4 artifacts
 
 Generated from `manifest.json`; edit the build inputs/report, not this file.
 
@@ -14,16 +14,16 @@ not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 
 | File | Source commit | Build date | Bytes |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | `0f90001bd58808f189068fca1b26d687c2f34676` | 2026-10-20 | 2894424 |
-| `cooloo-windows-x86_64.exe` | `0f90001bd58808f189068fca1b26d687c2f34676` | 2026-10-20 | 5132217 |
-| `cooloo-text-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 2667720 |
-| `cooloo-text-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 4830255 |
-| `cooloo-workbench-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 298784 |
-| `cooloo-workbench-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 647246 |
-| `cooloo-cli-darwin-arm64` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 161848 |
-| `cooloo-cli-windows-x86_64.exe` | `0149d964c09708dfaa17cf5a2328990db3f19024` | 2026-10-20 | 606172 |
+| `cooloo-darwin-arm64` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 2911048 |
+| `cooloo-windows-x86_64.exe` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 5152834 |
+| `cooloo-text-darwin-arm64` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 2667768 |
+| `cooloo-text-windows-x86_64.exe` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 4830851 |
+| `cooloo-workbench-darwin-arm64` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 315296 |
+| `cooloo-workbench-windows-x86_64.exe` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 660046 |
+| `cooloo-cli-darwin-arm64` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 161912 |
+| `cooloo-cli-windows-x86_64.exe` | `ed1f67cafe810d9ee79ec8d204875b59ce3e070a` | 2026-10-21 | 607249 |
 
-Mixed source revisions: each artifact retains its own provenance.
+All artifacts use the same source revision.
 
 SHA-256 values and toolchain details are in `manifest.json`; `SHA256SUMS`
 is derived from it. This development refresh does not create a tag,
