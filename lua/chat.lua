@@ -305,8 +305,10 @@ function M.on_line(conn, line)
             if not s.room.sent_ends[key] then
                 s.room.sent_ends[key] = true
                 s.room.revision=(s.room.revision or 0)+1
-                table.insert(s.room.buf, {id=msg.id,endoff=h.endoff, ts=msg.ts, from=msg.from,
-                    nick=msg.from, text=msg.content, to=msg.to, sent=true})
+                local added={id=msg.id,endoff=h.endoff, ts=msg.ts, from=msg.from,
+                    nick=msg.from, text=msg.content, to=msg.to, sent=true}
+                table.insert(s.room.buf, added)
+                if M.sent_added then M.sent_added(s.room,added) end
                 table.sort(s.room.buf, function(a,b)
                     if a.ts ~= b.ts then return a.ts < b.ts end
                     if (a.to or s.room.name) ~= (b.to or s.room.name) then

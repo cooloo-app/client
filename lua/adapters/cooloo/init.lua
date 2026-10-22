@@ -28,10 +28,14 @@ function M.new()
     if not id then callback(false,{},-1);return false,err end
     p.jobs[id]={epoch=p.epoch,callback=callback};return true
   end
+  local threadcache=require('adapters.cooloo.threadcache').new(chat,job,cooloo.record)
+  function p:thread_index(id) return threadcache:get(id) end
+  chat.sent_added=function(r,m) threadcache:add(r.name,m) end
   local function state_error(err)
     p.read_error='Read state: '..tostring(err)
   end
   chat.message_added=function(r,m)
+    threadcache:add(r.name,m)
     r.model_at=p.clock()
     local s=r.read_state
     if s and s:observe(m.endoff,m.from,chat.identity()) and r.following and not r.loading_state then
@@ -251,7 +255,7 @@ function M.new()
   function p:open(id)
     local r=chat.rooms[id];local messages={}
     for _,m in ipairs(r and r.buf or {}) do
-      messages[#messages+1]={id=m.id,message_id=m.id,cursor=m.endoff,source=m.to or id,from=m.nick,sender_id=m.from,text=m.text,ts=m.ts}
+      messages[#messages+1]=threadcache:message(id,m)
     end
     return messages
   end
@@ -421,7 +425,7 @@ function M.new()
         job('generation',room,0,generation,function(ok,_,changed)
           if room.conn~=e.conn then return end
           if not ok then wait.done(false,{},-1);return end
-          if changed==1 then room.buf={};room.ends={};room.newest_end=0;room.read_state=nil;room.revision=(room.revision or 0)+1 end
+          if changed==1 then threadcache:reset(room.name);room.buf={};room.ends={};room.newest_end=0;room.read_state=nil;room.revision=(room.revision or 0)+1 end
           load_cache(room,wait.done)
         end)
       elseif e.line:match('^ERR unknown%-command ') then
@@ -559,6 +563,7 @@ function M.new()
     chat.register(nick);return true
   end
   local function reset()
+    threadcache:reset()
     sync_close();p.sync_disabled=nil;p.sync_at=nil;p.sync_last=nil;p.sync_status=nil
     if p.sending then finish(p.sending.phase=='sent' and 'unknown' or 'rejected','connection reset') end
     p.epoch=p.epoch+1;p.jobs={};p.blocked={};p.deferred={};p.trust={};p.health={};p.permissions={};p.history_status=nil

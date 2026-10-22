@@ -183,6 +183,49 @@ function M.install(provider)
       core.log('%s',status or (ok and 'sent' or 'send failed'))
     end,
   })
+  -- Capture UUID before the palette takes focus; never retain a line number.
+  local reply_target
+  local function capture_reply()
+    local id=active_room()
+    local view=core.active_view
+    if not id or not view.history or view.pane~=view.history then return end
+    local a,_,b=view.doc:get_selection(true)
+    local range=require('workbench.threads').at(view.doc.ranges,a,b)
+    return {room=id,id=range and range.id,view=view,raw=range and range.raw}
+  end
+  local find_command=command.map['core:find-command'].perform
+  command.map['core:find-command'].perform=function()
+    reply_target=capture_reply();find_command()
+    local state=core.command_view.state
+    local submit,cancel=state.submit,state.cancel
+    state.submit=function(...)
+      submit(...);reply_target=nil
+    end
+    state.cancel=function(...)
+      reply_target=nil;cancel(...)
+    end
+  end
+  command.add(function()
+    local view=core.active_view
+    return (active_room() and view.history and view.pane==view.history)
+      or (view==core.command_view and reply_target~=nil)
+  end,{
+    ['chat:reply-in-thread']=function()
+      local target=reply_target or capture_reply();reply_target=nil
+      if not target or not target.id then core.error('请选定一条消息');return end
+      local ok,err=workspace:reply(target.room,target.id,function()
+        return system.show_confirm_dialog('切换回复目标','保留草稿正文并切换到另一个讨论？')
+      end)
+      if ok then target.view:focus(target.view.input);core.set_active_view(target.view)
+      else core.error('%s',err) end
+    end,
+    ['chat:copy-message-source']=function()
+      local target=reply_target or capture_reply();reply_target=nil
+      if target and target.raw then system.set_clipboard(target.raw)
+      else core.error('请选定一条消息') end
+    end,
+  })
+  keymap.add{['alt+r']='chat:reply-in-thread'}
   command.add(nil,{
     ['workspace:switch']=function()
       core.command_view:enter('Conversation',function(_,item) if item then select_room(item.id) end end,

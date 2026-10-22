@@ -6,7 +6,7 @@ assert(p.text=='00:00  sender\n中文\nsecond\n\n00:01  other\nhello\n')
 assert(p.anchors.a==1 and p.anchors.b==5 and p.ranges[1].last_line==3)
 assert(p.source_revision=='r')
 assert(project({}).text=='')
-assert(not pcall(project,{{id='x',text='a'},{id='x',text='b'}}))
+assert(#project({{id='x',text='a'},{id='x',text='a'}}).ranges==1) -- UUID backfill dedup
 assert(not pcall(project,{{id='x',text='\255'}}))
 local stopped={}
 local results={}

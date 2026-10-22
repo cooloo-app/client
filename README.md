@@ -123,7 +123,10 @@ commands below are available only in the full workbench, not `cooloo-text`:
 
 - Ctrl+Shift+P: command palette; Ctrl+O/N/S/F: open/new/save/find.
 - Alt+Shift+J/L/I/K: split left/right/up/down; Ctrl+Tab: next tab.
-- Ctrl+Enter in a message draft: send; elsewhere it does not send hidden drafts.
+- Ctrl+Enter in a message draft: send after stripping leading/trailing whitespace
+  and blank lines; internal formatting is preserved. Elsewhere it does not send hidden drafts.
+- Alt+R / `Chat: Reply In Thread` on a history message: reply in a flat thread,
+  in rooms or private inboxes. See [thread behavior and validation](docs/THREADS.md).
 - F5: save and run the current named Lua file in a new child VM.
 - Ctrl+backtick: Lua console output/input split; Ctrl+Enter submits multiline input.
 - Alt+Up/Down in console input: history. `Console: Stop File`, `Stop Session`,

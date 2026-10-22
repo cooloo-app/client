@@ -1,24 +1,34 @@
 -- Headless message projection. No editor, renderer, network or identity access.
 local M = {}
+local Threads = require 'workbench.threads'
 function M.project(messages, options)
   options = options or {}
   local lines, anchors, ranges, headers, line = {}, {}, {}, {}, 1
-  for _, m in ipairs(messages) do
+  local decorations={}
+  local entries,index=Threads.project(messages,options.thread_index)
+  for i, entry in ipairs(entries) do
+    local m=entry.message
     assert(type(m.id)=='string' and not anchors[m.id], 'missing or duplicate message ID')
     assert(type(m.text)=='string' and utf8.len(m.text), 'invalid UTF-8 message')
     local stamp = assert(os.date(options.local_time and '%H:%M' or '!%H:%M', m.ts or 0))
     local name = (m.from or '?'):gsub('[%c]', ' ')
-    local block = ('%s  %s\n%s\n'):format(stamp, name, m.text)
+    local _,body=Threads.parse(m.text)
+    if entry.problem then body='['..entry.problem..']\n'..body end
+    if i>1 and not entry.reply then lines[#lines+1]='\n';line=line+1 end
+    local block = ('%s  %s\n%s\n'):format(stamp, name, body)
     headers[line] = {first= #stamp+3, last= #stamp+3+#name,
       sender=m.sender_id or m.from or '?'}
     lines[#lines+1] = block
     anchors[m.id] = line
     local _, count = block:gsub('\n', '')
-    ranges[#ranges+1] = {id=m.id, first_line=line, last_line=line+count-1}
-    line = line + count + 1
+    ranges[#ranges+1] = {id=m.id, first_line=line, last_line=line+count-1, raw=m.text}
+    if entry.reply then
+      for l=line,line+count-1 do decorations[l]=true end
+    end
+    line = line + count
   end
-  return {text=table.concat(lines, '\n'), anchors=anchors, ranges=ranges, headers=headers,
-    source_revision=options.source_revision}
+  return {text=table.concat(lines), anchors=anchors, ranges=ranges, headers=headers,
+    decorations=decorations,thread_index=index,source_revision=options.source_revision}
 end
 -- Decoder is injected so the CLI and native GUI use the same C record parser.
 -- IDs are source byte endpoints, not display line numbers. Input is never executed.

@@ -143,4 +143,43 @@ for _,text in ipairs({'no newline','one\ntwo\n','中文\r\n尾',''}) do
   f=assert(io.open(tmp,'rb'));assert(f:read('*a')==text);f:close()
 end
 os.remove(tmp)
-print('workbench: readonly, virtual, local provider, console buffer, wrap, composition and input passed')
+-- Thread decoration uses source coordinates: guide is not copied, wrapped
+-- rows resolve clicks back to the same message, and scroll follows UUID.
+local Threads=require 'workbench.threads'
+local rid='550e8400e29b41d4a716446655440000'
+local bid='550e8400e29b41d4a716446655440001'
+local fixture={{id=rid,from='A',text='root',ts=0},
+ {id=bid,from='B',text=Threads.header(rid,string.rep('中文 reply ',30)),ts=1}}
+local fp={open=function()return fixture end,send=function()return true end}
+local fw=require('plugins.workspace.model').new(fp)
+local hd,dd=fw:select('r')
+local hv=require('plugins.workspace.historyview')(hd);hv.size.x=160;hv.size.y=100
+hv:layout();assert(#hv.rows>#hd.lines)
+local line=hd.anchors[bid]
+local x,y=hv:get_line_screen_position(line)
+local resolved,col=hv:resolve_screen_position(x,y+hv:get_line_height()/2)
+assert(resolved==line and col==1)
+assert(not table.concat(hd.lines):find('│',1,true))
+assert(fw:reply('r',bid));assert(dd.lines[1]=='@thread/1 msg:'..rid..'\n')
+dd:undo();assert(dd.lines[1]=='\n','reply header must be undoable')
+hv.follow=false;hv.scroll.y=(hv.line_rows[line]-1)*hv:get_line_height();hv.scroll.to.y=hv.scroll.y
+local before=hd.anchors[bid]
+table.insert(fixture,1,{id='older',from='old',text='older',ts=0})
+fw:refresh();hv:layout()
+assert(hd.anchors[bid]>before)
+assert(hv.rows[math.floor(hv.scroll.y/hv:get_line_height())+1].line==hd.anchors[bid])
+-- Actual command palette freezes target UUID before any projection change.
+core.set_active_view(chat);chat:focus(chat.history)
+chat.history.doc.ranges={{id=rid,first_line=1,last_line=1,raw='raw'}}
+chat.history.doc:set_selection(1,1)
+assert(command.perform('core:find-command'))
+local found=false
+for _,item in ipairs(core.command_view.suggestions) do
+ if item.command=='chat:reply-in-thread' then found=true end
+end
+-- Suggestions are bounded; use the actual palette search.
+core.command_view:set_text('Chat: Reply In Thread');core.command_view:update_suggestions()
+assert(core.command_view.suggestions[1].command=='chat:reply-in-thread')
+core.command_view:exit(false)
+assert(keymap.get_binding('chat:reply-in-thread')=='alt+r')
+print('workbench: readonly, wrap, composition, thread geometry/undo/UUID scroll/palette passed')

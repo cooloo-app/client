@@ -204,6 +204,8 @@ $(BUILD)/file-write-test.exe: tests/file_write_test.c src/platform/api/file.c sr
 
 # Deliberately no GUI, SDL dummy, rendering or desktop tests in this target.
 test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner
+	$(BUILD)/lua-runner --lua-run tests/threads.lua
+	$(BUILD)/lua-runner --lua-run tests/workspace_models.lua
 	$(BUILD)/lua-runner --lua-run tests/folder_sync.lua
 	$(BUILD)/lua-runner --lua-run tests/workbench_headless.lua
 	$(BUILD)/lua-runner --lua-run tests/readstate.lua
