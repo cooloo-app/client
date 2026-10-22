@@ -18,6 +18,7 @@
 #include "net.h"
 #include "config.h"
 #include "record.h"
+#include "message_id.h"
 #include "noise_xx.h"
 #ifdef COOLOO_WORKBENCH
 #include "cache.h"
@@ -523,11 +524,14 @@ static int l_public_id(lua_State *l)
     for (i = 0; i < 32; i++) sprintf(id + i * 2, "%02x", pk[i]);
     lua_pushstring(l, id); return 1;
 }
+static int l_message_id(lua_State *l)
+{ char id[33];if(message_id_generate(id))return luaL_error(l,"secure random unavailable");lua_pushstring(l,id);return 1; }
 static int l_record(lua_State *l)
 {
     struct record r;
     if (record_parse(luaL_checkstring(l, 1), &r)) { lua_pushnil(l); return 1; }
     lua_newtable(l);
+    lua_pushstring(l, r.id); lua_setfield(l, -2, "id");
     lua_pushinteger(l, r.ts); lua_setfield(l, -2, "ts");
     lua_pushstring(l, r.from); lua_setfield(l, -2, "from");
     lua_pushstring(l, r.to); lua_setfield(l, -2, "to");
@@ -594,6 +598,7 @@ static void register_api(void)
         { "identity_fp", l_identity_fp },
         { "public_id", l_public_id },
         { "record", l_record },
+        { "message_id", l_message_id },
         { "cache_offset", l_cache_offset },
         { "cache_read", l_cache_read },
         { "cache_meta", l_cache_meta },

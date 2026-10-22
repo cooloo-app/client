@@ -1,6 +1,7 @@
 #define _DARWIN_C_SOURCE 1
 #define _POSIX_C_SOURCE 200809L
 #include "record.h"
+#include "message_id.h"
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
@@ -73,7 +74,8 @@ int record_parse(const char *p,struct record *r)
     errno=0;r->ts=strtoll(p,&e,10);if(errno||e==p||r->ts<0)return -1;p=e;
     if(literal(&p,",\"from\":")||string(&p,r->from,sizeof r->from)||!id(r->from)||
        literal(&p,",\"to\":")||string(&p,r->to,sizeof r->to)||!id(r->to)||
-       literal(&p,",\"content\":")||string(&p,r->content,sizeof r->content)||strcmp(p,"}"))return -1;
+       literal(&p,",\"content\":")||string(&p,r->content,sizeof r->content)||
+       literal(&p,",\"id\":")||string(&p,r->id,sizeof r->id)||!message_id_valid(r->id)||strcmp(p,"}"))return -1;
     return 0;
 }
 #ifndef COOLOO_RECORD_ONLY
@@ -165,10 +167,11 @@ int cache_generation(const char *server,const char *self,const char *room,const 
     f=open_cache(server,self,room,NULL,NULL);if(!f)return -1;
     g=fopen(marker,"rb");if(g){size_t n=fread(old,1,65,g);fclose(g);if(n!=64||!id(old))goto done;}
     else if(errno!=ENOENT)goto done;
-    changed=old[0]&&strcmp(old,generation);
+    /* Missing epoch on legacy caches is also a reset, never trust old offsets. */
+    changed=!old[0] || strcmp(old,generation);
     if(changed){
         char archive[1500];char bytes[8192];size_t n;
-        snprintf(archive,sizeof archive,"%s.%s",p,old);
+        snprintf(archive,sizeof archive,"%s.%s",p,old[0]?old:"pre-uuid");
         g=fopen(archive,"rb");
         if(g)fclose(g); /* Preserve the first archive on retry after interrupted reset. */
         else {

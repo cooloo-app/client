@@ -272,7 +272,7 @@ The [Python SDK](https://github.com/cooloo-app/python-sdk) wraps this executable
 platform wheels containing the GUI+CLI binary; it does not reimplement the Native protocol.
 
 
-Requires a protocol-2 server. Production uses Protocol 2; the new simple private
+Requires a Protocol 3 server (UUIDv4 messages); older servers are rejected. The simple private
 room commands require server v0.2.1 or later. No old config/history migration
 is provided.
 
@@ -292,7 +292,7 @@ cooloo identity                      # actual login and effective message identi
 cooloo rooms
 cooloo meta <id-or-alias>
 cooloo rename <id-or-alias> <nickname>
-cooloo send <id-or-alias> [text...]     # stdin preserves exact bytes
+cooloo send <id-or-alias> [--message-id <uuid>] [text...] # exact stdin; reuse UUID for explicit retry
 cooloo read [--raw] <id-or-alias> <offset>
 cooloo follow <id-or-alias>            # durable catch-up then live stream
 cooloo delegate <child-id> read|write|read,write|none # parent's access TO ordinary child

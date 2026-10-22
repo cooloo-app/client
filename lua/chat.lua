@@ -163,11 +163,11 @@ function M.ensure_conns()
     if M.rooms_loaded then M.start_follows() end
 end
 
-local function add_msg(r, endoff, ts, nick, text, from)
+local function add_msg(r, endoff, ts, nick, text, from, message_id)
     if r.ends[endoff] then return end           -- dedupe (backfill overlap)
     r.ends[endoff] = true
     r.revision=(r.revision or 0)+1
-    local m = { endoff = endoff, ts = ts, nick = nick, text = text, from=from }
+    local m = { id=message_id, endoff = endoff, ts = ts, nick = nick, text = text, from=from }
     local i = #r.buf + 1
     if r.name == M.identity() then
         local lo,hi=1,#r.buf
@@ -246,7 +246,7 @@ function M.ready_identity(conn, nick)
                 for _,v in ipairs(records) do
                     local msg=cooloo.record(v.json)
                     if msg then
-                        add_msg(r,v.offset,msg.ts,(M.names or {})[msg.from] or msg.from,msg.content,msg.from)
+                        add_msg(r,v.offset,msg.ts,(M.names or {})[msg.from] or msg.from,msg.content,msg.from,msg.id)
                     end
                 end
             end
@@ -257,7 +257,7 @@ function M.ready_identity(conn, nick)
         local ok = cooloo.cache_read(r.server_fp, r.self_id, r.name, function(endoff, json)
             local msg = cooloo.record(json)
             if msg then
-                add_msg(r, endoff, msg.ts, (M.names or {})[msg.from] or msg.from, msg.content,msg.from)
+                add_msg(r, endoff, msg.ts, (M.names or {})[msg.from] or msg.from, msg.content,msg.from,msg.id)
             end
         end)
         offset = cooloo.cache_offset(r.server_fp, r.self_id, r.name)
@@ -305,7 +305,7 @@ function M.on_line(conn, line)
             if not s.room.sent_ends[key] then
                 s.room.sent_ends[key] = true
                 s.room.revision=(s.room.revision or 0)+1
-                table.insert(s.room.buf, {endoff=h.endoff, ts=msg.ts, from=msg.from,
+                table.insert(s.room.buf, {id=msg.id,endoff=h.endoff, ts=msg.ts, from=msg.from,
                     nick=msg.from, text=msg.content, to=msg.to, sent=true})
                 table.sort(s.room.buf, function(a,b)
                     if a.ts ~= b.ts then return a.ts < b.ts end
@@ -421,7 +421,7 @@ function M.on_line(conn, line)
             M.names[msg.from] = msg.from
             cooloo.net.send(M.ctrl, "META " .. msg.from .. "\n")
         end
-        add_msg(r, h.endoff, msg.ts, M.names[msg.from], msg.content,msg.from)
+        add_msg(r, h.endoff, msg.ts, M.names[msg.from], msg.content,msg.from,msg.id)
         if r.following and r.name == M.identity() then M.fetch_sent(r) end
         end
         if M.persist then M.persist(r,h.endoff,line,persisted)
@@ -519,7 +519,7 @@ function M.send_text(text)
     if not r or not M.ctrl_up or not M.registered or text == "" then
         return false
     end
-    return cooloo.net.send(M.ctrl, ("SEND %s %d\n"):format(r.name, #text) .. text)
+    return cooloo.net.send(M.ctrl, ("SEND %s %s %d\n"):format(r.name, cooloo.message_id(), #text) .. text)
 end
 
 function M.scroll(r, dlines)

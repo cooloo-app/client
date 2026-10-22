@@ -2,6 +2,7 @@
 local sent, cached = {}, {}
 local A, R = string.rep('a',64), string.rep('b',64)
 cooloo = {
+    message_id=function()return '550e8400e29b41d4a716446655440000' end,
     time = function() return 0 end,
     config={get=function()end,set=function()return true end},
     public_id=function()return A end,
@@ -57,7 +58,7 @@ assert(sent[#sent]=='ROOMS\n' and chat.ctrl_up)
 chat.on_line(2,'ROOM '..R..' delegated-room')
 chat.sel=R
 assert(chat.send_text('as owner'))
-assert(sent[#sent]=='SEND '..R..' 8\nas owner')
+assert(sent[#sent]=='SEND '..R..' '..cooloo.message_id()..' 8\nas owner')
 assert(chat.identity()==owner)
 -- Denied AS never silently falls back to B.
 assert(chat.use_identity(owner))

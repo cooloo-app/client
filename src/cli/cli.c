@@ -6,6 +6,7 @@
 #include "cli.h"
 #include "config.h"
 #include "record.h"
+#include "message_id.h"
 #include "machine.h"
 #include "win_console.h"
 #include <errno.h>
@@ -160,7 +161,11 @@ out:net_close(&c);return rc;
 }
 int cooloo_cli_send(int argc,char **argv)
 {
-    netconn c;char self[65],text[4097],line[512];size_t n=0;int i,rc=1;
+    netconn c;char self[65],text[4097],line[512],uuid[33];size_t n=0;int i,rc=1;
+    if(argc>=5 && !strcmp(argv[3],"--message-id")) {
+        if(!message_id_valid(argv[4]))return 2;
+        strcpy(uuid,argv[4]);for(i=3;i<argc-2;i++)argv[i]=argv[i+2];argc-=2;
+    } else if(message_id_generate(uuid))return 1;
     if(argc<3||strlen(argv[2])>68||strpbrk(argv[2]," \r\n"))return 2;
     if(argc==3){
         if(cooloo_console_input_is_terminal() && !cooloo_console_can_read())return 1;
@@ -173,7 +178,10 @@ int cooloo_cli_send(int argc,char **argv)
     }
     if(!n||n>4096||memchr(text,0,n))return 2;
     if(connect_client(&c,self))return 1;
-    snprintf(line,sizeof line,"SEND %s %zu\n",argv[2],n);
+    if(cooloo_machine)printf("{\"schema\":1,\"type\":\"sending\",\"message_id\":\"%s\"}\n",uuid);
+    else fprintf(stderr,"message_id=%s\n",uuid);
+    fflush(stdout);
+    snprintf(line,sizeof line,"SEND %s %s %zu\n",argv[2],uuid,n);
     if(!net_send_line(&c,line)&&!net_send(&c,text,n)&&!net_read_line(&c,line,sizeof line)){
         if(cooloo_machine)rc=machine_response("SEND",line);else{puts(line);rc=strncmp(line,"OK ",3)!=0;}
     }else if(cooloo_machine)machine_error("send-outcome-unknown","connection lost before send acknowledgement");

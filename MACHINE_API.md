@@ -3,7 +3,7 @@
 Opt in with `cooloo --json <command>`. Existing human output and `read --raw` remain
 available. This is an output adapter around the existing C Native client, not a new
 server protocol or long-running RPC service. This source requires the matching
-pure-mirror server with IDENTITY support. Default operations use the parent for
+Protocol 3 server with UUIDv4 SEND and IDENTITY support. Default operations use the parent for
 mirror credentials; WHOAMI remains the actual login identity.
 
 ## Invocation
@@ -37,15 +37,25 @@ external termination and broken output pipes may have no error event.
 | identity | result: authenticated_id, effective_id |
 | meta id | result: id, kind, owner ("-" if none), slot (integer), nickname |
 | rename / room-mode / delegate / detach | result |
-| send / join | result: end_offset |
+| send / join | sending(message_id), then result(end_offset,message_id,ts) or error |
 | rooms | room(id,nickname)* then end |
 | read id offset | message* then end(next_offset) |
 | follow id offset | message* until failure/cancellation, no normal end |
 | sent peer offset | message* then end(scan_offset), including empty matches |
 
-Message: `{"schema":1,"type":"message","end_offset":123,"message":{"ts":1,"from":"...","to":"...","content":"..."}}`.
+Message: `{"schema":1,"type":"message","end_offset":123,"message":{"ts":1,"from":"...","to":"...","content":"...","id":"550e8400e29b41d4a716446655440000"}}`.
 Error: `{"schema":1,"type":"error","code":"forbidden","message":"..."}`.
 Machine history/chat/help are not supported. Use ordinary help for human documentation.
+
+## Stable IDs and explicit retry
+
+`send <destination> [--message-id <32-lowercase-hex-UUIDv4>] [text...]` generates
+an OS-random ID if omitted. Persist a caller-supplied ID before launching CLI when
+recovery across process loss is required. The nonterminal `sending` event flushes
+before transmission; it is not a delivery result. Successful ACK includes original
+server timestamp and actual cursor. Reuse the ID only with the same effective
+identity, canonical destination and exact body. Changed content is a new send.
+`id-conflict` and `duplicate-content` are explicit rejections. No automatic retry.
 
 ## Cursors and failures
 
@@ -70,4 +80,5 @@ Python deadlines control subprocess lifetime; the blocking native CLI itself has
 network deadline flag. FOLLOW may close on the server idle timeout.
 
 See python-sdk repository for subprocess API and wheel distribution. Client version alone
-does not establish remote server feature support. No wire format/server changes required.
+does not establish remote server feature support. This breaking upgrade requires
+Protocol 3; old greetings and old records are rejected.

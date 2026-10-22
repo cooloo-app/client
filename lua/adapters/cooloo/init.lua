@@ -251,13 +251,17 @@ function M.new()
   function p:open(id)
     local r=chat.rooms[id];local messages={}
     for _,m in ipairs(r and r.buf or {}) do
-      messages[#messages+1]={id=(m.to or id)..':'..tostring(m.endoff),from=m.nick,sender_id=m.from,text=m.text,ts=m.ts}
+      messages[#messages+1]={id=m.id,message_id=m.id,cursor=m.endoff,source=m.to or id,from=m.nick,sender_id=m.from,text=m.text,ts=m.ts}
     end
     return messages
   end
   local function finish(state,detail)
     local s=p.sending;if not s then return end
-    p.deliveries[s.room]={state=state,detail=detail,text=s.text}
+    p.deliveries[s.room]={state=state,detail=detail,text=s.text,message_id=s.uuid}
+    if state=='sent' and s.path then
+      local ok=system.write_file(s.path,'')
+      if not ok then p.deliveries[s.room].detail=detail..'; pending cleanup failed (retry remains idempotent)' end
+    end
     if s.conn then cooloo.net.close(s.conn);p.trust[s.conn]=nil end
     p.sending=nil
   end
@@ -266,10 +270,23 @@ function M.new()
     local caps=self:capabilities(id)
     if not caps.can_send then return false,caps.reason or 'send unavailable' end
     if #text==0 or #text>4096 or text:find('%z') or not utf8.len(text) then return false,'message must contain 1..4096 UTF-8 bytes without NUL' end
-    local c,err=cooloo.net.connect(chat.host,chat.port)
+    local root,err=self:directory(id)
+    if not root then return false,err end
+    local path=root..'/pending-message-v1';local previous,readerr,code=system.read_file(path)
+    if not previous and code~=2 then return false,readerr end
+    local uuid,identity,target,body
+    if previous and previous~='' then
+      uuid,identity,target,body=previous:match('^([0-9a-f]+)\n([0-9a-f]+)\n([0-9a-f]+)\n(.*)$')
+      if not uuid or #uuid~=32 then return false,'invalid persisted pending message; manual recovery required' end
+      if identity~=chat.identity() or target~=id or body~=text then uuid=nil end
+    end
+    uuid=uuid or cooloo.message_id()
+    local ok,why=system.write_file(path,uuid..'\n'..chat.identity()..'\n'..id..'\n'..text)
+    if not ok then return false,why end
+    local c; c,err=cooloo.net.connect(chat.host,chat.port)
     if not c then return false,err end
-    self.sending={conn=c,room=id,text=text,phase='connecting',deadline=self.clock()+20}
-    self.deliveries[id]={state='pending',detail='connecting; not delivered',text=text}
+    self.sending={conn=c,room=id,text=text,uuid=uuid,path=path,phase='connecting',deadline=self.clock()+20}
+    self.deliveries[id]={state='pending',detail='connecting; not delivered',text=text,message_id=uuid}
     return true,'pending; draft retained until acknowledgment'
   end
   function p:delivery(id) return self.deliveries[id] end
@@ -290,7 +307,7 @@ function M.new()
       for _,v in ipairs(records) do
         local m=cooloo.record(v.json)
         if m and not r.ends[v.offset] then
-          all[#all+1]={endoff=v.offset,ts=m.ts,nick=(chat.names or {})[m.from] or m.from,from=m.from,text=m.content}
+          all[#all+1]={id=m.id,endoff=v.offset,ts=m.ts,nick=(chat.names or {})[m.from] or m.from,from=m.from,text=m.content}
           r.ends[v.offset]=true
         end
       end
@@ -419,7 +436,7 @@ function M.new()
         s.phase='as';cooloo.net.send(s.conn,'AS '..chat.identity()..'\n')
       elseif e.type=='net_line' then
         if s.phase=='as' and e.line=='OK' then s.phase='ready'
-        elseif s.phase=='sent' and e.line:match('^OK %d+$') then
+        elseif s.phase=='sent' and e.line:match('^OK %d+ '..s.uuid..' %d+$') then
           p.permissions[s.room]={write_verified=true};finish('sent',e.line)
         elseif e.line:match('^ERR ') then
           if e.line:match('^ERR forbidden') then p.permissions[s.room]={write_denied=true,reason=e.line} end
@@ -429,7 +446,7 @@ function M.new()
       elseif e.type=='net_tofu' then p.trust[e.conn]=e.fp end
       if p.sending and s.phase=='ready' then
         s.phase='sent'
-        if not cooloo.net.send(s.conn,('SEND %s %d\n'):format(s.room,#s.text)..s.text) then
+        if not cooloo.net.send(s.conn,('SEND %s %s %d\n'):format(s.room,s.uuid,#s.text)..s.text) then
           finish('unknown','transport write failed; do not blindly retry')
         end
       end

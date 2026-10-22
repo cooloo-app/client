@@ -182,8 +182,8 @@ end
             p=run([gui_binary,'--gui','--debug','--lua-dev',locked_dev],env)
             assert 'LOCKED_CACHE_UI_ALIVE' in p.stdout and time.monotonic()-started<5
         # Page a large on-disk history without projecting its full size or rescanning in UI.
-        record=json.dumps(dict(ts=1,**{'from':identity,'to':identity},content='bulk'),separators=(',',':'))+'\n'
-        cache.write_text(record*12000)
+        record=json.dumps(dict(ts=1,**{'from':identity,'to':identity},content='bulk',id='550e8400e29b41d4a716446655440000'),separators=(',',':'))+'\n'
+        cache.write_text(''.join(record.replace('550e8400e29b41d4a716446655440000',f'{i:012x}41d4a716446655440000') for i in range(12000)))
         history_dev=base/'history-dev';history_dev.mkdir()
         run(['python3',root/'tools/embed_workbench.py',history_dev/'workbench.lua','--lua'],env)
         with (history_dev/'workbench.lua').open('a') as f:

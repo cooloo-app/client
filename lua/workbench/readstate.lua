@@ -40,9 +40,9 @@ function M.new(path,write)
     if self.generation==generation then return true end
     local previous=self.generation
     self.generation=generation
-    local ok,err=self:save(previous and 0 or self.watermark,self.muted)
+    local ok,err=self:save(0,self.muted)
     if not ok then self.generation=previous;return false,err end
-    if previous then self.pending={};self.unread=0 end
+    self.pending={};self.unread=0
     return true
   end
   function s:baseline(checkpoint)

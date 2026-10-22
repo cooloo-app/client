@@ -1,5 +1,6 @@
 """CLI + native daemon + forced-command gate + exact cache interoperability."""
 import json
+import uuid
 import os
 from pathlib import Path
 import socket
@@ -22,6 +23,8 @@ with tempfile.TemporaryDirectory(prefix='cooloo-client2-') as tmp:
         assert (p.returncode == 0) == ok, (args, p.stdout, p.stderr, p.returncode)
         return p.stdout
     def gate(user_id, command, input=None, ok=True):
+        if command.startswith('send '):
+            parts=command.split(' ',2);command=' '.join(parts[:2])+ ' '+uuid.uuid4().hex+(' '+parts[2] if len(parts)>2 else '')
         p = subprocess.run([str(server / 'cooloo'), '__gate', user_id], env=dict(env, SSH_ORIGINAL_COMMAND=command), input=input, text=True, capture_output=True, timeout=10)
         assert (p.returncode == 0) == ok, (command, p.stdout, p.stderr)
         return p.stdout

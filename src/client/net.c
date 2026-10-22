@@ -166,7 +166,7 @@ static int read_greeting(netconn *c, char *errbuf, size_t errcap)
         snprintf(errbuf, errcap, "no greeting from server");
         return -1;
     }
-    if (strncmp(line, "COOLOO 2 ", 9) != 0) {
+    if (strncmp(line, "COOLOO 3 ", 9) != 0) {
         snprintf(errbuf, errcap, "bad greeting: %s", line);
         return -1;
     }
@@ -627,7 +627,7 @@ int net_async_pump(net_async *a)
             a->stall_ticks = 0;
         if (!net_try_line(c, line, sizeof line))
             return 0;
-        if (strncmp(line, "COOLOO 2 ", 9) != 0) {
+        if (strncmp(line, "COOLOO 3 ", 9) != 0) {
             snprintf(a->err, sizeof a->err, "bad greeting: %.64s", line);
             a->state = NAS_FAILED;
             return -1;

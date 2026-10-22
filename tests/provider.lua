@@ -14,10 +14,11 @@ io.open=function(path,mode)
  end
  return original_open(path,mode)
 end
-system={write_file=function(path,value)state_files[path]=value;return true end}
+system={write_file=function(path,value)state_files[path]=value;return true end,
+ read_file=function(path)if state_files[path]~=nil then return state_files[path] end;return nil,'missing',2 end}
 local sender=A
 local conns,writes,jobs,results={},{},{},{}
-cooloo={public_id=function()return A end,ensure_identity=function()return true end,server=function()return 'localhost',4222 end,
+cooloo={message_id=function()return '550e8400e29b41d4a716446655440000' end,public_id=function()return A end,ensure_identity=function()return true end,server=function()return 'localhost',4222 end,
  time=function()return time end,config={get=function()end,set=function()return true end},
  net={connect=function()
    local count=0;for _ in pairs(conns)do count=count+1 end
@@ -114,10 +115,10 @@ event('net_line',c,'END');sender=A
 -- A dedicated send stream cannot consume unrelated ctrl ERR as an ACK.
 assert(p:send(R,'/as '..B));local send=p.sending.conn
 event('net_ready',send)
-assert(writes[#writes].s=='SEND '..R..' 68\n/as '..B)
+assert(writes[#writes].s=='SEND '..R..' '..cooloo.message_id()..' 68\n/as '..B)
 event('net_line',chat.ctrl,'ERR internal unrelated metadata')
 assert(p:delivery(R).state=='pending')
-event('net_line',send,'OK 300');assert(p:delivery(R).state=='sent' and chat.identity()==A)
+event('net_line',send,'OK 300 '..cooloo.message_id()..' 1');assert(p:delivery(R).state=='sent' and chat.identity()==A)
 assert(p:send(R,'uncertain'));send=p.sending.conn;event('net_ready',send);event('net_closed',send)
 assert(p:delivery(R).state=='unknown')
 assert(p:send(R,'denied'));send=p.sending.conn;event('net_ready',send);event('net_line',send,'ERR forbidden read-only grant')

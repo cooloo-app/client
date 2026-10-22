@@ -1,4 +1,5 @@
 #include "machine.h"
+#include "message_id.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,6 +55,10 @@ int machine_response(const char *command,const char *line)
     if(!strncmp(line,"ERR ",4))return machine_server_error(line);
     if(!strcmp(line,"OK")){puts("{\"schema\":1,\"type\":\"result\"}");return 0;}
     if(!strncmp(line,"OK ",3)) {
+        char uuid[33];long long ts,offset;int used=0;
+        if(sscanf(line,"OK %lld %32s %lld%n",&offset,uuid,&ts,&used)==3 && !line[used] && offset>=0 && ts>=0 && message_id_valid(uuid)) {
+            printf("{\"schema\":1,\"type\":\"result\",\"end_offset\":%lld,\"message_id\":\"%s\",\"ts\":%lld}\n",offset,uuid,ts);return 0;
+        }
         char *end;long long off;errno=0;off=strtoll(line+3,&end,10);
         if(errno||end==line+3||*end||off<0)return machine_error("protocol-error","invalid send offset");
         machine_offset("result","end_offset",off);return 0;
@@ -85,5 +90,5 @@ int machine_finish(int status)
 }
 void machine_version(void)
 {
-    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.4\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\",\"mirror\"]}");
+    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.4\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\",\"mirror\",\"message-uuid-v4\",\"idempotent-send\"]}");
 }
