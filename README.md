@@ -1,8 +1,8 @@
-# Protocol 2 client — v0.3.4 text workbench
+# Protocol 3 client — v0.3.5 text workbench
 
-The modular workbench replaces the v0.2 GUI. Protocol 2, Machine API schema 1,
-identity and cache formats remain compatible. See [docs/README.md](docs/README.md)
-for dependency boundaries and runner API, and [release/README.md](release/README.md)
+This client implements Protocol 3 with UUIDv4 message identity and idempotent sends.
+The modular workbench adds client-side message threads without changing the server
+wire format. See [docs/README.md](docs/README.md) for dependency boundaries and runner API, and [release/README.md](release/README.md)
 for the release overview. Machine-readable artifact provenance is in
 [release/manifest.json](release/manifest.json).
 
