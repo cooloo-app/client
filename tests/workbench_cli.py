@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory() as tmp:
     run('--help')
     run('bad', code=2)
     fixture = base / 'messages.jsonl'
-    record = {'ts': 0, 'from': 'a'*64, 'to': 'b'*64, 'content': '中文\nhello'}
+    record = {'ts': 0, 'from': 'a'*64, 'to': 'b'*64, 'content': '中文\nhello', 'id': '550e8400e29b41d4a716446655440000'}
     raw = (json.dumps(record, ensure_ascii=False, separators=(',', ':'))+'\n').encode()
     fixture.write_bytes(raw)
     run('message', 'validate', fixture)
