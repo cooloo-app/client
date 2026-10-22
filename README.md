@@ -1,4 +1,4 @@
-# Protocol 3 client — v0.3.5 text workbench
+# Protocol 3 client — v0.3.6 text workbench
 
 This client implements Protocol 3 with UUIDv4 message identity and idempotent sends.
 The modular workbench adds client-side message threads without changing the server
