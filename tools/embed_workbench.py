@@ -18,7 +18,8 @@ if profile != 'cli':
 if profile != 'text':
     bases += [('lua/workbench', 'workbench')]
 if profile == 'gui':
-    bases += [('lua/plugins', 'plugins'), ('lua/adapters/local', 'adapters.local')]
+    bases += [('lua/plugins', 'plugins'), ('lua/adapters/local', 'adapters.local'),
+              ('lua/adapters/cooloo', 'adapters.cooloo')]
 for base, prefix in bases:
     for path in (root / base).rglob('*.lua'):
         name = '.'.join(path.relative_to(root / base).with_suffix('').parts)
@@ -28,7 +29,6 @@ for base, prefix in bases:
             name = name[:-5]
         modules['.'.join(filter(None, [prefix, name]))] = path.read_text()
 if profile == 'gui':
-    modules['adapters.cooloo'] = (root / 'lua/adapters/cooloo/init.lua').read_text()
     modules['client.chat'] = (root / 'lua/chat.lua').read_text() + '\nreturn chat\n'
 if profile != 'cli':
     modules['user.example'] = 'return [====[' + (root / 'vendor/lite/user-init.lua').read_text() + ']====]\n'

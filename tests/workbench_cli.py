@@ -58,6 +58,19 @@ with tempfile.TemporaryDirectory() as tmp:
             for name in ('workbench.', 'plugins.console', 'plugins.workspace', 'adapters.', 'client.chat'):
                 assert 'package.preload[\''+name not in source
             assert 'workspace:send' not in source and 'console:open' not in source
+        if profile == 'gui':
+            # Execute the real provider tests using ONLY embedded modules. Source
+            # paths in ordinary provider tests otherwise hide missing bundle files.
+            entry = (root/'lua/apps/workbench/gui.lua').read_text()
+            assert source.endswith(entry)
+            provider = (root/'tests/provider.lua').read_text().splitlines()
+            provider = '\n'.join(line for line in provider
+                                 if not line.startswith(('package.path=',
+                                                         "package.preload['client.chat']=")))
+            bundled_test = base/'bundled-provider.lua'
+            bundled_test.write_text("package.path=''; package.cpath=''\n" +
+                                    source[:-len(entry)] + '\n' + provider)
+            run('--lua-run', bundled_test)
         if profile == 'cli':
             assert "package.preload['core" not in source
             assert "require 'core" not in source
