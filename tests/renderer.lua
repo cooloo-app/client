@@ -16,7 +16,7 @@ font:set_tab_width(0);assert(font:get_width('\t')==0)
 assert(not pcall(r.font.load,'embedded:monospace',14,'grid'))
 local natural=r.font.load('assets/fonts/monospace.ttf',13.5)
 assert(natural:get_width('0')>0)
-for _,size in ipairs{8,13.5,14,17.5,21,27,34,51} do
+for _,size in ipairs{8,13,13.5,14,17.5,21,27,34,51} do
   local f=r.font.load('embedded:monospace',size)
   local c=f:get_width('0')
   assert(c>=1)
