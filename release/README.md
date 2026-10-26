@@ -1,4 +1,4 @@
-# cooloo client 0.3.7 artifacts
+# cooloo client 0.3.8 artifacts
 
 Generated from `manifest.json`; edit the build inputs/report, not this file.
 
@@ -14,14 +14,14 @@ not notarized, and tracked by Git LFS. No Linux GUI artifact is published.
 
 | File | Source commit | Build date | Bytes |
 |---|---|---|---|
-| `cooloo-darwin-arm64` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 2944248 |
-| `cooloo-windows-x86_64.exe` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 5186790 |
-| `cooloo-text-darwin-arm64` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 2667864 |
-| `cooloo-text-windows-x86_64.exe` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 4846385 |
-| `cooloo-workbench-darwin-arm64` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 315344 |
-| `cooloo-workbench-windows-x86_64.exe` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 663630 |
-| `cooloo-cli-darwin-arm64` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 161944 |
-| `cooloo-cli-windows-x86_64.exe` | `61aeca20b9cdece0716889cf044ac22b97321f18` | 2026-10-26 | 608286 |
+| `cooloo-darwin-arm64` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 2944248 |
+| `cooloo-windows-x86_64.exe` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 5186790 |
+| `cooloo-text-darwin-arm64` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 2667864 |
+| `cooloo-text-windows-x86_64.exe` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 4846385 |
+| `cooloo-workbench-darwin-arm64` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 315344 |
+| `cooloo-workbench-windows-x86_64.exe` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 663630 |
+| `cooloo-cli-darwin-arm64` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 161944 |
+| `cooloo-cli-windows-x86_64.exe` | `2e5327ce984e6722b60f081ef9a2ea353739e986` | 2026-10-26 | 608286 |
 
 All artifacts use the same source revision.
 
@@ -31,8 +31,6 @@ GitHub Release or Python publication.
 
 ## Verification
 
-- `cooloo-darwin-arm64`, `cooloo-text-darwin-arm64`, `cooloo-text-windows-x86_64.exe`, `cooloo-workbench-darwin-arm64`, `cooloo-workbench-windows-x86_64.exe`, `cooloo-cli-darwin-arm64`, `cooloo-cli-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build.
-
-- `cooloo-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build. Additionally, Windows local startup and window/icon/console probes passed; visual UX acceptance pending.
+- `cooloo-darwin-arm64`, `cooloo-windows-x86_64.exe`, `cooloo-text-darwin-arm64`, `cooloo-text-windows-x86_64.exe`, `cooloo-workbench-darwin-arm64`, `cooloo-workbench-windows-x86_64.exe`, `cooloo-cli-darwin-arm64`, `cooloo-cli-windows-x86_64.exe`: Isolated make test, headless workbench and provider tests passed; architecture, subsystem and system dependencies checked; macOS GUI, SDL dummy and Windows runtime/desktop tests not run by m106 build.
 
 Validate with `python3 tools/release_manifest.py`.
