@@ -1,7 +1,7 @@
 local r,p=native_renderer,native_platform
 local font=r.font.load('embedded:monospace',13.5)
 assert(type(font)=='userdata')
-local external=r.font.load('assets/fonts/monospace.ttf',13.5)
+local external=r.font.load('assets/fonts/monospace.ttf',13.5,true)
 assert(font:get_width('Hello')==external:get_width('Hello'))
 assert(font:get_height()==external:get_height())
 assert(not pcall(r.font.load,'missing-font.ttf',14))
@@ -13,6 +13,19 @@ assert(icons:get_width('abcd')~=normal:get_width('abcd'))
 font:set_tab_width(3);assert(font:get_width('\t')==3)
 assert(font:get_width('a\tb')==font:get_width('ab')+3)
 font:set_tab_width(0);assert(font:get_width('\t')==0)
+assert(not pcall(r.font.load,'embedded:monospace',14,'grid'))
+local natural=r.font.load('assets/fonts/monospace.ttf',13.5)
+assert(natural:get_width('0')>0)
+for _,size in ipairs{8,13.5,14,17.5,21,27,34,51} do
+  local f=r.font.load('embedded:monospace',size)
+  local c=f:get_width('0')
+  assert(c>=1)
+  for _,ch in ipairs{'i','W','a',' ','Ω','·'} do assert(f:get_width(ch)==c,ch) end
+  for _,ch in ipairs{'中','文','，','。','Ａ','𠀀'} do assert(f:get_width(ch)==2*c,ch) end
+  assert(f:get_width('中文')==f:get_width('0000'))
+  assert(f:get_width('a中b')==4*c)
+  assert(f:get_width(string.rep('a中b',1000))==4000*c,'no accumulated drift')
+end
 local text='Hello 中文🙂'
 local sum=0
 for _,cp in utf8.codes(text) do sum=sum+font:get_width(utf8.char(cp)) end
@@ -22,6 +35,27 @@ assert(font:get_width('\255\240\159')>=0,'strict malformed UTF-8')
 local function background()
   r.begin_frame();r.set_clip_rect(0,0,960,640);r.draw_rect(0,0,960,640,{0,0,0})
 end
+-- Compare actual raster output: one draw versus separately colored/tokenized
+-- fragments must have identical positions; transparent draws share endpoints.
+background()
+local endpoint=r.draw_text(font,'a中b',20,150)
+assert(endpoint==20+font:get_width('0000'))
+r.end_frame()
+local whole={}
+for y=145,180 do for x=15,65 do
+  local a,b,c=pixel(x,y);whole[#whole+1]=a..','..b..','..c
+end end
+background()
+local at=20
+for _,ch in ipairs{'a','中','b'} do at=r.draw_text(font,ch,at,150) end
+assert(at==endpoint)
+assert(r.draw_text(font,'a中b',20,200,{255,255,255,0})==endpoint)
+r.end_frame()
+local i=0
+for y=145,180 do for x=15,65 do
+  i=i+1;local a,b,c=pixel(x,y)
+  assert(whole[i]==a..','..b..','..c,'fragment/whole raster agreement')
+end end
 background()
 r.draw_rect(0,0,10,10,{255,0,0,128})
 r.draw_rect(10,0,10,10,{255,0,0,0})

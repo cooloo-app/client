@@ -22,7 +22,7 @@ void ren_get_size(int *x, int *y);
 RenImage* ren_new_image(int width, int height);
 void ren_free_image(RenImage *image);
 
-RenFont* ren_load_font(const char *filename, float size);
+RenFont* ren_load_font(const char *filename, float size, bool grid);
 void ren_free_font(RenFont *font);
 void ren_set_font_tab_width(RenFont *font, int n);
 int ren_get_font_tab_width(RenFont *font);

@@ -144,14 +144,13 @@ end
 function DocView:get_x_offset_col(line, x)
   local text = self.doc.lines[line]
 
-  local xoffset, last_i, i = 0, 1, 1
+  local xoffset, i = 0, 1
   for char in common.utf8_chars(text) do
     local w = self:get_font():get_width(char)
-    if xoffset >= x then
-      return (xoffset - x > w / 2) and last_i or i
-    end
+    -- Hit-test against this glyph's midpoint, not the next glyph's width:
+    -- adjacent ASCII/CJK cells have different widths.
+    if x < xoffset + w / 2 then return i end
     xoffset = xoffset + w
-    last_i = i
     i = i + #char
   end
 

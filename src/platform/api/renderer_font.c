@@ -1,14 +1,22 @@
 #include "renderer_api.h"
 #include "renderer.h"
 #include "rencache.h"
+#include <string.h>
 
 
 static int f_load(lua_State *L) {
   const char *filename  = luaL_checkstring(L, 1);
   float size = luaL_checknumber(L, 2);
+  /* Embedded body/UI text opts into the grid; icons and arbitrary external
+   * fonts keep natural metrics unless the caller explicitly requests it. */
+  bool grid = !strcmp(filename, "embedded:monospace");
+  if (!lua_isnoneornil(L, 3)) {
+    luaL_checktype(L, 3, LUA_TBOOLEAN);
+    grid = lua_toboolean(L, 3);
+  }
   RenFont **self = lua_newuserdata(L, sizeof(*self));
   luaL_setmetatable(L, API_TYPE_FONT);
-  *self = ren_load_font(filename, size);
+  *self = ren_load_font(filename, size, grid);
   if (!*self) { luaL_error(L, "failed to load font"); }
   return 1;
 }

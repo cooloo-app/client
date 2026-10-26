@@ -4,6 +4,7 @@
 #include <math.h>
 #include "stb_truetype.h"
 #include "font.h"
+#include "cell_width.h"
 #include "rencache.h"
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,7 @@ struct RenFont {
   GlyphSet *sets[MAX_GLYPHSET];
   float size;
   int height;
+  int cell_width; /* zero: natural advances (icons/external compatibility) */
 };
 
 
@@ -182,7 +184,7 @@ static GlyphSet* get_glyphset(RenFont *font, int codepoint) {
 }
 
 
-RenFont* ren_load_font(const char *filename, float size) {
+RenFont* ren_load_font(const char *filename, float size, bool grid) {
   extern const unsigned char cooloo_embedded_font[], cooloo_embedded_icons[], cooloo_embedded_monospace[];
   extern const unsigned int cooloo_embedded_font_len, cooloo_embedded_icons_len, cooloo_embedded_monospace_len;
   const void *data = NULL;
@@ -211,6 +213,11 @@ RenFont* ren_load_font(const char *filename, float size) {
   stbtt_GetFontVMetrics(&font->stbfont, &ascent, &descent, &linegap);
   float scale = stbtt_ScaleForMappingEmToPixels(&font->stbfont, size);
   font->height = (ascent - descent + linegap) * scale + 0.5;
+  if (grid) {
+    int advance, bearing;
+    stbtt_GetCodepointHMetrics(&font->stbfont, '0', &advance, &bearing);
+    font->cell_width = SDL_max(1, (int)floorf(advance * scale + 0.5f));
+  }
   stbtt_bakedchar *g = get_glyphset(font, '\n')->glyphs;
   g['\t'].x1 = g['\t'].x0;
   g['\n'].x1 = g['\n'].x0;
@@ -247,6 +254,14 @@ int ren_get_font_tab_width(RenFont *font) {
 }
 
 
+/* Both native glyphs and fallback glyphs use this exact layout policy.
+ * Controls retain Lite semantics, notably pixel-valued Tab overrides. */
+static int layout_advance(RenFont *font, unsigned cp, int natural) {
+  if (font->cell_width && cp >= 32 && cp != 127)
+    return cell_columns(cp) * font->cell_width;
+  return natural;
+}
+
 int ren_get_font_width(RenFont *font, const char *text) {
   int x = 0;
   const char *p = text, *end = text + strlen(text);
@@ -254,12 +269,12 @@ int ren_get_font_width(RenFont *font, const char *text) {
   while (*p) {
     p = utf8_to_codepoint(p, end, &codepoint);
     if (codepoint >= 32 && !stbtt_FindGlyphIndex(&font->stbfont, (int)codepoint)) {
-      x += font_glyph(codepoint, font->size)->advance;
+      x += layout_advance(font, codepoint, font_glyph(codepoint, font->size)->advance);
       continue;
     }
     GlyphSet *set = get_glyphset(font, codepoint);
     stbtt_bakedchar *g = &set->glyphs[codepoint & 0xff];
-    x += g->xadvance;
+    x += layout_advance(font, codepoint, (int)g->xadvance);
   }
   return x;
 }
@@ -366,6 +381,8 @@ int ren_draw_text(RenFont *font, const char *text, int x, int y, RenColor color)
     p = utf8_to_codepoint(p, end, &codepoint);
     if (codepoint >= 32 && !stbtt_FindGlyphIndex(&font->stbfont, (int)codepoint)) {
       const glyph *g = font_glyph(codepoint, font->size);
+      int advance = layout_advance(font, codepoint, g->advance);
+      int offset = font->cell_width ? (int)floorf((advance - g->advance) / 2.0f) : 0;
       int ascent, descent, gap;
       stbtt_GetFontVMetrics(&font->stbfont, &ascent, &descent, &gap);
       int baseline = y + (int)(ascent * stbtt_ScaleForMappingEmToPixels(&font->stbfont, font->size) + 0.5f);
@@ -373,15 +390,17 @@ int ren_draw_text(RenFont *font, const char *text, int x, int y, RenColor color)
       for (int j = 0; j < g->h; j++) {
         int py = baseline + g->yoff + j;
         if (py < clip.top || py >= clip.bottom) continue;
+        if (font->cell_width && (py < y || py >= y + font->height)) continue;
         for (int i = 0; i < g->w; i++) {
-          int px = x + g->xoff + i;
+          int px = x + offset + g->xoff + i;
           if (px < clip.left || px >= clip.right) continue;
+          if (font->cell_width && (px < x || px >= x + advance)) continue;
           RenColor *d = (RenColor*)((char*)surf->pixels + py * surf->pitch) + px;
           RenColor mask = {255,255,255,g->bmp[j*g->w+i]};
           *d = blend_pixel2(*d, mask, color);
         }
       }
-      x += g->advance;
+      x += advance;
       continue;
     }
     GlyphSet *set = get_glyphset(font, codepoint);
@@ -390,8 +409,18 @@ int ren_draw_text(RenFont *font, const char *text, int x, int y, RenColor color)
     rect.y = g->y0;
     rect.width = g->x1 - g->x0;
     rect.height = g->y1 - g->y0;
-    ren_draw_image(set->image, &rect, x + g->xoff, y + g->yoff, color);
-    x += g->xadvance;
+    int advance = layout_advance(font, codepoint, (int)g->xadvance);
+    int offset = font->cell_width ? (int)floorf((advance - g->xadvance) / 2.0f) : 0;
+    /* Keep grid ink inside its layout rectangle: cache dirty bounds remain
+     * valid even for unusually large fallback/custom glyphs. No stretching. */
+    int left = clip.left, right = clip.right, top = clip.top, bottom = clip.bottom;
+    if (font->cell_width) {
+      clip.left = SDL_max(left, x); clip.right = SDL_min(right, x + advance);
+      clip.top = SDL_max(top, y); clip.bottom = SDL_min(bottom, y + font->height);
+    }
+    ren_draw_image(set->image, &rect, x + offset + g->xoff, y + g->yoff, color);
+    clip.left = left; clip.right = right; clip.top = top; clip.bottom = bottom;
+    x += advance;
   }
   return x;
 }

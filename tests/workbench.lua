@@ -16,6 +16,24 @@ cooloo={renderer=assert(native_renderer,'run with renderer-test (real font userd
 require('platform.lite')
 local host=require 'core.host';host.init()
 local Doc=require 'core.doc'
+-- Grid consumers: byte-based caret/selection, asymmetric midpoint hit testing,
+-- and wrapping must all share the native font's exact advances.
+local style=require 'core.style'
+for _,f in ipairs{style.font,style.big_font,style.code_font} do
+  assert(f:get_width('i')==f:get_width('W'))
+  assert(f:get_width('中')==f:get_width('00'))
+end
+local grid_doc=Doc();grid_doc:text_input('a中b');grid_doc:set_selection(1,1)
+local grid_view=require('core.docview')(grid_doc)
+local c=grid_view:get_font():get_width('0')
+assert(grid_view:get_col_x_offset(1,2)==c)
+assert(grid_view:get_col_x_offset(1,5)==3*c)
+for _,test in ipairs{{0,1},{0.6,2},{1.6,2},{2.1,5},{3.4,5},{3.6,6}} do
+  assert(grid_view:get_x_offset_col(1,test[1]*c)==test[2],'mixed-width hit testing')
+end
+local grid_wrap=require('core.wrappedview')(grid_doc)
+grid_wrap.size.x=style.padding.x*2+3*c;grid_wrap:layout()
+assert(#grid_wrap.rows==2 and grid_wrap.rows[1].last==5 and grid_wrap.rows[2].first==5)
 local d=Doc();d.virtual=true;d.readonly=true;d:set_projection('中文\nhello')
 local before=table.concat(d.lines)
 d:insert(1,1,'bad');d:remove(1,1,2,1);d:text_input('bad');d:replace(function()return 'bad' end);d:undo();d:redo()

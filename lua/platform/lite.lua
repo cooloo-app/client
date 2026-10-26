@@ -25,14 +25,14 @@ end
 renderer = api.renderer
 -- Explicit aliases preserve upstream style/user examples in embedded products.
 local load_font = renderer.font.load
-renderer.font.load = function(filename, size)
+renderer.font.load = function(filename, size, grid)
   for _, name in ipairs { 'font', 'icons', 'monospace' } do
     if filename == EXEDIR .. '/data/fonts/' .. name .. '.ttf' then
       filename = 'embedded:' .. name
       break
     end
   end
-  return load_font(filename, size)
+  return load_font(filename, size, grid)
 end
 system = {
   platform=api.platform.name,
