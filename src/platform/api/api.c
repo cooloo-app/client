@@ -154,6 +154,23 @@ static int set_unread(lua_State *L) {
     else if(lua_toboolean(L,2))SDL_FlashWindow(w,SDL_FLASH_BRIEFLY);
     return 0;
 }
+/* Logical SDL dimensions, not renderer surface pixels (HiDPI). */
+static int window_size(lua_State *L) {
+    SDL_Window *w=window();int width=960,height=640;
+    if(!lua_isnoneornil(L,1)) {
+        width=(int)luaL_checkinteger(L,1);height=(int)luaL_checkinteger(L,2);
+        luaL_argcheck(L,width>=320 && width<=16384,1,"invalid width");
+        luaL_argcheck(L,height>=240 && height<=16384,2,"invalid height");
+        if(w)SDL_SetWindowSize(w,width,height);
+    }
+    if(w)SDL_GetWindowSize(w,&width,&height);
+    lua_pushinteger(L,width);lua_pushinteger(L,height);return 2;
+}
+static int center_window(lua_State *L) {
+    (void)L;
+    if(window())SDL_SetWindowPosition(window(),SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED);
+    return 0;
+}
 static int title(lua_State *L) { if(window())SDL_SetWindowTitle(window(),luaL_checkstring(L,1)); return 0; }
 static int mode(lua_State *L) {
     SDL_Window *w = window();
@@ -392,7 +409,7 @@ static int temp_file(lua_State *L) {
 }
 
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"make_dir",make_dir},{"remove_file",remove_file},{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"window_size",window_size},{"center_window",center_window},{"make_dir",make_dir},{"remove_file",remove_file},{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());

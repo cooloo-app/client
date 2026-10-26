@@ -140,6 +140,7 @@ $(BUILD)/runtime-test.exe: tests/runtime_test.c src/runtime/process.c $(LUA_SRC)
 test-workbench-macos: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test-macos $(BUILD)/runtime-test-macos editor cooloo
 	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/workbench.lua
 	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/notifications.lua
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test-macos tests/workspace_state.lua
 	$(BUILD)/lua-runner --lua-run tests/readstate.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test-macos $(BUILD)/lua-runner tests/runtime.lua
@@ -151,6 +152,7 @@ $(BUILD)/runtime-test: tests/runtime_test.c src/runtime/process.c $(LUA_SRC) $(S
 test-workbench: cooloo-cli $(BUILD)/lua-runner $(BUILD)/renderer-test $(BUILD)/runtime-test editor-linux cooloo-linux
 	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/workbench.lua
 	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/notifications.lua
+	SDL_VIDEODRIVER=dummy $(BUILD)/renderer-test tests/workspace_state.lua
 	$(BUILD)/lua-runner --lua-run tests/readstate.lua
 	$(BUILD)/lua-runner --lua-run tests/provider.lua
 	$(BUILD)/runtime-test $(BUILD)/lua-runner tests/runtime.lua
@@ -204,6 +206,7 @@ $(BUILD)/file-write-test.exe: tests/file_write_test.c src/platform/api/file.c sr
 
 # Deliberately no GUI, SDL dummy, rendering or desktop tests in this target.
 test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner
+	$(BUILD)/lua-runner --lua-run tests/ui_state.lua
 	$(BUILD)/lua-runner --lua-run tests/threads.lua
 	$(BUILD)/lua-runner --lua-run tests/workspace_models.lua
 	$(BUILD)/lua-runner --lua-run tests/folder_sync.lua

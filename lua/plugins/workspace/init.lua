@@ -13,6 +13,10 @@ function M.install(provider)
   local files=require('plugins.workspace.files').new(system,provider)
   local chats,file_resources,collapsed={},{},{}
   local browser,last_focus,stamp
+  local host=require 'core.host'
+  local layout=require 'core.session_layout'
+  local json=require 'core.state_json'
+  local state_entry,state_key,restored
   local notification_count,notification_serial=0,0
   local list,filelist,navigation
   local function node_for(view)
@@ -135,7 +139,24 @@ function M.install(provider)
   middle:set_active_view(middle.active_view)
   refresh_tree()
   local rooms=provider:list()
-  if rooms[1] then select_room(rooms[1].id) end
+  -- Full provider restoration waits for authenticated identity AND a completed
+  -- room listing. Offline fixtures retain their original startup behavior.
+  if not provider.state_context and rooms[1] then select_room(rooms[1].id) end
+  local function snapshot()
+    if not state_entry or not restored then return end
+    local groups=json.array()
+    for key,value in pairs(collapsed) do if value then groups[#groups+1]=key end end
+    table.sort(groups)
+    state_entry.browser={room_id=browser,collapsed_groups=groups}
+    state_entry.layout,state_entry.active_pane=layout.capture(middle,function(view)
+      local resource=navigation:resource(view)
+      if resource and resource.kind=='chat' then return {kind='chat',room_id=resource.room} end
+      -- Cache projections keep their protected opening route, not plain files.
+      if resource and resource.protected then return end
+      return layout.file(view)
+    end)
+  end
+  host.snapshot=snapshot
   local function confirm_leave()
     transcripts:flush()
     if not storage:flush() then
@@ -151,6 +172,7 @@ function M.install(provider)
   local request_quit=system.request_quit
   system.request_quit=function()
     if not confirm_leave() then return end
+    host.save(true);host.snapshot=nil
     workspace:reset()
     if provider.close then provider:close() end
     request_quit()
@@ -159,7 +181,7 @@ function M.install(provider)
     workspace:reset()
     local closing={}
     for view,resource in pairs(navigation.views) do
-      if resource.kind=='chat' or resource.protected then closing[#closing+1]=view end
+      if resource.kind=='chat' or resource.kind=='file' then closing[#closing+1]=view end
     end
     for _,view in ipairs(closing) do
       local node=node_for(view)
@@ -283,7 +305,15 @@ function M.install(provider)
     ['workspace:identity']=function()
       if provider.identity then prompt('Identity ID (empty = self)',function(id)
         if not confirm_leave() then return end
-        if provider:identity(id~='' and id or nil) then reset_views()
+        for view,resource in pairs(navigation.views) do
+          if resource.kind=='file' and view.doc:is_dirty() then
+            core.error('Save or close edited files before switching identity');return
+          end
+        end
+        host.save(true)
+        if provider:identity(id~='' and id or nil) then
+          state_entry=nil;state_key=nil;restored=false;collapsed={}
+          reset_views()
         else core.error('Invalid identity ID') end
       end) end
     end,
@@ -299,6 +329,39 @@ function M.install(provider)
     ['down']='workspace:tree-down',['return']='workspace:tree-open',['space']='workspace:tree-toggle'}
   local had_rooms=#rooms>0
   local function sync_ui()
+    if provider.state_context and host.state then
+      local context,ready=provider:state_context()
+      local key=context and json.encode(context)
+      if key and key~=state_key then
+        if state_key then snapshot();host.state:save(system.get_time(),true);reset_views() end
+        state_key=key;state_entry=host.state:workspace(context,'workbench');restored=false;collapsed={}
+        local saved=type(state_entry.browser)=='table' and state_entry.browser or {}
+        if type(saved.collapsed_groups)=='table' then
+          for i,group in ipairs(saved.collapsed_groups) do
+            if i>2048 then break end
+            if type(group)=='string' and #group<=4096 then collapsed[group]=true end
+          end
+        end
+      end
+      if state_entry and not restored and ready then
+        local available={};for _,room in ipairs(provider:list()) do available[room.id]=true end
+        if state_entry.layout then
+          layout.restore(middle,state_entry.layout,state_entry.active_pane,function(resource,node)
+            if resource.kind=='chat' and available[resource.room_id] then
+              return navigation:open(chat_resource(resource.room_id),node)
+            end
+            return layout.open_file(resource,node)
+          end)
+        end
+        navigation:sync()
+        local saved=type(state_entry.browser)=='table' and state_entry.browser or {}
+        if saved.room_id and available[saved.room_id] then browse(saved.room_id) end
+        local current=provider:list()
+        if not next(navigation.views) and current[1] then select_room(current[1].id) end
+        if not browser and current[1] then browse(current[1].id) end
+        last_focus=core.active_view;had_rooms=true;restored=true
+      end
+    end
     navigation:sync()
     local focus=core.active_view
     if focus~=last_focus then
@@ -318,7 +381,7 @@ function M.install(provider)
       end
     end
     local current=provider:list()
-    if not had_rooms and current[1] then had_rooms=true;select_room(current[1].id) end
+    if not provider.state_context and not had_rooms and current[1] then had_rooms=true;select_room(current[1].id) end
     local parts={provider.status or '',provider.identity_label or '',browser or ''}
     for _,r in ipairs(current) do parts[#parts+1]=r.id..':'..(r.name or '')..':'..tostring(r.unread or 0)..':'..tostring(r.muted) end
     local delivery=browser and provider.delivery and provider:delivery(browser)

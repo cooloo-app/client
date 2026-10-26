@@ -2,7 +2,7 @@
 local api = cooloo
 local M = {}
 SCALE, EXEDIR, PATHSEP, EXEFILE, ARGS = api.platform.scale or 1, api.platform.exedir, package.config:sub(1,1), api.platform.exefile, api.args or {}
-VERSION, PLATFORM = 'cooloo 0.3.0', api.platform.name
+VERSION, PLATFORM = 'cooloo 0.3.7', api.platform.name
 USERDIR = api.platform.userdir
 if api.text_files and not api.safe_mode then
   package.path = USERDIR .. '/?.lua;' .. USERDIR .. '/?/init.lua;'

@@ -10,8 +10,8 @@ pane. A dropped directory starts a separate text-editor process, with an argv
 array (no shell interpolation). Safe mode is inherited by directory children;
 a development `--lua-dev` bundle is deliberately not inherited.
 
-With no file arguments, the editor shows an empty welcome view rather than
-creating a document; Ctrl+N creates an unnamed document. Project scanning,
+With no file arguments, the editor restores the selected project's named file
+session if available, otherwise shows an empty welcome view; Ctrl+N creates an unnamed document. Project scanning,
 Ctrl+P file candidates, treeview and project search use the selected directory.
 The window title includes the project path. The SDL3 host
 uses Lite's poll → editor step → coroutine work → sleep-remaining-frame sequence,
@@ -43,7 +43,7 @@ reimplemented. See [vendor/lite/README.md](../vendor/lite/README.md).
 The user directory (`USERDIR`) defaults to `~/.cooloo-text`, or the absolute path
 of `COOLOO_TEXT_USERDIR` if set. It is independent of communication credentials
 in `~/.cooloo`. Create these files/directories yourself; startup does not write
-configuration:
+configuration (the UI session directory/file is created automatically when saving state):
 
 ```
 ~/.cooloo-text/
@@ -97,6 +97,52 @@ Untitled dirty documents also receive recovery copies; virtual projections are
 excluded. Write failures are diagnosed on stderr. Normal confirmed/forced exits
 and fatal recovery remove this session's temporary files. Plugin `core.try`
 errors remain locally recoverable; explicitly broken `--lua-dev` bundles fail.
+
+## Local UI session state
+
+Both GUI products share `core.ui_state`, `core.state_json` and
+`core.session_layout`, but write independent UTF-8 JSON snapshots:
+
+- Text: `$COOLOO_TEXT_USERDIR/ui-state.json` (default `~/.cooloo-text`).
+- Workbench: `$COOLOO_CONFIG/ui-state.json` (default `~/.cooloo`), outside
+  identity-private synced configuration.
+
+Version 1 stores product-level logical SDL window width/height and up to 16
+workspaces. Window size policy lives in Lua; native APIs only get/set size and
+center the hidden window before its first frame. No window coordinates are
+saved. Workbench reads legacy `gui.w`/`gui.h` only when no new window state is
+available; these keys are no longer written.
+
+Text workspaces are keyed by the launch project root. Explicit file/directory
+arguments win over restoration; no persisted path selects a project or executes
+its configuration. Workbench workspaces are keyed by the authenticated server
+fingerprint and effective identity, never used as login instructions. Restoration
+waits for authentication and the completed room list. Switching identity first
+saves the old snapshot; edited files must be saved/closed before switching.
+
+A single split tree stores File/Chat resource descriptors, tab order, active tab
+and active pane. Locked chrome/console is excluded. Workbench also records tree
+collapsed groups and the browsed room independently of the active Chat/File.
+Missing files/rooms and unknown resource kinds are skipped. Protected cache
+projections are not reopened as ordinary writable files. Unnamed documents,
+unsaved text, cursor/scroll, right file-tree expansion and chat history anchors
+are not session backups; message/draft persistence remains separate.
+
+Snapshots use the existing atomic file writer, a 750 ms quiet period (five-second
+maximum while changing) and a confirmed-quit flush. Size is capped at 1 MiB,
+layout depth at 8 and restored tabs at 128. Invalid JSON falls back to defaults;
+unreadable/oversized files and unsupported versions/products are preserved,
+not overwritten. Failures are reported in Core: Open Log and never block startup.
+Multiple processes use last successful writer wins; this is not a merge or
+power-loss durability guarantee. Settings remain separate executable Lua files.
+
+Validation: `build/lua-runner --lua-run tests/ui_state.lua`,
+`SDL_VIDEODRIVER=dummy build/renderer-test tests/workspace_state.lua`, and
+`python3 tests/ui_state_integration.py ./editor-linux` (use the macOS equivalents
+on macOS). These exercise data parsing, limits, async identity isolation and
+actual process restart with Unicode file paths, split/focus, explicit arguments,
+missing resources and future/corrupt snapshots; desktop HiDPI/visual behavior
+still needs platform acceptance.
 
 ## Saving and edit state
 

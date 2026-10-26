@@ -107,6 +107,14 @@ function M.new()
   end
   chat.init(cooloo.server());chat.connect_ctrl()
   -- Match cfg_dir/cache_path without exposing credentials or changing cache formats.
+  function p:state_context()
+    if not chat.ctrl_up or not chat.identity_confirmed then return end
+    local fp=cooloo.net.fp(chat.ctrl)
+    local identity=chat.identity()
+    if type(fp)=='string' and #fp==64 and type(identity)=='string' and #identity==64 then
+      return {server_fp=fp,identity_id=identity},chat.rooms_loaded==true
+    end
+  end
   function p:directory(id)
     local r=chat.rooms[id]
     local server=r and r.server_fp or (chat.ctrl_up and cooloo.net.fp(chat.ctrl))

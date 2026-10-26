@@ -7,9 +7,6 @@
 #include "rencache.h"
 #include <lua.h>
 #include <lauxlib.h>
-#ifndef COOLOO_EDITOR_ONLY
-#include "config.h"
-#endif
 #ifdef COOLOO_EDITOR_ONLY
 #include "embedded_text_icon.h"
 #else
@@ -110,11 +107,6 @@ top:
 
 int cooloo_gui_run(const char *lua_dev_dir) {
     int w=960,h=640,quit=0,result=1;
-#ifndef COOLOO_EDITOR_ONLY
-    char val[32];
-    if(cfg_get("gui.w",val,sizeof val)==0)w=atoi(val);
-    if(cfg_get("gui.h",val,sizeof val)==0)h=atoi(val);
-#endif
     SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH,"1");
     SDL_SetHint(SDL_HINT_IME_IMPLEMENTED_UI,"composition");
     SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR,"0");
@@ -150,11 +142,6 @@ int cooloo_gui_run(const char *lua_dev_dir) {
         if(!quit && elapsed<period)SDL_DelayNS(period-elapsed);
     }
     result=luabind_failed()?1:0;
-#ifndef COOLOO_EDITOR_ONLY
-    SDL_GetWindowSize(win,&w,&h);
-    snprintf(val,sizeof val,"%d",w);cfg_set("gui.w",val);
-    snprintf(val,sizeof val,"%d",h);cfg_set("gui.h",val);
-#endif
 shutdown:
     if (luabind_failed() && strcmp(SDL_GetCurrentVideoDriver(), "dummy"))
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "cooloo fatal error",

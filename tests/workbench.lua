@@ -182,4 +182,24 @@ core.command_view:set_text('Chat: Reply In Thread');core.command_view:update_sug
 assert(core.command_view.suggestions[1].command=='chat:reply-in-thread')
 core.command_view:exit(false)
 assert(keymap.get_binding('chat:reply-in-thread')=='alt+r')
-print('workbench: readonly, wrap, composition, thread geometry/undo/UUID scroll/palette passed')
+-- Mixed Chat/File snapshot shares a single tree and prunes locked chrome.
+local Layout=require 'core.session_layout'
+local snap,path=Layout.capture(core.root_view.root_node,function(view)
+  if view==chat then return {kind='chat',room_id='room-a'} end
+  return Layout.file(view)
+end)
+assert(snap and type(path)=='table')
+local target=core.root_view:get_active_node()
+local restored={type='split',axis='y',ratio=0.6,
+ a={type='leaf',active_tab=2,tabs={{resource={kind='chat',room_id='a'}},{resource={kind='chat',room_id='b'}}}},
+ b={type='leaf',active_tab=1,tabs={{resource={kind='chat',room_id='missing'}}}}}
+local opened={}
+assert(Layout.restore(target,restored,{'a'},function(resource,node)
+  if resource.room_id=='missing' then return end
+  local view=require('core.docview')(Doc());node:add_view(view)
+  opened[resource.room_id]=view;return view
+end))
+assert(target.type=='vsplit' and target.divider==0.6)
+assert(target.a.active_view==opened.b and core.active_view==opened.b)
+assert(not Layout.restore(target,{type='split',axis='bad'},nil,function()error('must not open')end))
+print('workbench: readonly, wrap, composition, thread geometry/undo/UUID scroll/palette, mixed layout passed')

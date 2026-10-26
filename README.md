@@ -1,4 +1,11 @@
-# Protocol 3 client — v0.3.6 text workbench
+# Protocol 3 client — v0.3.7 text workbench
+
+GUI products now share Lua-managed local JSON session persistence: window size
+(always centered), named-file/Chat tabs, splits and active panes; Workbench also
+remembers conversation-tree folding and the browsed room per authenticated
+server/identity. Text and Workbench state files remain independent. See
+[local UI session state](docs/EDITOR.md#local-ui-session-state) for boundaries
+and recovery behavior.
 
 This client implements Protocol 3 with UUIDv4 message identity and idempotent sends.
 The modular workbench adds client-side message threads without changing the server
