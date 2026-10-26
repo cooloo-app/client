@@ -79,8 +79,8 @@ file in EXEDIR and tracks that exact path for session cleanup; it may fail if th
 directory is not writable.
 
 The native Lite renderer uses independent, garbage-collected font objects.
-Default UI and body text use bundled Roboto Mono Regular, at independent
-sizes of 13 and 14 respectively (multiplied by SCALE). Chinese glyphs still use
+Default UI and body text use bundled Roboto Mono Regular, both at size 14
+(multiplied by SCALE). Chinese glyphs still use
 the system CJK fallback chain.
 Each default text font rounds the advance of `0` once to an integer cell width:
 ASCII occupies one cell; Unicode 15.0.0 East_Asian_Width W/F occupies two;

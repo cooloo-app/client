@@ -8,7 +8,7 @@ style.caret_width = common.round(2 * SCALE)
 style.tab_width = common.round(170 * SCALE)
 
 -- One Latin monospace family; independent integer cells at each size/scale.
-style.font = renderer.font.load(EXEDIR .. "/data/fonts/monospace.ttf", 13 * SCALE)
+style.font = renderer.font.load(EXEDIR .. "/data/fonts/monospace.ttf", 14 * SCALE)
 style.big_font = renderer.font.load(EXEDIR .. "/data/fonts/monospace.ttf", 34 * SCALE)
 style.icon_font = renderer.font.load(EXEDIR .. "/data/fonts/icons.ttf", 14 * SCALE)
 style.code_font = renderer.font.load(EXEDIR .. "/data/fonts/monospace.ttf", 14 * SCALE)
