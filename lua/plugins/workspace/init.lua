@@ -403,8 +403,9 @@ function M.install(provider)
   -- and before central views update/draw, including native palette splits.
   list.before_update=sync_ui
   navigation:sync()
-  return {poll=function(events)
+  return {poll=function(events, network_only)
     provider:poll(events)
+    if network_only then return end
     sync_ui()
     workspace:refresh()
     local clock=system.get_time()

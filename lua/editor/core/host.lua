@@ -43,17 +43,29 @@ function M.save(force)
   M.state.data.window={width=w,height=h}
   M.state:save(system.get_time(),force)
 end
+function M.interval(now)
+  if cooloo.text_files then return 0 end
+  if not system.window_has_focus() then return 0.1 end
+  return now - (core.last_input or now) > 1 and 0.1 or 0
+end
 function M.tick(frame_start)
   core.frame_start = frame_start or system.get_time()
-  local did_redraw = core.step()
+  core.last_input = core.last_input or core.frame_start
+  local interval = M.interval(core.frame_start)
+  local did_redraw = core.step(interval)
   core.run_threads()
-  M.save(false)
-  -- Text matches Lite's inactive wait. Workbench keeps the fixed-frame network
-  -- pump budget (at most one normal frame of extra background message latency).
+  if not M.next_save or core.frame_start >= M.next_save then
+    M.save(false)
+    M.next_save = core.frame_start + 0.25
+  end
+  -- Text matches Lite's inactive wait. Workbench must not block its network
+  -- pump here; C pacing below supplies its bounded idle receive budget.
   if cooloo.text_files and not did_redraw and not system.window_has_focus() then
     system.wait_event(0.25)
   end
   -- Keep C pacing and Lite's per-frame animation/blink increments in agreement.
-  cooloo.platform.set_fps(config.fps)
+  -- Network/events keep a bounded 50ms budget independent of 100ms idle UI.
+  -- Re-evaluate after input so an interaction immediately restores animation FPS.
+  cooloo.platform.set_fps(M.interval(core.frame_start) > 0 and math.min(config.fps,20) or config.fps)
 end
 return M

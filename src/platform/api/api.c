@@ -107,6 +107,10 @@ static int focus(lua_State *L) {
     lua_pushboolean(L,w && (SDL_GetWindowFlags(w)&SDL_WINDOW_INPUT_FOCUS) &&
         !(SDL_GetWindowFlags(w)&SDL_WINDOW_MINIMIZED));return 1;
 }
+static int minimized(lua_State *L) {
+    SDL_Window *w=window();
+    lua_pushboolean(L,w && (SDL_GetWindowFlags(w)&SDL_WINDOW_MINIMIZED));return 1;
+}
 /* Policy is supplied by Lua. Native code only displays its aggregate. */
 static int set_unread(lua_State *L) {
     int unread=luaL_checkinteger(L,1)>0;
@@ -409,7 +413,7 @@ static int temp_file(lua_State *L) {
 }
 
 void platform_register(lua_State *L) {
-    static const luaL_Reg f[]={{"window_size",window_size},{"center_window",center_window},{"make_dir",make_dir},{"remove_file",remove_file},{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
+    static const luaL_Reg f[]={{"window_size",window_size},{"center_window",center_window},{"make_dir",make_dir},{"remove_file",remove_file},{"read_file",platform_read_file},{"write_file",platform_write_file},{"temp_file",temp_file},{"focus",focus},{"minimized",minimized},{"set_unread",set_unread},{"title",title},{"mode",mode},{"cursor",cursor},{"confirm",confirm},{"list_dir",list},{"info",info},{"absolute_path",absolute},{"resolve_path",resolve_path},{"fuzzy_match",fuzzy_match},{"chdir",chdir_api},{"exec",exec_api},{"open_project",open_project},{"sleep",sleep_api},{"set_fps",set_fps},{NULL,NULL}};
     luaL_newlib(L,f);
     lua_pushstring(L,SDL_GetPlatform());lua_setfield(L,-2,"name");
     float scale=window()?SDL_GetWindowDisplayScale(window()):SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());

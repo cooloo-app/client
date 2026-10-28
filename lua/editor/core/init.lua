@@ -443,13 +443,16 @@ function core.on_event(type, ...)
 end
 
 
-function core.step()
+function core.step(update_interval)
+  -- Always drain input, even when background layout/drawing is throttled.
+  local had_event = false
   -- handle events
   local did_keymap = false
   local mouse_moved = false
   local mouse = { x = 0, y = 0, dx = 0, dy = 0 }
 
   for type, a,b,c,d in system.poll_event do
+    had_event = true
     if type == "mousemoved" then
       mouse_moved = true
       mouse.x, mouse.y = a, b
@@ -478,11 +481,19 @@ function core.step()
     core.try(core.on_event, "mousemoved", mouse.x, mouse.y, mouse.dx, mouse.dy)
   end
 
+  local now = system.get_time()
+  if had_event then core.last_input = now end
+  if update_interval and not had_event and core.next_update and now < core.next_update then
+    return false
+  end
+  core.next_update = now + (update_interval or 0)
   local width, height = renderer.get_size()
 
   -- update
   core.root_view.size.x, core.root_view.size.y = width, height
   core.root_view:update()
+  -- Keep dirty state while minimized: restore must paint the latest model.
+  if system.window_is_minimized and system.window_is_minimized() then return false end
   if not core.redraw then return false end
   core.redraw = false
 
