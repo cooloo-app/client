@@ -32,7 +32,7 @@ core.add_thread(function()
   local function get_symbols(doc)
     local i = 1
     local s = {}
-    while i < #doc.lines do
+    while i <= #doc.lines do
       for sym in doc.lines[i]:gmatch(config.symbol_pattern) do
         s[sym] = true
       end
@@ -112,14 +112,19 @@ local function update_suggestions()
 
   -- fuzzy match, remove duplicates and store
   items = common.fuzzy_match(items, partial)
-  local j = 1
-  for i = 1, config.autocomplete_max_suggestions do
-    suggestions[i] = items[j]
-    while items[j] and items[i].text == items[j].text do
-      items[i].info = items[i].info or items[j].info
-      j = j + 1
+  suggestions = {}
+  local seen = {}
+  for _, item in ipairs(items) do
+    local existing = seen[item.text]
+    if existing then
+      existing.info = existing.info or item.info
+    elseif #suggestions < config.autocomplete_max_suggestions then
+      local suggestion = { text = item.text, info = item.info }
+      seen[item.text] = suggestion
+      table.insert(suggestions, suggestion)
     end
   end
+  suggestions_idx = math.max(1, math.min(suggestions_idx, #suggestions))
 end
 
 
@@ -244,7 +249,7 @@ end
 
 
 local function predicate()
-  return get_active_view() and #suggestions > 0
+  return get_active_view() and suggestions[suggestions_idx] ~= nil
 end
 
 

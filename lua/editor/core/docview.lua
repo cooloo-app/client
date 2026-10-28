@@ -65,11 +65,20 @@ function DocView:try_close(do_close)
   if self.doc:is_dirty()
   and #core.get_views_referencing_doc(self.doc) == 1 then
     core.command_view:enter("Unsaved Changes; Confirm Close", function(_, item)
+      if not item then return end
       if item.text:match("^[cC]") then
         do_close()
       elseif item.text:match("^[sS]") then
-        self.doc:save()
-        do_close()
+        local function save_and_close(filename)
+          self.doc:save(filename)
+          if not self.doc:is_dirty() then do_close() end
+        end
+        if self.doc.filename then
+          save_and_close()
+        else
+          core.command_view:set_text("")
+          core.command_view:enter("Save As", save_and_close, common.path_suggest)
+        end
       end
     end, function(text)
       local items = {}

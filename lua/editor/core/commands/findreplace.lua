@@ -129,11 +129,11 @@ command.add("core.docview", {
   end,
 
   ["find-replace:previous-find"] = function()
-    local sel = table.remove(previous_finds)
-    if not sel or doc() ~= last_doc then
+    if doc() ~= last_doc or not previous_finds or #previous_finds == 0 then
       core.error("No previous finds")
       return
     end
+    local sel = table.remove(previous_finds)
     doc():set_selection(table.unpack(sel))
     core.active_view:scroll_to_line(sel[3], true)
   end,

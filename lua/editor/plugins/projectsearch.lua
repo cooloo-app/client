@@ -22,11 +22,12 @@ function ResultsView:get_name()
 end
 
 
-local function find_all_matches_in_file(t, filename, fn)
-  local fp = io.open(filename)
+local function find_all_matches_in_file(t, filename, fn, current)
+  local fp <close> = io.open(filename)
   if not fp then return t end
   local n = 1
   for line in fp:lines() do
+    if not current() then return end
     local s = fn(line)
     if s then
       table.insert(t, { file = filename, text = line, line = n, col = s })
@@ -36,7 +37,6 @@ local function find_all_matches_in_file(t, filename, fn)
     n = n + 1
     core.redraw = true
   end
-  fp:close()
 end
 
 
@@ -48,17 +48,26 @@ function ResultsView:begin_search(text, fn)
   self.searching = true
   self.selected_idx = 0
 
+  local results = self.results
+  local files = core.project_files
+  local function current() return self.results == results end
   core.add_thread(function()
-    for i, file in ipairs(core.project_files) do
-      if file.type == "file" then
-        find_all_matches_in_file(self.results, file.filename, fn)
+    core.try(function()
+      for i, file in ipairs(files) do
+        if not current() then return end
+        if file.type == "file" then
+          find_all_matches_in_file(results, file.filename, fn, current)
+        end
+        if not current() then return end
+        self.last_file_idx = i
       end
-      self.last_file_idx = i
+    end)
+    if current() then
+      self.searching = false
+      self.brightness = 100
+      core.redraw = true
     end
-    self.searching = false
-    self.brightness = 100
-    core.redraw = true
-  end, self.results)
+  end, results)
 
   self.scroll.to.y = 0
 end

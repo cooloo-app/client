@@ -203,8 +203,8 @@ local commands = {
 
   ["doc:move-lines-up"] = function()
     local line1, col1, line2, col2, swap = doc():get_selection(true)
-    append_line_if_last_line(line2)
     if line1 > 1 then
+      append_line_if_last_line(line2)
       local text = doc().lines[line1 - 1]
       doc():insert(line2 + 1, 1, text)
       doc():remove(line1 - 1, 1, line1, 1)

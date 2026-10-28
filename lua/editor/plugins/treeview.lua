@@ -54,11 +54,18 @@ end
 
 
 function TreeView:check_cache()
-  -- invalidate cache's skip values if project_files has changed
+  -- Retain expansion only for paths whose type survives the new scan.
   if core.project_files ~= self.last_project_files then
-    for _, v in pairs(self.cache) do
-      v.skip = nil
+    local cache = {}
+    for _, item in ipairs(core.project_files) do
+      local old = self.cache[item.filename]
+      if old and old.type == item.type then
+        old.skip = nil
+        cache[item.filename] = old
+      end
     end
+    self.cache = cache
+    self.hovered_item = nil
     self.last_project_files = core.project_files
   end
 end
@@ -111,6 +118,7 @@ end
 
 
 function TreeView:on_mouse_pressed(button, x, y)
+  self:on_mouse_moved(x, y)
   if not self.hovered_item then
     return
   elseif self.hovered_item.type == "dir" then
