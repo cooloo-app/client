@@ -18,7 +18,8 @@ function Sidebar:update()
   if self.before_update then self.before_update() end
   -- Fit both sidebars without changing the editor's layout machinery.
   local width=math.min(240*SCALE,math.max(80*SCALE,core.root_view.size.x*0.22))
-  if self.size.x~=width then self.size.x=width;core.redraw=true end
+  -- Split layout subtraction can leave a subpixel floating-point tail.
+  if math.abs(self.size.x-width)>0.01 then self.size.x=width;core.redraw=true end
   Sidebar.super.update(self)
 end
 function Sidebar:get_name() return self.title end

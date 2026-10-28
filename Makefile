@@ -209,6 +209,7 @@ test-workbench-headless: cooloo-workbench $(BUILD)/lua-runner
 	$(BUILD)/lua-runner --lua-run tests/ui_state.lua
 	$(BUILD)/lua-runner --lua-run tests/threads.lua
 	$(BUILD)/lua-runner --lua-run tests/workspace_models.lua
+	$(BUILD)/lua-runner --lua-run tests/sidebar_width.lua
 	$(BUILD)/lua-runner --lua-run tests/folder_sync.lua
 	$(BUILD)/lua-runner --lua-run tests/workbench_headless.lua
 	$(BUILD)/lua-runner --lua-run tests/readstate.lua
