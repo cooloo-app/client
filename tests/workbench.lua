@@ -1,10 +1,16 @@
 package.path='lua/editor/?.lua;lua/editor/?/init.lua;lua/?.lua;lua/?/init.lua;./?.lua;./?/init.lua;'..package.path
 local input={}
+-- Keep system.get_time and the host's frame timestamp on one deterministic clock.
+local now=0
+local function frame()
+  now=now+0.016
+  return cooloo.frame({},0.016,now)
+end
 local function frame_input(...)
   input={...}
-  return cooloo.frame({},0.016)
+  return frame()
 end
-cooloo={renderer=assert(native_renderer,'run with renderer-test (real font userdata)'),offline=true,time=os.clock,screen=function()return 960,640 end,
+cooloo={renderer=assert(native_renderer,'run with renderer-test (real font userdata)'),offline=true,time=function()return now end,screen=function()return 960,640 end,
  poll_event=function() local e=table.remove(input,1);if e then return table.unpack(e) end end,
  clear_ime=function()end,
  text_width=function(s)return utf8.len(s)*8 end,line_height=function()return 18 end,
@@ -94,7 +100,7 @@ con:submit('x=42');con:recall(-1);assert(con.input.lines[1]:find('x=42',1,true))
 con:append(string.rep('a',300000));assert(#con.output<=con.limit);assert(not con.doc:is_dirty())
 -- Exercise actual composition, event dispatch, drawing, editing and split commands.
 dofile('lua/apps/workbench/gui.lua')
-for i=1,3 do cooloo.frame({},0.016) end
+for i=1,3 do frame() end
 -- Use the real key + text event sequence: text-only injection misses swallowed
 -- input when a globally registered shortcut is invalid in the focused view.
 local core=require 'core'
@@ -153,7 +159,7 @@ end
 assert(sidebars==2)
 core.set_active_view(edit)
 require('core.command').perform('root:split-right')
-cooloo.frame({},0.016)
+frame()
 local tmp=os.tmpname()
 for _,text in ipairs({'no newline','one\ntwo\n','中文\r\n尾',''}) do
   local f=assert(io.open(tmp,'wb'));assert(f:write(text));f:close()

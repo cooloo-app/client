@@ -33,8 +33,8 @@ local frames=0
 assert(cooloo.runtime==nil)
 assert(not package.loaded['plugins.workspace'])
 assert(not package.loaded['plugins.console'])
-function cooloo.frame(events,dt)
-  local draws=original(events,dt)
+function cooloo.frame(events,dt,frame_start)
+  local draws=original(events,dt,frame_start)
   frames=frames+1
   if frames==30 then
     print('PURE_TEXT_READY')
@@ -102,8 +102,8 @@ assert(success==0,good)
             f.write('''
 local original=cooloo.frame
 local count,submitted=0,false
-function cooloo.frame(events, dt)
-  local draws=original(events,dt)
+function cooloo.frame(events,dt,frame_start)
+  local draws=original(events,dt,frame_start)
   count=count+1
   local core=require 'core'
   local cmd=require 'core.command'
@@ -133,8 +133,8 @@ local original=cooloo.frame
 local focused=false
 system.window_has_focus=function()return focused end
 local frames,marked=0,false
-function cooloo.frame(events,dt)
-  local draws=original(events,dt);frames=frames+1
+function cooloo.frame(events,dt,frame_start)
+  local draws=original(events,dt,frame_start);frames=frames+1
   local r=chat.current()
   if r and r.phase=='following' and r.read_state and not r.loading_state then
     if phase=='background' then
@@ -167,9 +167,9 @@ local original=cooloo.frame
 local frames=0
 for i=1,32 do assert(cooloo.cache_async.submit('read',cache_server,cache_self,cache_self,math.maxinteger,200)) end
 assert(not cooloo.cache_async.submit('read',cache_server,cache_self,cache_self,math.maxinteger,200))
-function cooloo.frame(events,dt)
+function cooloo.frame(events,dt,frame_start)
   local before=cooloo.time()
-  local draws=original(events,dt)
+  local draws=original(events,dt,frame_start)
   assert(cooloo.time()-before<0.5,'cache blocked UI')
   frames=frames+1
   if frames==40 then print('LOCKED_CACHE_UI_ALIVE');cooloo.quit() end
@@ -190,9 +190,9 @@ end
             f.write('''
 local original=cooloo.frame
 local frames,requested=0,false
-function cooloo.frame(events,dt)
+function cooloo.frame(events,dt,frame_start)
   local before=cooloo.time()
-  local draws=original(events,dt)
+  local draws=original(events,dt,frame_start)
   assert(cooloo.time()-before<0.5,'large history blocked UI')
   frames=frames+1
   local r=chat.current()
@@ -221,8 +221,8 @@ local who,ok=cooloo.request("whoami");assert(ok==0,who)
             f.write('''
 local original=cooloo.frame
 local frames=0
-function cooloo.frame(events,dt)
-  local draws=original(events,dt);frames=frames+1
+function cooloo.frame(events,dt,frame_start)
+  local draws=original(events,dt,frame_start);frames=frames+1
   if chat.status:find('cache read failure',1,true) then
     assert(#chat.current().buf==0);print('CACHE_FAILED_CLOSED');cooloo.quit()
   end
