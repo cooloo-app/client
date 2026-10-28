@@ -17,9 +17,17 @@ local function tabularize_lines(lines, delim)
   local cols = {}
 
   -- split lines at delimiters and get maximum width of columns
-  local ptn = "[^" .. delim:sub(1,1):gsub("%W", "%%%1") .. "]+"
   for i, line in ipairs(lines) do
-    rows[i] = gmatch_to_array(line, ptn)
+    rows[i] = {}
+    local start = 1
+    while true do
+      local first, last = line:find(delim, start, true)
+      local field = line:sub(start, first and first - 1 or #line)
+      -- Preserve the existing nonempty-field formatting semantics.
+      if field ~= "" then table.insert(rows[i], field) end
+      if not first then break end
+      start = last + 1
+    end
     for j, col in ipairs(rows[i]) do
       cols[j] = math.max(#col, cols[j] or 0)
     end

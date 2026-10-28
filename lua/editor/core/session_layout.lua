@@ -33,7 +33,7 @@ function M.restore(root,layout,path,open)
   local function valid(t,depth)
     if type(t)~='table' or depth>8 then return false end
     if t.type=='split' then
-      return (t.axis=='x' or t.axis=='y') and type(t.ratio)=='number' and t.ratio>=0.05 and t.ratio<=0.95
+      return (t.axis=='x' or t.axis=='y') and type(t.ratio)=='number' and t.ratio>=0.01 and t.ratio<=0.99
         and valid(t.a,depth+1) and valid(t.b,depth+1)
     end
     if t.type~='leaf' or type(t.tabs)~='table' then return false end

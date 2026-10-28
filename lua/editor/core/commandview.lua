@@ -80,6 +80,9 @@ end
 
 
 function CommandView:move_suggestion_idx(dir)
+  if self.last_change_id ~= self.doc:get_change_id() then
+    self:update_suggestions()
+  end
   local n = self.suggestion_idx + dir
   self.suggestion_idx = common.clamp(n, 1, #self.suggestions)
   self:complete()
@@ -95,6 +98,9 @@ end
 
 
 function CommandView:submit()
+  if self.last_change_id ~= self.doc:get_change_id() then
+    self:update_suggestions()
+  end
   local suggestion = self.suggestions[self.suggestion_idx]
   local text = self:get_text()
   local submit = self.state.submit
@@ -155,6 +161,7 @@ function CommandView:update_suggestions()
   end
   self.suggestions = res
   self.suggestion_idx = 1
+  self.last_change_id = self.doc:get_change_id()
 end
 
 

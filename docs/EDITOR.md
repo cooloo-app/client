@@ -163,6 +163,24 @@ actual process restart with Unicode file paths, split/focus, explicit arguments,
 missing resources and future/corrupt snapshots; desktop HiDPI/visual behavior
 still needs platform acceptance.
 
+## Word boundaries and formatting
+
+Word navigation, selection (including double-click), word deletion and completion
+prefixes advance on complete UTF-8 scalars. `config.non_word_chars` is a literal
+set of separator characters; defaults include common Chinese/fullwidth punctuation
+and ideographic space as well as ASCII punctuation. Adjacent Chinese characters
+remain one word: this is delimiter navigation, not Chinese lexical segmentation
+or full Unicode word breaking. User overrides replace the default separator set.
+Invalid UTF-8 bytes remain independently navigable and are not matched against
+bytes inside multibyte separators.
+
+Reflow recognizes only ASCII indentation/comment prefix markers, so non-ASCII
+body text is not stripped as a prefix. It still uses the inherited byte-based
+wrapping width, not full Unicode typography. Tabularize splits on the entire
+literal delimiter (including multibyte/multicharacter strings); its existing
+nonempty-field and byte-width alignment semantics remain unchanged, so it is not
+a CSV-preserving formatter.
+
 ## Saving and edit state
 
 Text history uses distinct version identities across undo branches. Undo/redo can
@@ -233,6 +251,8 @@ python3 tests/lifecycle_test.py ./cooloo-text
 python3 tests/adversarial_test.py ./cooloo-text ./build/renderer-test-macos
 python3 tests/round2_test.py ./cooloo-text
 python3 tests/round3_test.py ./cooloo-text
+python3 tests/review_round1_test.py ./cooloo-text
+python3 tests/review_round2_test.py ./cooloo-text
 make build/file-write-test
 fixture=$(mktemp -d)
 build/file-write-test "$fixture/file.txt"

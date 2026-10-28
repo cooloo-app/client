@@ -88,11 +88,13 @@ local partial = ""
 local suggestions_idx = 1
 local suggestions = {}
 local last_line, last_col
+local suggestion_view, suggestion_change_id
 
 
 local function reset_suggestions()
   suggestions_idx = 1
   suggestions = {}
+  suggestion_view, suggestion_change_id = nil, nil
 end
 
 
@@ -140,6 +142,18 @@ local function get_active_view()
   if getmetatable(core.active_view) == DocView then
     return core.active_view
   end
+end
+
+
+local function suggestions_valid()
+  local av = get_active_view()
+  if not av or av ~= suggestion_view
+    or av.doc:get_change_id() ~= suggestion_change_id then
+    return false
+  end
+  local line, col = av.doc:get_selection()
+  return line == last_line and col == last_col
+    and not av.doc:has_selection() and get_partial_symbol() == partial
 end
 
 
@@ -209,6 +223,7 @@ RootView.on_text_input = function(...)
     if #partial >= 3 then
       update_suggestions()
       last_line, last_col = av.doc:get_selection()
+      suggestion_view, suggestion_change_id = av, av.doc:get_change_id()
     else
       reset_suggestions()
     end
@@ -226,14 +241,7 @@ end
 RootView.update = function(...)
   update(...)
 
-  local av = get_active_view()
-  if av then
-    -- reset suggestions if caret was moved
-    local line, col = av.doc:get_selection()
-    if line ~= last_line or col ~= last_col then
-      reset_suggestions()
-    end
-  end
+  if not suggestions_valid() then reset_suggestions() end
 end
 
 
@@ -249,6 +257,7 @@ end
 
 
 local function predicate()
+  if not suggestions_valid() then reset_suggestions() end
   return get_active_view() and suggestions[suggestions_idx] ~= nil
 end
 

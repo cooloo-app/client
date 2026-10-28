@@ -7,6 +7,8 @@ local translate = {}
 
 
 local function is_non_word(char)
+  -- Never match a retained invalid byte inside a configured UTF-8 scalar.
+  if #char == 1 and char:byte() >= 0x80 then return false end
   return config.non_word_chars:find(char, nil, true)
 end
 
@@ -43,11 +45,18 @@ function translate.next_char(doc, line, col)
 end
 
 
+local function word_char(doc, line, col)
+  line, col = doc:sanitize_position(line, col)
+  local text = doc.lines[line]
+  return text:sub(col, col + char_size(text, col) - 1)
+end
+
+
 function translate.previous_word_start(doc, line, col)
   local prev
   while line > 1 or col > 1 do
-    local l, c = doc:position_offset(line, col, -1)
-    local char = doc:get_char(l, c)
+    local l, c = translate.previous_char(doc, line, col)
+    local char = word_char(doc, l, c)
     if prev and prev ~= char or not is_non_word(char) then
       break
     end
@@ -61,11 +70,11 @@ function translate.next_word_end(doc, line, col)
   local prev
   local end_line, end_col = translate.end_of_doc(doc, line, col)
   while line < end_line or col < end_col do
-    local char = doc:get_char(line, col)
+    local char = word_char(doc, line, col)
     if prev and prev ~= char or not is_non_word(char) then
       break
     end
-    line, col = doc:position_offset(line, col, 1)
+    line, col = translate.next_char(doc, line, col)
     prev = char
   end
   return translate.end_of_word(doc, line, col)
@@ -74,8 +83,8 @@ end
 
 function translate.start_of_word(doc, line, col)
   while true do
-    local line2, col2 = doc:position_offset(line, col, -1)
-    local char = doc:get_char(line2, col2)
+    local line2, col2 = translate.previous_char(doc, line, col)
+    local char = word_char(doc, line2, col2)
     if is_non_word(char)
     or line == line2 and col == col2 then
       break
@@ -88,8 +97,8 @@ end
 
 function translate.end_of_word(doc, line, col)
   while true do
-    local line2, col2 = doc:position_offset(line, col, 1)
-    local char = doc:get_char(line, col)
+    local line2, col2 = translate.next_char(doc, line, col)
+    local char = word_char(doc, line, col)
     if is_non_word(char)
     or line == line2 and col == col2 then
       break

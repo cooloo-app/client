@@ -27,7 +27,9 @@ command.add("core.docview", {
   ["reflow:reflow"] = function()
     local doc = core.active_view.doc
     doc:replace(function(text)
-      local prefix_set = "[^%w\n%[%](){}`'\"]*"
+      -- Only ASCII indentation/comment markers are formatting prefixes.
+      -- Non-ASCII bytes must never be discarded as punctuation.
+      local prefix_set = "[ \t/*#>%;%-]*"
 
       -- get line prefix and trailing whitespace
       local prefix1 = text:match("^\n*" .. prefix_set)
