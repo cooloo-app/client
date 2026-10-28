@@ -1,4 +1,4 @@
-# Protocol 3 client — v0.3.9 text workbench
+# Protocol 3 client — v0.3.10 text workbench
 
 GUI products now share Lua-managed local JSON session persistence: window size
 (always centered), named-file/Chat tabs, splits and active panes; Workbench also
