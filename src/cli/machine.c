@@ -90,5 +90,5 @@ int machine_finish(int status)
 }
 void machine_version(void)
 {
-    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.10\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\",\"mirror\",\"message-uuid-v4\",\"idempotent-send\"]}");
+    puts("{\"schema\":1,\"type\":\"result\",\"binary_version\":\"0.3.11\",\"schema_versions\":[1],\"capabilities\":[\"json-output\",\"follow-offset\",\"no-cache\",\"sent\",\"delegation\",\"mirror\",\"message-uuid-v4\",\"idempotent-send\"]}");
 }
