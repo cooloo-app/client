@@ -466,7 +466,12 @@ function M.new()
     end
     if e.conn~=chat.ctrl and not chat.by_conn[e.conn] and not (chat.sent_conns or {})[e.conn] then return end
     if e.type=='net_ready' then chat.on_ready(e.conn,e.nick)
-    elseif e.type=='net_line' then chat.on_line(e.conn,e.line)
+    elseif e.type=='net_line' then
+      local sent=(chat.sent_conns or {})[e.conn]
+      chat.on_line(e.conn,e.line)
+      -- SENT completion closes locally, without a net_closed event. Retire
+      -- its health record here so idle polling cannot grow with past queries.
+      if sent and not (chat.sent_conns or {})[e.conn] then p.health[e.conn]=nil end
     elseif e.type=='net_closed' then
       p.trust[e.conn]=nil;p.blocked[e.conn]=nil;p.deferred[e.conn]=nil
       chat.on_closed(e.conn,e.reason)

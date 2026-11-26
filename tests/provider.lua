@@ -169,6 +169,25 @@ event('net_line',ctrl,'ROOM '..fresh..' new room');event('net_line',ctrl,'END')
 assert(chat.rooms[fresh] and chat.rooms[R].denied)
 assert(p:refresh_rooms());event('net_line',ctrl,'ROOM '..R..' renamed');event('net_line',ctrl,'END')
 assert(not chat.rooms[R].denied and chat.rooms[R].nickname=='renamed')
+-- Locally completed SENT streams emit no net_closed event. Their health
+-- records must be released immediately, without disturbing live connections.
+local function health_count()
+ local n=0;for _ in pairs(p.health)do n=n+1 end;return n
+end
+local health_before=health_count()
+local ctrl_health=p.health[ctrl]
+for i=1,100 do
+ local sent=cooloo.net.connect()
+ chat.sent_conns=chat.sent_conns or {}
+ chat.sent_conns[sent]={peer=B,room={buf={}}}
+ event('net_ready',sent)
+ assert(p.health[sent],'SENT readiness must register health')
+ event('net_line',sent,i%2==0 and 'END 0' or 'ERR forbidden test')
+ assert(not conns[sent] and not chat.sent_conns[sent])
+ assert(not p.health[sent],'completed SENT stream leaked health')
+ assert(health_count()==health_before,'SENT health records accumulated')
+ assert(p.health[ctrl]==ctrl_health,'live control health was removed')
+end
 -- Keep control and a synchronized room alive for over ten minutes.
 assert(p:subscribe(R));c=chat.rooms[R].conn;event('net_ready',c);complete(job_serial,{},0)
 event('net_line',c,'END')
